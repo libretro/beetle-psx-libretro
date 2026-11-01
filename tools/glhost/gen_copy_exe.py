@@ -11,7 +11,10 @@ written) and upwards, a same-row shift in both directions across 128-pixel
 chunks, source and destination wrapping in x and in y, the mask test, the
 forced mask bit, both together, and an overlapping masked copy. Then it
 loops copying all of VRAM to RAM at 0x100000 through GP0(C0h), so the
-host's RAM dump shows VRAM as the content reads it."""
+host's RAM dump shows VRAM as the content reads it.
+usage: gen_copy_exe.py out.exe [gp1loop]
+  gp1loop  the loop also sends the display start and mode again, unchanged,
+           as many games do every frame: the screen stays static"""
 import struct, sys
 BASE = 0xA0010000
 DEST = 0xA0100000
@@ -120,6 +123,9 @@ wait_ready()
 gp0(0xE6000000)
 
 loop = here()
+if 'gp1loop' in sys.argv[2:]:
+    gp1(0x05000000)                    # display start (0,0), unchanged
+    gp1(0x08000001)                    # 320x240 NTSC, unchanged
 wait_ready()
 gp0(0xC0000000); gp0(xy(0, 0)); gp0(xy(1024, 512))      # VRAM to CPU
 li32(T3, 0x08000000)                                     # GPUSTAT ready

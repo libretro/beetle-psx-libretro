@@ -5,6 +5,9 @@ name: Analog cable
 # the subcarrier), strict C89, ASan/UBSan and mingw-w64 under Wine. cables:
 # a reference scene through every cable tier on Vulkan (lavapipe) and
 # OpenGL (llvmpipe), which must keep black black and white white and agree.
+# static screen: unchanged display settings sent every frame leave Vulkan's
+# output as it was, and the composite carrier still moves on a still
+# picture (tools/vkhost/static_scanout.sh).
 
 on:
   push:
@@ -63,3 +66,5 @@ jobs:
         run: make -j"$(nproc)" HAVE_HW=1
       - name: Cable lanes
         run: sh tools/analog_trap/cable_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"
+      - name: Static screen scanout
+        run: sh tools/vkhost/static_scanout.sh "$PWD/mednafen_psx_hw_libretro.so"

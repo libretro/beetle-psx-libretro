@@ -6489,6 +6489,11 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          unsigned xstart,
          unsigned ystart)
    {
+      /* Games resend unchanged display settings every frame; only a change
+       * makes the cached scanout stale. */
+      if (xstart == self->render_state.display_fb_xstart &&
+          ystart == self->render_state.display_fb_ystart)
+         return;
       ih_reset(&self->last_scanout);
 
       self->render_state.display_fb_xstart = xstart;
@@ -6500,6 +6505,11 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          bool is_480i,
          WidthMode width_mode)
    {
+      if (mode == self->render_state.scanout_mode &&
+          is_pal == self->render_state.is_pal &&
+          is_480i == self->render_state.is_480i &&
+          width_mode == self->render_state.width_mode)
+         return;
       ih_reset(&self->last_scanout);
 
       self->render_state.scanout_mode = mode;
@@ -7751,6 +7761,24 @@ static void renderer_mipmap_framebuffer(Renderer *self)
    } }
 }
 
+/* VKHOST_CORE_DUMP, read once rather than per frame. */
+static bool renderer_core_dump(void)
+{
+   static int on = -1;
+   if (on < 0)
+      on = getenv("VKHOST_CORE_DUMP") ? 1 : 0;
+   return on != 0;
+}
+
+/* BEETLE_VK_DIAG, read once rather than per primitive. */
+static bool renderer_vk_diag(void)
+{
+   static int on = -1;
+   if (on < 0)
+      on = getenv("BEETLE_VK_DIAG") ? 1 : 0;
+   return on != 0;
+}
+
 static void renderer_ssaa_framebuffer(Renderer *self)
 {
    /* self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self); */
@@ -7760,18 +7788,8 @@ static void renderer_ssaa_framebuffer(Renderer *self)
    unsigned right = (rect->x + rect->width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
    unsigned bottom = (rect->y + rect->height + BLOCK_HEIGHT - 1) / BLOCK_HEIGHT;
 
-   /* Exact element count is known up front (block grid), so use a single
-    * malloc'd buffer filled by index rather than a growing array. */
-   unsigned resolves_count = (bottom > top && right > left) ? (bottom - top) * (right - left) : 0;
-   VkRect2D *resolves_ssaa = (VkRect2D *)malloc((resolves_count ? resolves_count : 1) * sizeof(VkRect2D));
-   unsigned resolves_n = 0;
-   { unsigned y; for (y = top; y < bottom; y++) { unsigned x; for (x = left; x < right; x++) {
-         VkRect2D r = {
-            { (int)(x * BLOCK_WIDTH % FB_WIDTH), (int)(y * BLOCK_HEIGHT % FB_HEIGHT) },
-            { BLOCK_WIDTH, BLOCK_HEIGHT }
-         };
-         resolves_ssaa[resolves_n++] = r;
-      } } }
+   unsigned cols = right > left ? right - left : 0;
+   unsigned size = (bottom > top && cols) ? (bottom - top) * cols : 0;
 
    renderer_ensure_command_buffer(self);
 
@@ -7790,19 +7808,26 @@ static void renderer_ssaa_framebuffer(Renderer *self)
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
 
    /* No push constants: the unscaled resolve takes its clamp bounds from
-    * textureSize() on the bound source view. */
-   { unsigned size = resolves_n;
+    * textureSize() on the bound source view. The block rects are written
+    * straight into the constant data, 1024 per dispatch. */
    { unsigned i; for (i = 0; i < size; i += 1024) {
-      void * ptr;
+      VkRect2D *ptr;
+      unsigned j;
       unsigned to_run = min_(size - i, 1024u);
 
-      ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
-      memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
+      ptr = (VkRect2D *)commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
+      for (j = 0; j < to_run; j++)
+      {
+         unsigned x = left + (i + j) % cols;
+         unsigned y = top + (i + j) / cols;
+         ptr[j].offset.x      = (int)(x * BLOCK_WIDTH % FB_WIDTH);
+         ptr[j].offset.y      = (int)(y * BLOCK_HEIGHT % FB_HEIGHT);
+         ptr[j].extent.width  = BLOCK_WIDTH;
+         ptr[j].extent.height = BLOCK_HEIGHT;
+      }
       commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
       commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
    } }
-   free(resolves_ssaa);
-   }
 }
 
 static TTRect renderer_compute_vram_framebuffer_rect(Renderer *self)
@@ -9145,7 +9170,9 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          ih_reset(&self->last_scanout);
       }
    }
-   if (ih_is_valid(&self->last_scanout))
+   /* The cable's carrier phase advances every field, so the analog chain
+    * encodes every field even when VRAM and the display are unchanged. */
+   if (ih_is_valid(&self->last_scanout) && !analog)
       return self->last_scanout;
 
    self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
@@ -10043,7 +10070,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       if (feedback)
       {
          param = (int16_t)(param | 0x800);
-         if (getenv("BEETLE_VK_DIAG"))
+         if (renderer_vk_diag())
          {
             static unsigned _fb_n;
             if (_fb_n < 8 || (_fb_n % 512) == 0)
@@ -23783,7 +23810,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer_flush(renderer);
 
    /* VKHOST_CORE_DUMP: readback through the core's own machinery. */
-   if (getenv("VKHOST_CORE_DUMP"))
+   if (renderer_core_dump())
    {
       static int dump_n;
       if (++dump_n == 100)
