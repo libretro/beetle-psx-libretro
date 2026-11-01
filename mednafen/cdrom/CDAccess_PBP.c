@@ -3212,14 +3212,12 @@ static int CDAccess_PBP_decompress2(struct CDAccess_PBP *self, void *out, uint32
 
 static bool CDAccess_PBP_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf, int32_t lba){
    struct CDAccess_PBP *self = (struct CDAccess_PBP *)base_self;
-   uint8_t SimuQ[0xC];
    int32_t block = lba >> 4;
 
    self->sector_in_blk = lba & 0xf;
 
    memset(buf + 2352, 0, 96);
    CDAccess_PBP_MakeSubPQ(self, lba, buf + 2352);
-   subq_deinterleave(buf + 2352, SimuQ);
 
    if (block != (int32_t)self->current_block)
    {

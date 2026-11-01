@@ -1,0 +1,55 @@
+name: Video CD savestate churn
+
+# Runahead and rollback netplay load a savestate every frame, and every load
+# runs the Video CD section. Decoders nothing has fed must survive the load
+# instead of being rebuilt (over 2 MiB a frame), while decoders that have
+# been fed must still be dropped so no stale reference picture crosses it.
+# tools/vcd/vcd_churn counts the heap allocations inside each load to check
+# both. Linux under ASan/UBSan, and mingw-w64 under Wine.
+
+on:
+  push:
+    paths:
+      - 'mednafen/psx/vcd.c'
+      - 'mednafen/psx/vcd.h'
+      - 'mednafen/state.c'
+      - 'libretro-common/formats/mpeg1/**'
+      - 'libretro-common/formats/mp3/**'
+      - 'tools/vcd/**'
+      - 'tools/harness_cflags.sh'
+      - '.github/workflows/vcd-state-churn.yml'
+  pull_request:
+    paths:
+      - 'mednafen/psx/vcd.c'
+      - 'mednafen/psx/vcd.h'
+      - 'mednafen/state.c'
+      - 'libretro-common/formats/mpeg1/**'
+      - 'libretro-common/formats/mp3/**'
+      - 'tools/vcd/**'
+      - 'tools/harness_cflags.sh'
+      - '.github/workflows/vcd-state-churn.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  churn:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      WRAP: -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux (ASan/UBSan)
+        run: |
+          OUT=/tmp/vcd_churn sh tools/vcd/build.sh vcd_churn $WRAP -fsanitize=address,undefined
+          /tmp/vcd_churn
+      - name: Install mingw-w64 and Wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 wine64 wine
+      - name: Windows (mingw-w64 under Wine)
+        run: |
+          CC=x86_64-w64-mingw32-gcc OUT=/tmp/vcd_churn.exe sh tools/vcd/build.sh vcd_churn $WRAP
+          WINEDEBUG=-all wine /tmp/vcd_churn.exe

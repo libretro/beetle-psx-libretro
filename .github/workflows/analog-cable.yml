@@ -1,0 +1,65 @@
+name: Analog cable
+
+# The analog video chain on both hardware renderers. trap: the chroma trap
+# coefficients both backends share (stable poles, 0 dB at DC, the notch on
+# the subcarrier), strict C89, ASan/UBSan and mingw-w64 under Wine. cables:
+# a reference scene through every cable tier on Vulkan (lavapipe) and
+# OpenGL (llvmpipe), which must keep black black and white white and agree.
+
+on:
+  push:
+    paths:
+      - 'rhi/**'
+      - 'libretro.c'
+      - 'Makefile*'
+      - 'tools/analog_trap/**'
+      - 'tools/hdr_post/gen_post_exe.py'
+      - 'tools/vkhost/**'
+      - 'tools/glhost/**'
+      - '.github/workflows/analog-cable.yml'
+  pull_request:
+    paths:
+      - 'rhi/**'
+      - 'libretro.c'
+      - 'Makefile*'
+      - 'tools/analog_trap/**'
+      - 'tools/hdr_post/gen_post_exe.py'
+      - 'tools/vkhost/**'
+      - 'tools/glhost/**'
+      - '.github/workflows/analog-cable.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux, C89 and ASan/UBSan
+        run: tools/analog_trap/run.sh
+      - name: Install mingw-w64 and Wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 wine64 wine
+      - name: Windows (mingw-w64 under Wine)
+        run: CC=x86_64-w64-mingw32-gcc WINEDEBUG=-all RUN=wine tools/analog_trap/run.sh
+
+  cables:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan and GL (lavapipe, llvmpipe, validation layer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libvulkan-dev mesa-vulkan-drivers \
+            vulkan-validationlayers libgl1-mesa-dev libegl1-mesa-dev \
+            libgl1-mesa-dri python3
+      - name: Build the core
+        run: make -j"$(nproc)" HAVE_HW=1
+      - name: Cable lanes
+        run: sh tools/analog_trap/cable_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"

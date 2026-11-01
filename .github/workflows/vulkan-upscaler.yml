@@ -1,0 +1,58 @@
+name: Vulkan temporal upscaler
+
+# The Vulkan renderer's feed for a frontend temporal upscaler (DLSS, FSR,
+# XeSS through RETRO_ENVIRONMENT_GET_HW_RENDER_UPSCALER_INTERFACE): the
+# frame drawn at the factor the request fits, jittered along Halton
+# (2, 3), with motion vectors from the primitives matched across frames,
+# painter's-order depth (PGXP's where a primitive has it) and the
+# transparency mask. vkhost offers the interface on lavapipe with the
+# validation layer over a scene that moves polygons, a sprite and a
+# GTE-projected triangle with PGXP on and off, and check.py reads the
+# dumps back. The geometry module's unit test runs as strict C89 under
+# ASan/UBSan, and as a mingw-w64 build under Wine.
+
+on:
+  push:
+    paths:
+      - 'rhi/**'
+      - 'tools/vkhost/**'
+      - 'tools/upscaler/**'
+      - 'libretro.c'
+      - 'Makefile*'
+      - '.github/workflows/vulkan-upscaler.yml'
+  pull_request:
+    paths:
+      - 'rhi/**'
+      - 'tools/vkhost/**'
+      - 'tools/upscaler/**'
+      - 'libretro.c'
+      - 'Makefile*'
+      - '.github/workflows/vulkan-upscaler.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upscaler:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan (lavapipe, validation layer), mingw-w64 and Wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libvulkan-dev mesa-vulkan-drivers \
+            vulkan-validationlayers libgl1-mesa-dev python3 \
+            gcc-mingw-w64-x86-64 wine64 wine
+      - name: Geometry unit test, C89 and ASan/UBSan
+        run: sh tools/upscaler/run.sh
+      - name: Geometry unit test, Windows (mingw-w64 under Wine)
+        run: CC=x86_64-w64-mingw32-gcc WINEDEBUG=-all RUN=wine sh tools/upscaler/run.sh
+      - name: Build the core
+        run: make -j"$(nproc)" HAVE_HW=1
+      - name: Build vkhost
+        run: make -C tools/vkhost
+      - name: Upscaler lanes
+        run: sh tools/upscaler/lanes.sh "$PWD/mednafen_psx_hw_libretro.so"

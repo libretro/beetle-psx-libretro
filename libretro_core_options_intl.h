@@ -765,7 +765,7 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_AR,
@@ -2841,7 +2841,7 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_AST,
@@ -4917,7 +4917,7 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_BE,
@@ -6993,7 +6993,7 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_BG,
@@ -9069,7 +9069,7 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CA,
@@ -11145,7 +11145,7 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CHS,
@@ -13221,7 +13221,7 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CHT,
@@ -15297,7 +15297,7 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CS,
@@ -17373,7 +17373,7 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_CY,
@@ -19449,7 +19449,7 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_DA,
@@ -21525,7 +21525,7 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_DE,
@@ -23601,7 +23601,7 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_EL,
@@ -25677,7 +25677,7 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_EN,
@@ -27753,7 +27753,7 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_EO,
@@ -29829,7 +29829,7 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_ES,
@@ -31905,7 +31905,7 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_FA,
@@ -33981,7 +33981,7 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_FI,
@@ -36057,7 +36057,7 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_FR,
@@ -38133,7 +38133,7 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_GA,
@@ -40209,7 +40209,7 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_GL,
@@ -42285,7 +42285,7 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_HE,
@@ -44361,7 +44361,7 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_HR,
@@ -46437,7 +46437,7 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_HU,
@@ -48513,7 +48513,7 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_ID,
@@ -50589,7 +50589,7 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_IT,
@@ -52665,7 +52665,7 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_JA,
@@ -54741,7 +54741,7 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_KO,
@@ -56817,7 +56817,7 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_NL,
@@ -58893,7 +58893,7 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_NO,
@@ -60969,7 +60969,7 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_OR,
@@ -63045,7 +63045,7 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_PL,
@@ -65121,7 +65121,7 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_PT_BR,
@@ -67197,7 +67197,7 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_PT_PT,
@@ -69273,7 +69273,7 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_RU,
@@ -71349,7 +71349,7 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_SK,
@@ -73425,7 +73425,7 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_SR,
@@ -75501,7 +75501,7 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_SV,
@@ -77578,7 +77578,7 @@ struct retro_core_option_v2_definition option_defs_th[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_TH,
@@ -79655,7 +79655,7 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_TR,
@@ -81731,7 +81731,7 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_TT,
@@ -83807,7 +83807,7 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_UK,
@@ -85883,7 +85883,7 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_VAL,
@@ -87959,7 +87959,7 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       BEETLE_OPT_SCALED_UV_OFFSET_LABEL_VN,

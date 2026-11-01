@@ -19,6 +19,7 @@
 #include <retro_inline.h>
 #include <math.h>
 #include "rhi_tt.h"
+#include "rhi_upscaler.h"
 
 /* Force-inline shim for converted accessors. Must resolve to a real
  * always-inline so that the small accessor free functions retain identical
@@ -58,6 +59,10 @@ extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;  /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;    /* 0 = off, 1 = S-Video, 2 = composite, 3 = RF, 4 = RGB */
+extern uint16_t psx_hdr_panel_xy[8];
+
+#include "hdr_transform.h"
+#include "analog_trap.h"
 
 /* psx_hdr_to_panel as a std430 mat3: three columns, each padded to a vec4. */
 static void hdr_push_panel(float dst[12])
@@ -117,6 +122,8 @@ extern PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
 extern PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
 extern PFN_vkCmdDispatch vkCmdDispatch;
 extern PFN_vkCmdDraw vkCmdDraw;
+extern PFN_vkCmdDrawIndexed vkCmdDrawIndexed;
+extern PFN_vkCmdBindIndexBuffer vkCmdBindIndexBuffer;
 extern PFN_vkCmdEndRenderPass vkCmdEndRenderPass;
 extern PFN_vkCmdNextSubpass vkCmdNextSubpass;
 extern PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
@@ -274,6 +281,8 @@ static void volkGenLoadDevice(void* context,
    vkCmdCopyImageToBuffer = (PFN_vkCmdCopyImageToBuffer)load(context, "vkCmdCopyImageToBuffer");
    vkCmdDispatch = (PFN_vkCmdDispatch)load(context, "vkCmdDispatch");
    vkCmdDraw = (PFN_vkCmdDraw)load(context, "vkCmdDraw");
+   vkCmdDrawIndexed = (PFN_vkCmdDrawIndexed)load(context, "vkCmdDrawIndexed");
+   vkCmdBindIndexBuffer = (PFN_vkCmdBindIndexBuffer)load(context, "vkCmdBindIndexBuffer");
    vkCmdEndRenderPass = (PFN_vkCmdEndRenderPass)load(context, "vkCmdEndRenderPass");
    vkCmdNextSubpass = (PFN_vkCmdNextSubpass)load(context, "vkCmdNextSubpass");
    vkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)load(context, "vkCmdPipelineBarrier");
@@ -376,6 +385,8 @@ PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
 PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
 PFN_vkCmdDispatch vkCmdDispatch;
 PFN_vkCmdDraw vkCmdDraw;
+PFN_vkCmdDrawIndexed vkCmdDrawIndexed;
+PFN_vkCmdBindIndexBuffer vkCmdBindIndexBuffer;
 PFN_vkCmdEndRenderPass vkCmdEndRenderPass;
 PFN_vkCmdNextSubpass vkCmdNextSubpass;
 PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
@@ -478,6 +489,11 @@ PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 #include <streams/file_stream.h>
 #include <encodings/crc32.h>
 #include <file/file_path.h>
+#ifdef HAVE_THREADS
+#include <rthreads/rthreads.h>
+#include <retro_spsc.h>
+#include <retro_waitable_spsc.h>
+#endif
 #include <compat/strl.h>
 
 /* C89-compatible compile-time assertion. C89 has no static_assert /
@@ -1712,6 +1728,10 @@ static size_t tfl_get_layer_size(const struct TextureFormatLayout *self,
    {
       return self->mips[mip].block_image_height * tfl_get_row_size(self, mip);
    }
+static void tfl_set_2d(struct TextureFormatLayout *self, VkFormat format,
+      uint32_t width, uint32_t height, uint32_t array_layers, uint32_t mip_levels);
+static void tfl_build_buffer_image_copies(const struct TextureFormatLayout *self,
+      VkBufferImageCopy *copies, unsigned *num_copies);
 static const TextureFormatLayoutMipInfo *tfl_get_mip_info(const struct TextureFormatLayout *self,
       uint32_t mip)
    {
@@ -4336,6 +4356,12 @@ static void command_pool_signal_submitted(CommandPool *self,
          unsigned set,
          unsigned binding,
          const ImageView *view);
+   static void commandbuffer_set_storage_buffer(struct CommandBuffer *self,
+         unsigned set,
+         unsigned binding,
+         const Buffer *buffer,
+         VkDeviceSize offset,
+         VkDeviceSize range);
    static void commandbuffer_set_uniform_buffer(struct CommandBuffer *self,
          unsigned set,
          unsigned binding,
@@ -4351,6 +4377,8 @@ static void command_pool_signal_submitted(CommandPool *self,
          VkDeviceSize size,
          VkDeviceSize stride,
          VkVertexInputRate step_rate);
+   static uint32_t *commandbuffer_allocate_index_data(struct CommandBuffer *self,
+         uint32_t count);
 
    /* Group D: state-setter free functions. The SET_STATIC_STATE /
     * SET_POTENTIALLY_STATIC_STATE macros are redefined to operate on self. */
@@ -4399,6 +4427,9 @@ static void command_pool_signal_submitted(CommandPool *self,
          uint32_t instance_count,
          uint32_t first_vertex,
          uint32_t first_instance);
+   static void commandbuffer_draw_indexed(struct CommandBuffer *self,
+         uint32_t index_count,
+         uint32_t first_index);
    static void commandbuffer_dispatch(struct CommandBuffer *self,
          uint32_t groups_x,
          uint32_t groups_y,
@@ -4709,6 +4740,11 @@ static void cbh_move(struct CommandBufferHandle *dst,
    {
       SemaphoreHandleVec wait_semaphores;
       VkPipelineStageVec wait_stages;
+      /* The fence of the latest submit on the queue, when that submit was
+       * not asked for one: it signals once everything submitted to the
+       * queue so far has completed, so it can serve as the frame's fence
+       * without a submit of its own. */
+      VkFence tail_fence;
       bool need_fence;
    };
    typedef struct QueueData QueueData;
@@ -4768,6 +4804,11 @@ static void cbh_move(struct CommandBufferHandle *dst,
          size_t   pipeline_cache_saved_size;
          unsigned pipeline_cache_dirty;
          unsigned pipeline_cache_quiet_frames;
+#ifdef HAVE_THREADS
+         /* The pipeline warm-up thread and the pipeline list: see
+          * device_warm_start. */
+         struct PipelineWarm *warm;
+#endif
 
          uint64_t cookie;
 
@@ -5467,6 +5508,8 @@ static struct PrimitiveInfo primitive_info_make(
       bool scaled_read;
       unsigned shift;
       bool offset_uv;
+      /* The triangle in the queue's vertices; not part of the state */
+      unsigned triangle_index;
    };
    POD_VEC_DECLARE(SemiTransparentStateVec, SemiTransparentState);
 
@@ -5755,19 +5798,20 @@ static void render_state_init(struct RenderState *s)
  * backing storage is freed in ~Renderer (already explicit). */
 struct OpaqueQueue
 {
+   /* Every queued primitive's vertices, once, in the order pushed; the
+    * queues below refer to them by triangle and draw them indexed. */
+   BufferVertexVec vertices;
+
    /* Non-textured primitives. */
-   BufferVertexVec opaque;
    PrimitiveInfoVec opaque_scissor;
 
    /* Textured primitives, no semi-transparency. */
-   BufferVertexVec opaque_textured;
    PrimitiveInfoVec opaque_textured_scissor;
 
    /* Textured primitives, semi-transparency enabled. */
-   BufferVertexVec semi_transparent_opaque;
    PrimitiveInfoVec semi_transparent_opaque_scissor;
 
-   BufferVertexVec semi_transparent;
+   /* Blended in order: one per triangle */
    SemiTransparentStateVec semi_transparent_state;
 
    Rect2DVec scaled_resolves;
@@ -5789,13 +5833,10 @@ static void opaque_queue_init(struct OpaqueQueue *q)
    /* Each POD_VEC's empty state is { items=NULL, count=0, cap=0 }; the macro
     * provides no _init, so zero the three fields directly. */
 #define OQ_VEC_ZERO(v) do { (v).items = NULL; (v).count = 0; (v).cap = 0; } while (0)
-   OQ_VEC_ZERO(q->opaque);
+   OQ_VEC_ZERO(q->vertices);
    OQ_VEC_ZERO(q->opaque_scissor);
-   OQ_VEC_ZERO(q->opaque_textured);
    OQ_VEC_ZERO(q->opaque_textured_scissor);
-   OQ_VEC_ZERO(q->semi_transparent_opaque);
    OQ_VEC_ZERO(q->semi_transparent_opaque_scissor);
-   OQ_VEC_ZERO(q->semi_transparent);
    OQ_VEC_ZERO(q->semi_transparent_state);
    OQ_VEC_ZERO(q->scaled_resolves);
    OQ_VEC_ZERO(q->unscaled_resolves);
@@ -5880,6 +5921,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       /* Display programs use slot 0 independently of primitive/resolve
        * programs; reflected masks keep the pipeline keys separate. */
       SpecConstIndex_ColorMode = 0,
+      /* HDR display programs only (hdr.h HDR_LINEAR_OUT): write scene-linear
+       * light for the post effects instead of encoding. Aliases FilterMode,
+       * which only the primitive programs reflect. */
+      SpecConstIndex_HdrLinearOut = 1,
       /* Feedback (programmable blend) shaders only. Aliases ResolveEotf the
        * same way Samples aliases TransMode: the resolve/display programs and
        * the primitive feedback programs never share a pipeline, and the
@@ -5910,6 +5955,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       TextureTrackerSaveState *tracker_state;
    };
    typedef struct SaveState SaveState;
+   enum { RENDERER_UPLOAD_RINGS = 8 };
+   enum { RENDERER_IMAGE_CACHE = 32 };
    struct Renderer
    {
          /* batch-7 out-of-line methods -> free functions. */
@@ -5952,6 +5999,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          /* Cached, device-probed format for the HDR scanout image (lazily
           * filled on first HDR frame). VK_FORMAT_UNDEFINED = not yet probed. */
          VkFormat hdr_scanout_format;
+         /* 0 until probed: whether B10G11R11_UFLOAT can be a blended,
+          * filtered render target (1) or not (-1). */
+         int post_compact_supported;
          /* Colour format of the scaled framebuffer. R8G8B8A8_UNORM normally;
           * R16G16B16A16_SFLOAT when a 30-bit/HDR format was requested and the
           * device supports it for every scaled-fb usage (probed at init), so
@@ -5974,6 +6024,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    uint32_t vram_gpu_written[VRAM_PROV_WORDS];
          bool texture_tracking_enabled;
          TextureTracker *tracker;
+         bool hd_staging_uncached; /* no cached host memory for HD upload memory */
 
          CommandBufferHandle cmd;
 
@@ -5985,8 +6036,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          {
             Program *copy_to_vram;
             Program *copy_to_vram_masked;
+            Program *readback_pack;
             Program *unscaled_quad_blitter;
             Program *scaled_quad_blitter;
+            Program *upscaler_motion;
             Program *bpp24_quad_blitter;
             Program *bpp24_yuv_quad_blitter;
             /* HDR10 (PQ Rec.2020) counterparts of the display quad blitters,
@@ -6050,6 +6103,13 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *analog_notch_pal;
             Program *analog_resolve;       /* region-independent: box + encode only */
             Program *analog_resolve_hdr;
+            /* HDR post effects (hdr_bloom.frag, hdr_post.frag). */
+            Program *hdr_bloom_bright;
+            Program *hdr_bloom_blur;
+            Program *hdr_bloom_down;
+            Program *hdr_bloom_down_karis;
+            Program *hdr_bloom_up;
+            Program *hdr_post;
             Program *mipmap_energy_first;
             Program *mipmap_energy;
             Program *mipmap_energy_blur;
@@ -6071,7 +6131,22 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
          ImageHandle last_scanout;
+         /* What last_scanout was encoded with besides VRAM; see
+          * renderer_output_key. */
+         struct RendererOutputKey
+         {
+            float    paper_white_nits, max_nits, black_pq, phase_error;
+            float    to_panel[9];
+            int32_t  hdr_active, scrgb, expand_gamut, shoulder, sdr_eotf;
+            int32_t  src_primaries, video_cable, black_setup;
+            uint32_t dt_serial;
+         } output_key;
          ImageHandle reuseable_scanout;
+         /* The frontend's temporal upscaler (rhi_upscaler.h): what keeps
+          * the frame's primitives, and the jitter they are drawn with, in
+          * native pixels */
+         psx_upscaler_t *upscaler;
+         float upscaler_jitter_x, upscaler_jitter_y;
          /* Analog path intermediates. sig holds the modulated signal at the
           * CRTC base clock, sep the separated luma/chroma; both are RG16F and
           * bipolar (composite swings negative and the comb produces negative
@@ -6084,6 +6159,20 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          ImageHandle analog_dec;   /* decoded (luma,C1,C2) at base rate */
          ImageHandle analog_rgb;   /* after the chroma trap, RGB at base rate */
          ImageHandle analog_out;
+         /* Display Transform tables (hdr_transform.c) and their stand-in. */
+         ImageHandle dt_aces2_lut;
+         ImageHandle dt_aces2_cube;
+         ImageHandle dt_dummy_3d;
+         ImageHandle dt_film_lut;
+         ImageHandle dt_film_desat;
+         ImageHandle dt_dummy;
+         unsigned    dt_generation;
+         /* HDR post effects: the two bloom bands' ping-pong pairs ([0,1] at
+          * quarter size, [2,3] at a sixteenth), the convolution pyramid, and
+          * the encoded result. Recreated per frame like the analog chain's. */
+         ImageHandle post_bloom[4];
+         ImageHandle post_conv[HDR_POST_CONV_MAX];
+         ImageHandle post_out;
          /* Running subcarrier phase, in cycles, kept in [0,1).
           *
           * Advanced once per field by the field's *total* line count times the
@@ -6104,6 +6193,32 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
          BufferHandle quad;
+         /* Staging for synchronous VRAM readbacks, sized for the whole
+          * framebuffer and kept: each read waits on its fence before the
+          * next can reuse it, and creating one per FBRead allocated device
+          * memory on the hot path. */
+         BufferHandle readback;
+         /* CPU->VRAM upload staging: one persistent texel buffer and view
+          * per frame context, sub-allocated linearly. A frame context is
+          * reused only after device_next_frame_context waited on its
+          * fences, so a slot's space is free again once its serial is
+          * stale. Uploads that do not fit take a buffer of their own. */
+         struct UploadRing
+         {
+            BufferHandle     buf;
+            BufferViewHandle view;
+            VkDeviceSize     size;
+            VkDeviceSize     used;
+            unsigned         serial;
+         } upload_ring[RENDERER_UPLOAD_RINGS];
+         unsigned upload_serial;
+         /* Per-frame images (scanout, the analog chain's and the HDR post
+          * effects' intermediates) kept for reuse, so the display path stops
+          * creating images, memory and views every frame. An image only this
+          * cache references is free: the member that last held it moved on,
+          * and the frontend's per-sync-index handle is dropped once that
+          * index comes round again. Sized for two frames of intermediates. */
+         ImageHandle image_cache[RENDERER_IMAGE_CACHE];
    };
 
    /* SaveState lifecycle free functions (SaveState is a plain struct). vram is
@@ -6142,7 +6257,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
     * ones whose definitions appear later in the file. */
    static TTGpuBackend vk_tt_make_backend(Renderer *self);
    static void renderer_dispatch(Renderer *self,
-         const BufferVertexVec *vertices,
          PrimitiveInfoVec *scissors,
          bool textured);
    static void renderer_render_opaque_primitives(Renderer *self);
@@ -6165,6 +6279,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
    static ImageHandle renderer_scanout_to_texture(Renderer *self);
    static VkFormat renderer_hdr_scanout_format(Renderer *self);
+   static VkFormat renderer_post_format(Renderer *self);
+   static void renderer_take_image(Renderer *self, ImageHandle *dst,
+         const ImageCreateInfo *info);
    static bool renderer_analog_active(Renderer *self);
    static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsigned native_h,
                                             unsigned out_w, unsigned out_h);
@@ -6236,9 +6353,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
 
    static void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
-      BufferVertexVec *vertices = &self->queue.semi_transparent_opaque;
       PrimitiveInfoVec *scissors = &self->queue.semi_transparent_opaque_scissor;
-      if (BufferVertexVec_empty(vertices))
+      if (PrimitiveInfoVec_empty(scissors))
          return;
 
       commandbuffer_set_opaque_state(cbh_get(&self->cmd));
@@ -6252,13 +6368,12 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-      renderer_dispatch(self, vertices, scissors, true);
+      renderer_dispatch(self, scissors, true);
    }
 
    static void renderer_render_opaque_texture_primitives(Renderer *self){
-      BufferVertexVec *vertices = &self->queue.opaque_textured;
       PrimitiveInfoVec *scissors = &self->queue.opaque_textured_scissor;
-      if (BufferVertexVec_empty(vertices))
+      if (PrimitiveInfoVec_empty(scissors))
          return;
 
       commandbuffer_set_opaque_state(cbh_get(&self->cmd));
@@ -6272,7 +6387,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-      renderer_dispatch(self, vertices, scissors, true);
+      renderer_dispatch(self, scissors, true);
    }
 
 
@@ -6424,6 +6539,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          int x1,
          int x2)
    {
+      /* The scanout is cut to the range; games rewrite an unchanged one
+       * every frame, which must not cost the cached scanout */
+      if (self->render_state.horiz_start != x1 || self->render_state.horiz_end != x2)
+         ih_reset(&self->last_scanout);
       self->render_state.horiz_start = x1;
       self->render_state.horiz_end = x2;
    }
@@ -6431,6 +6550,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          int y1,
          int y2)
    {
+      if (self->render_state.vert_start != y1 || self->render_state.vert_end != y2)
+         ih_reset(&self->last_scanout);
       self->render_state.vert_start = y1;
       self->render_state.vert_end = y2;
    }
@@ -6449,6 +6570,12 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
    static const uint32_t quad_vert[] =
 #include "shaders_vulkan/prebuilt/quad.vert.inc"
+      ;
+   static const uint32_t upscaler_motion_vert[] =
+#include "shaders_vulkan/prebuilt/upscaler_motion.vert.inc"
+      ;
+   static const uint32_t upscaler_motion_frag[] =
+#include "shaders_vulkan/prebuilt/upscaler_motion.frag.inc"
       ;
    static const uint32_t scaled_quad_frag[] =
 #include "shaders_vulkan/prebuilt/scaled.quad.frag.inc"
@@ -6476,6 +6603,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       ;
    static const uint32_t copy_vram_comp[] =
 #include "shaders_vulkan/prebuilt/copy_vram.comp.inc"
+      ;
+   static const uint32_t readback_pack_comp[] =
+#include "shaders_vulkan/prebuilt/readback_pack.comp.inc"
       ;
    static const uint32_t copy_vram_masked_comp[] =
 #include "shaders_vulkan/prebuilt/copy_vram.masked.comp.inc"
@@ -6699,6 +6829,24 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t analog_resolve_hdr_frag[] =
 #include "shaders_vulkan/prebuilt/analog.resolve.hdr.frag.inc"
    ;
+   static const uint32_t hdr_bloom_bright_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.bright.frag.inc"
+   ;
+   static const uint32_t hdr_bloom_blur_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.blur.frag.inc"
+   ;
+   static const uint32_t hdr_bloom_down_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.down.frag.inc"
+   ;
+   static const uint32_t hdr_bloom_down_karis_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.down.karis.frag.inc"
+   ;
+   static const uint32_t hdr_bloom_up_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.up.frag.inc"
+   ;
+   static const uint32_t hdr_post_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.post.frag.inc"
+   ;
       ;
    static const uint32_t mipmap_energy_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.frag.inc"
@@ -6767,6 +6915,7 @@ static void renderer_init(Renderer *self,
    self->primitive_index = 0;
    self->render_pass_is_feedback = false;
    self->quad.data = NULL;
+   self->upscaler = psx_upscaler_new();
 
    /* ImageHandle is now a plain struct with no default member initializer;
     * null every handle member so conditional assignment and ~Renderer's
@@ -6791,6 +6940,7 @@ static void renderer_init(Renderer *self,
    self->reuseable_scanout.data       = NULL;
    fbatlas_init(&self->atlas);
    self->tracker = NULL; /* created below via texture_tracker_new once the GPU backend is up */
+   self->hd_staging_uncached = false;
    /* Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone. */
    if (self->scaling == 16 && self->msaa > 1)
    {
@@ -7142,6 +7292,9 @@ static void renderer_init_pipelines(Renderer *self)
 
    self->pipelines.scaled_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
+   self->pipelines.upscaler_motion =
+      device_request_program_graphics_code(self->device, upscaler_motion_vert, sizeof(upscaler_motion_vert),
+                                           upscaler_motion_frag, sizeof(upscaler_motion_frag));
    self->pipelines.bpp24_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
    self->pipelines.bpp24_yuv_quad_blitter =
@@ -7162,6 +7315,7 @@ static void renderer_init_pipelines(Renderer *self)
          reduce_cached_color_comp, sizeof(reduce_cached_color_comp));
    self->pipelines.copy_to_vram = device_request_program_compute_code(self->device, copy_vram_comp, sizeof(copy_vram_comp));
    self->pipelines.copy_to_vram_masked = device_request_program_compute_code(self->device, copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
+   self->pipelines.readback_pack = device_request_program_compute_code(self->device, readback_pack_comp, sizeof(readback_pack_comp));
 
    /* Select the 16F storage program twin when the scaled framebuffer is
     * R16F (see scaled_fb_format); the rgba8 program otherwise. One
@@ -7239,6 +7393,18 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_frag, sizeof(analog_resolve_frag));
    self->pipelines.analog_resolve_hdr =
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_hdr_frag, sizeof(analog_resolve_hdr_frag));
+   self->pipelines.hdr_bloom_bright =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_bright_frag, sizeof(hdr_bloom_bright_frag));
+   self->pipelines.hdr_bloom_blur =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_blur_frag, sizeof(hdr_bloom_blur_frag));
+   self->pipelines.hdr_bloom_down =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_down_frag, sizeof(hdr_bloom_down_frag));
+   self->pipelines.hdr_bloom_down_karis =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_down_karis_frag, sizeof(hdr_bloom_down_karis_frag));
+   self->pipelines.hdr_bloom_up =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_up_frag, sizeof(hdr_bloom_up_frag));
+   self->pipelines.hdr_post =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_post_frag, sizeof(hdr_post_frag));
 
    self->pipelines.mipmap_energy = device_request_program_graphics_code(self->device, mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
          mipmap_energy_frag, sizeof(mipmap_energy_frag));
@@ -7255,6 +7421,9 @@ static void renderer_set_draw_rect(Renderer *self, const TTRect *rect)
 {
    fbatlas_set_draw_rect(&self->atlas, rect);
    self->render_state.draw_rect = *rect;
+   if (rect->width && rect->height)
+      psx_upscaler_set_draw_area(self->upscaler, rect->x, rect->y,
+            rect->x + rect->width - 1, rect->y + rect->height - 1);
 
    { const VkRect2D *last = Rect2DVec_back(&self->queue.scissors);
    const int scaled_x = (int)(rect->x * self->scaling);
@@ -7314,155 +7483,176 @@ static TTRect renderer_compute_window_rect(Renderer *self,
    }
 }
 
-static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
-      const TTRect *rect,
-      uint16_t *vram)
+/* Synchronous GPU->CPU readback of one or more VRAM rects, all in one
+ * submission and one fence. A rect that wraps VRAM is split into up to four
+ * non-wrapping tiles in unscaled framebuffer space, so only the covered
+ * region is transferred rather than widening the read to the whole
+ * framebuffer. The rects must not overlap: their tiles share the staging
+ * buffer, which holds one whole framebuffer. */
+#define RENDERER_READBACK_TILES 32
+static void renderer_copy_vram_to_cpu_rects(Renderer *self,
+      const TTRect *rects, unsigned count, uint16_t *vram)
 {
-   BufferHandle     buffer;
-   BufferCreateInfo buffer_create_info;
-   Fence            fence;
-   /* Split the (possibly VRAM-wrapping) request into up to four
-    * non-wrapping tiles in unscaled framebuffer space.  Only the covered
-    * region is transferred GPU->CPU instead of widening a wrapping read to
-    * the whole framebuffer (FB_WIDTH*FB_HEIGHT*4 bytes) purely to line up
-    * the scatter indices.  The non-wrapping case collapses to a single tile
-    * identical to the previous fast path. */
-   uint32_t x0 = rect->x & (FB_WIDTH  - 1);
-   uint32_t y0 = rect->y & (FB_HEIGHT - 1);
-   uint32_t hx[2], hw[2];
-   uint32_t vy[2], vh[2];
-   int      nh = 1;
-   int      nv = 1;
-   uint32_t sum_w;
-   uint32_t sum_h;
+   BufferHandle *buffer = &self->readback;
+   Fence         fence;
+   uint32_t      tx[RENDERER_READBACK_TILES], ty[RENDERER_READBACK_TILES];
+   uint32_t      tw[RENDERER_READBACK_TILES], th[RENDERER_READBACK_TILES];
+   unsigned      tiles = 0, r, t;
 
-   if (rect->width >= FB_WIDTH)
+   for (r = 0; r < count; r++)
    {
-      hx[0] = 0;  hw[0] = FB_WIDTH;
-   }
-   else if (x0 + rect->width > FB_WIDTH)
-   {
-      nh    = 2;
-      hx[0] = x0; hw[0] = FB_WIDTH - x0;
-      hx[1] = 0;  hw[1] = rect->width - hw[0];
-   }
-   else
-   {
-      hx[0] = x0; hw[0] = rect->width;
-   }
+      const TTRect *rect = &rects[r];
+      uint32_t x0 = rect->x & (FB_WIDTH  - 1);
+      uint32_t y0 = rect->y & (FB_HEIGHT - 1);
+      uint32_t hx[2], hw[2];
+      uint32_t vy[2], vh[2];
+      int      nh = 1, nv = 1, i, j;
 
-   if (rect->height >= FB_HEIGHT)
-   {
-      vy[0] = 0;  vh[0] = FB_HEIGHT;
-   }
-   else if (y0 + rect->height > FB_HEIGHT)
-   {
-      nv    = 2;
-      vy[0] = y0; vh[0] = FB_HEIGHT - y0;
-      vy[1] = 0;  vh[1] = rect->height - vh[0];
-   }
-   else
-   {
-      vy[0] = y0; vh[0] = rect->height;
-   }
+      if (!rect->width || !rect->height)
+         continue;
 
-   sum_w = (nh == 2) ? (hw[0] + hw[1]) : hw[0];
-   sum_h = (nv == 2) ? (vh[0] + vh[1]) : vh[0];
-
-   /* Sync each tile's source region from the scaled domain - mirrors the old
-    * single full-rect fbatlas_read_transfer, but only over what we read. */
-   {
-      int i, j;
-      for (j = 0; j < nv; j++)
+      if (rect->width >= FB_WIDTH)
       {
+         hx[0] = 0;  hw[0] = FB_WIDTH;
+      }
+      else if (x0 + rect->width > FB_WIDTH)
+      {
+         nh    = 2;
+         hx[0] = x0; hw[0] = FB_WIDTH - x0;
+         hx[1] = 0;  hw[1] = rect->width - hw[0];
+      }
+      else
+      {
+         hx[0] = x0; hw[0] = rect->width;
+      }
+
+      if (rect->height >= FB_HEIGHT)
+      {
+         vy[0] = 0;  vh[0] = FB_HEIGHT;
+      }
+      else if (y0 + rect->height > FB_HEIGHT)
+      {
+         nv    = 2;
+         vy[0] = y0; vh[0] = FB_HEIGHT - y0;
+         vy[1] = 0;  vh[1] = rect->height - vh[0];
+      }
+      else
+      {
+         vy[0] = y0; vh[0] = rect->height;
+      }
+
+      for (j = 0; j < nv; j++)
          for (i = 0; i < nh; i++)
          {
-            TTRect tr;
-            tr.x     = hx[i]; tr.y      = vy[j];
-            tr.width = hw[i]; tr.height = vh[j];
-            fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &tr);
+            if (tiles == RENDERER_READBACK_TILES)
+               break;
+            tx[tiles] = hx[i]; tw[tiles] = hw[i];
+            ty[tiles] = vy[j]; th[tiles] = vh[j];
+            tiles++;
          }
-      }
+   }
+   if (!tiles)
+      return;
+
+   /* Sync each tile's source region from the scaled domain - only over
+    * what we read. */
+   for (t = 0; t < tiles; t++)
+   {
+      TTRect tr;
+      tr.x     = tx[t]; tr.y      = ty[t];
+      tr.width = tw[t]; tr.height = th[t];
+      fbatlas_read_compute(&self->atlas, Domain_Unscaled, &tr);
    }
 
    renderer_ensure_command_buffer(self);
 
-   buffer_create_info.domain = BufferDomain_CachedHost;
-   buffer_create_info.size   = sum_w * sum_h * 4;
-   buffer_create_info.usage  = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-   buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
-
-   /* One copy per tile into a single tightly packed host buffer.  Still a
-    * single flush + single fence wait - no extra GPU round-trips. */
+   if (!bh_get(buffer))
    {
-      int         i, j;
-      VkDeviceSize byteoff = 0;
-      for (j = 0; j < nv; j++)
+      BufferCreateInfo info;
+      info.domain = BufferDomain_CachedHost;
+      info.size   = (VkDeviceSize)FB_WIDTH * FB_HEIGHT * 4;
+      info.usage  = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+      bh_move(buffer, device_create_buffer(self->device, &info, NULL));
+      if (!bh_get(buffer))
+         return;
+   }
+
+   /* Each tile is packed to 16-bit words on the GPU, two to a uint and
+    * each row starting on a whole uint, so half the bytes cross to the
+    * host and come out of the staging buffer a row at a time. */
+   commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.readback_pack);
+   commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
+   commandbuffer_set_storage_buffer(cbh_get(&self->cmd), 0, 1, bh_get(buffer), 0,
+         buffer_get_create_info(bh_get(buffer))->size);
+   {
+      uint32_t wordoff = 0;
+      for (t = 0; t < tiles; t++)
       {
-         for (i = 0; i < nh; i++)
+         struct
          {
-            VkOffset3D               _o = { 0, 0, 0 };
-            VkExtent3D               _e = { 0, 0, 1 };
-            VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-            _o.x = (int)hx[i]; _o.y = (int)vy[j];
-            _e.width = hw[i];  _e.height = vh[j];
-            commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer),
-                  ih_get(&self->framebuffer), byteoff, &_o, &_e, 0, 0, &_s);
-            byteoff += (VkDeviceSize)hw[i] * vh[j] * 4;
-         }
+            uint32_t offset[2];
+            uint32_t extent[2];
+            uint32_t word_offset;
+            uint32_t row_words;
+         } push;
+         push.offset[0]   = tx[t]; push.offset[1] = ty[t];
+         push.extent[0]   = tw[t]; push.extent[1] = th[t];
+         push.word_offset = wordoff;
+         push.row_words   = (tw[t] + 1) >> 1;
+         commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+         commandbuffer_dispatch(cbh_get(&self->cmd),
+               (push.row_words + 7) >> 3, (th[t] + 7) >> 3, 1);
+         wordoff += push.row_words * th[t];
       }
    }
 
-   commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+   commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
                 VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
    fence = renderer_flush_and_signal(self);
    fenceholder_wait(fence_get(&fence));
 
    {
-      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
-      int             i, j;
-      uint32_t        elemoff = 0;
-      for (j = 0; j < nv; j++)
+      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(buffer), MEMORY_ACCESS_READ_BIT));
+      uint32_t        wordoff = 0;
+      for (t = 0; t < tiles; t++)
       {
-         for (i = 0; i < nh; i++)
+         const uint32_t row_words = (tw[t] + 1) >> 1;
+         uint32_t       yy;
+         /* The words hold the pixels in order, low half first, which is
+          * vram's layout on a little-endian host */
+         for (yy = 0; yy < th[t]; yy++)
          {
-            uint32_t tw = hw[i];
-            uint32_t th = vh[j];
-            uint32_t bx = hx[i];
-            uint32_t by = vy[j];
-            {
-               uint32_t yy;
-               for (yy = 0; yy < th; yy++)
-               {
-                  uint32_t xx;
-                  for (xx = 0; xx < tw; xx++)
-                     vram[(by + yy) * FB_WIDTH + (bx + xx)] =
-                        (uint16_t)(mapped[elemoff + yy * tw + xx]);
-               }
-            }
-            elemoff += tw * th;
+            const uint32_t *src = mapped + wordoff + yy * row_words;
+            uint16_t       *dst = vram + (ty[t] + yy) * FB_WIDTH + tx[t];
+#ifdef MSB_FIRST
+            uint32_t        xx;
+            for (xx = 0; xx < tw[t]; xx++)
+               dst[xx] = (uint16_t)(src[xx >> 1] >> ((xx & 1) << 4));
+#else
+            memcpy(dst, src, (size_t)tw[t] * sizeof(uint16_t));
+#endif
          }
+         wordoff += row_words * th[t];
       }
 
       if (self->texture_tracking_enabled)
-      {
-         texture_tracker_notifyReadback(self->tracker, *rect, vram);
-      }
+         for (r = 0; r < count; r++)
+            texture_tracker_notifyReadback(self->tracker, rects[r], vram);
 
-      device_unmap_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
+      device_unmap_host_buffer(self->device, bh_get(buffer), MEMORY_ACCESS_READ_BIT);
 
       /* Single surviving owner of the fence handle (ownership moved out of
        * flush_and_signal); drop its reference at scope exit. */
       fence_reset(&fence);
-
-      /* Same for the staging buffer: device_create_buffer returned an owning
-       * reference, and nothing else holds one. In the C++ original the
-       * BufferHandle destructor dropped it at scope exit; in C the drop is
-       * explicit. Without this every synchronous VRAM readback (savestates,
-       * software-fb reads) leaked the staging VkBuffer and its memory. */
-      bh_reset(&buffer);
    }
+}
+
+static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
+      const TTRect *rect,
+      uint16_t *vram)
+{
+   renderer_copy_vram_to_cpu_rects(self, rect, 1, vram);
 }
 
 static void renderer_mipmap_framebuffer(Renderer *self)
@@ -7681,16 +7871,18 @@ static DisplayRect renderer_compute_display_rect(Renderer *self)
    int left_offset;
    if (self->render_state.crop_overscan)
    {
-      /* Horizontal crop amount is currently hardcoded. Future improvement could
-       * allow adjusting this. Restore old center behaviour is
+      /* The crop window follows the game's horizontal range when that is
+       * wider than the standard 2560 clocks. Restore old center behaviour is
        * self->render_state.horiz_start is intentionally very high. 938 fixes
        * Gunbird (1008) and Mobile Light Force (EU release of Gunbird), but this
        * value should be lowerer in the future if necessary. */
-      display_width = (2560/clock_div) - self->render_state.image_crop;
+      uint32_t win = rhi_common_crop_window(self->render_state.crop_overscan,
+            (int32_t)self->render_state.horiz_start, (int32_t)self->render_state.horiz_end);
+      display_width = (RHI_CROP_WIN_WIDTH(win)/clock_div) - self->render_state.image_crop;
       if ((self->render_state.horiz_start < 938) && (self->render_state.crop_overscan == 2))
          left_offset = floor((self->render_state.offset_cycles / (double) clock_div) - (self->render_state.image_crop / 2));
       else
-         left_offset = floor(((self->render_state.horiz_start + self->render_state.offset_cycles - 608) / (double) clock_div) - (self->render_state.image_crop / 2));
+         left_offset = floor(((self->render_state.horiz_start + self->render_state.offset_cycles - RHI_CROP_WIN_START(win)) / (double) clock_div) - (self->render_state.image_crop / 2));
    }
    else
    {
@@ -7786,6 +7978,107 @@ static void renderer_resolve_scanout_msaa(Renderer *self, const TTRect *rect)
        (self)->render_state.canonical_color ? 3 : \
        (int)(self)->render_state.color_mode))
 
+/* A Display Transform table as an immutable RGBA16F image: half floats
+ * are the 16-bit format every device must filter. */
+static ImageHandle renderer_dt_image(Renderer *self, const uint16_t *unorm,
+      unsigned w, unsigned h, unsigned channels)
+{
+   ImageCreateInfo  info = image_create_info_immutable_2d_image(w, h,
+         VK_FORMAT_R16G16B16A16_SFLOAT, false);
+   ImageInitialData init;
+   ImageHandle      img;
+   uint16_t        *half = (uint16_t*)malloc(sizeof(uint16_t) * 4 * w * h);
+   unsigned         i, c;
+   img.data = NULL;
+   if (!half)
+      return img;
+   for (i = 0; i < w * h; i++)
+      for (c = 0; c < 4; c++)
+         half[i * 4 + c] = hdr_dt_unorm16_to_half(
+               unorm ? unorm[i * channels + (c < channels ? c : 0)] : 0);
+   init.data         = half;
+   init.row_length   = 0;
+   init.image_height = 0;
+   img = device_create_image(self->device, &info, &init);
+   free(half);
+   return img;
+}
+
+/* A Display Transform cube: half RGBA, n^3 texels, red fastest; NULL data
+ * makes the 1x1x1 stand-in the binding needs before the cube exists. */
+static ImageHandle renderer_dt_cube_image(Renderer *self, const uint16_t *half, unsigned n)
+{
+   static const uint16_t zero[4] = { 0, 0, 0, 0 };
+   ImageCreateInfo  info = image_create_info_immutable_2d_image(n, n,
+         VK_FORMAT_R16G16B16A16_SFLOAT, false);
+   ImageInitialData init;
+   info.depth        = n;
+   info.type         = VK_IMAGE_TYPE_3D;
+   init.data         = half ? (const void*)half : (const void*)zero;
+   init.row_length   = 0;
+   init.image_height = 0;
+   return device_create_image(self->device, &info, &init);
+}
+
+/* The Display Transform for the HDR output programs: its constants at
+ * binding 8, written straight into the frame's uniform ring, and its
+ * tables at 9-12. Tables are rebuilt only when hdr_transform.c does. */
+static void renderer_bind_display_transform(Renderer *self)
+{
+   struct hdr_dt_block *b = (struct hdr_dt_block*)commandbuffer_allocate_constant_data(
+         cbh_get(&self->cmd), 0, 8, sizeof(*b));
+   unsigned gen;
+   if (b)
+      hdr_dt_fill(b, psx_hdr_paper_white_nits, psx_hdr_max_nits, 0.0f,
+            psx_hdr_panel_xy);
+   gen = hdr_dt_generation();
+   if (!ih_get(&self->dt_dummy))
+      ih_move(&self->dt_dummy, renderer_dt_image(self, NULL, 1, 1, 4));
+   if (!ih_get(&self->dt_dummy_3d))
+      ih_move(&self->dt_dummy_3d, renderer_dt_cube_image(self, NULL, 1));
+   if (gen != self->dt_generation)
+   {
+      const uint16_t *cube   = hdr_dt_aces2_cube();
+      const uint16_t *aces2  = hdr_dt_aces2_lut();
+      const uint16_t *film   = hdr_dt_film_lut();
+      const uint16_t *desat  = hdr_dt_film_desat();
+      ih_reset(&self->dt_aces2_lut);
+      ih_reset(&self->dt_film_lut);
+      ih_reset(&self->dt_film_desat);
+      ih_reset(&self->dt_aces2_cube);
+      if (cube)
+         ih_move(&self->dt_aces2_cube, renderer_dt_cube_image(self, cube,
+               HDR_DT_ACES2_CUBE));
+      if (aces2)
+         ih_move(&self->dt_aces2_lut, renderer_dt_image(self, aces2,
+               HDR_DT_ACES2_LUT_WIDTH, 1, 4));
+      if (film)
+         ih_move(&self->dt_film_lut, renderer_dt_image(self, film,
+               HDR_DT_FILM_LUT_WIDTH, 1, 1));
+      if (desat)
+         ih_move(&self->dt_film_desat, renderer_dt_image(self, desat,
+               HDR_DT_DESAT_WIDTH, HDR_DT_DESAT_HEIGHT, 4));
+      self->dt_generation = gen;
+   }
+   /* The cube only once the renderer holds it, whatever the block says. */
+   if (b && !ih_get(&self->dt_aces2_cube))
+      b->gm[2] = 0.0f;
+   if (!ih_get(&self->dt_dummy) || !ih_get(&self->dt_dummy_3d))
+      return;
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 12, image_get_view(ih_get(
+         ih_get(&self->dt_aces2_cube) ? &self->dt_aces2_cube : &self->dt_dummy_3d)),
+         StockSampler_LinearClamp);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 9, image_get_view(ih_get(
+         ih_get(&self->dt_aces2_lut) ? &self->dt_aces2_lut : &self->dt_dummy)),
+         StockSampler_LinearWrap);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 10, image_get_view(ih_get(
+         ih_get(&self->dt_film_lut) ? &self->dt_film_lut : &self->dt_dummy)),
+         StockSampler_LinearClamp);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 11, image_get_view(ih_get(
+         ih_get(&self->dt_film_desat) ? &self->dt_film_desat : &self->dt_dummy)),
+         StockSampler_LinearClamp);
+}
+
 static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 {
    RenderPassInfo rp;
@@ -7820,7 +8113,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-   ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->reuseable_scanout, &info);
 
    render_pass_info_defaults(&rp);
    rp.color_attachments[0] = image_get_view(ih_get(&self->reuseable_scanout));
@@ -7831,7 +8124,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    rp.clear_attachments = 1;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
@@ -7897,6 +8190,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       hpush.scrgb            = psx_hdr_scrgb;
       hdr_push_panel(hpush.to_panel);
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
+      renderer_bind_display_transform(self);
    }
    else
    { struct SdrQuadPush
@@ -7947,6 +8241,254 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
  * The output, on the other hand, does scale: the decoded signal carries real
  * sub-native structure at base-clock rate, and emitting at native would
  * average it flat. */
+/* ---- HDR post effects ----
+ *
+ * The display stage (quad, mipmap resolve or analog resolve) ran with
+ * HDR_LINEAR_OUT and left scene-linear light in a half-float image. Build the
+ * bloom from it - a bright pass into a quarter-size band, then either the
+ * two-band separable blur or the convolution pyramid - and composite: the
+ * chromatic aberration, the tinted bloom, and the same grade and encode the
+ * display stage would have run. Mirrors boom3's hdr_present_vk pass for
+ * pass; gl_post_run in the GL backend runs the same shaders translated. */
+struct PostPush
+{
+   float p0[4];
+   float p1[4];
+};
+
+/* One full-target pass. `add` blends into what the target already holds
+ * (the pyramid's upsample); otherwise the target is created and cleared. */
+static void renderer_post_pass(Renderer *self, ImageHandle *dst, unsigned w, unsigned h,
+      Program *program, ImageView *src, const float p0[4], const float p1[4], bool add)
+{
+   RenderPassInfo rp;
+   VkViewport vp;
+   struct PostPush push;
+
+   if (!add)
+   {
+      ImageCreateInfo info = image_create_info_render_target(w, h, renderer_post_format(self));
+      info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+      info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+      renderer_take_image(self, dst, &info);
+      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(dst),
+         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
+         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+   }
+   else
+      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(dst),
+         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT,
+         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   memset(&push, 0, sizeof(push));
+   if (p0)
+      memcpy(push.p0, p0, sizeof(push.p0));
+   if (p1)
+      memcpy(push.p1, p1, sizeof(push.p1));
+
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0]  = image_get_view(ih_get(dst));
+   rp.num_color_attachments = 1;
+   rp.store_attachments     = 1;
+   if (add)
+      rp.load_attachments   = 1;
+   else
+      rp.clear_attachments  = 1;
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   commandbuffer_set_quad_state(cbh_get(&self->cmd));
+   if (add)
+   {
+      commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
+      commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+      commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+            VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE);
+   }
+   vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)w; vp.height = (float)h;
+   vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+   commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+   commandbuffer_set_program(cbh_get(&self->cmd), program);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, src, StockSampler_LinearClamp);
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+   commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(dst),
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+}
+
+static unsigned renderer_post_dim(unsigned v, unsigned shift)
+{
+   v >>= shift;
+   return v ? v : 1u;
+}
+
+/* `scene` holds scene-linear light at w x h and is in SHADER_READ_ONLY. */
+static ImageHandle renderer_hdr_post_apply(Renderer *self, ImageHandle *scene,
+      unsigned w, unsigned h)
+{
+   struct hdr_post_frame f;
+   RenderPassInfo rp;
+   VkViewport vp;
+   ImageView *scene_view = image_get_view(ih_get(scene));
+   ImageView *bloom_t    = scene_view;
+   ImageView *bloom_w    = scene_view;
+   float p0[4], p1[4];
+   int i;
+
+   hdr_post_frame_params(&f, w, h);
+
+   if (f.bloom)
+   {
+      const unsigned qw = renderer_post_dim(w, 2), qh = renderer_post_dim(h, 2);
+      const unsigned sw = renderer_post_dim(w, 4), sh = renderer_post_dim(h, 4);
+      ImageHandle *base = f.levels ? &self->post_conv[0] : &self->post_bloom[0];
+
+      /* The bright pass, into the tight band or the pyramid's base. */
+      memcpy(p0, f.bright, sizeof(p0));
+      p1[0] = 1.0f / (float)w;
+      p1[1] = 1.0f / (float)h;
+      p1[2] = p1[3] = 0.0f;
+      renderer_post_pass(self, base, qw, qh, self->pipelines.hdr_bloom_bright,
+            scene_view, p0, p1, false);
+
+      if (f.levels)
+      {
+         /* Down the pyramid, then back up adding each level into the one above. */
+         for (i = 1; i < f.levels; i++)
+         {
+            const unsigned pw = renderer_post_dim(qw, (unsigned)(i - 1));
+            const unsigned ph = renderer_post_dim(qh, (unsigned)(i - 1));
+            p1[0] = 1.0f / (float)pw;
+            p1[1] = 1.0f / (float)ph;
+            renderer_post_pass(self, &self->post_conv[i],
+                  pw > 1 ? pw / 2 : 1, ph > 1 ? ph / 2 : 1,
+                  i == 1 ? self->pipelines.hdr_bloom_down_karis : self->pipelines.hdr_bloom_down,
+                  image_get_view(ih_get(&self->post_conv[i - 1])), NULL, p1, false);
+         }
+         p0[0] = 1.0f;   /* the radius */
+         p0[1] = p0[2] = p0[3] = 0.0f;
+         for (i = f.levels - 1; i > 0; i--)
+         {
+            const unsigned pw = renderer_post_dim(qw, (unsigned)i);
+            const unsigned ph = renderer_post_dim(qh, (unsigned)i);
+            const unsigned dw = renderer_post_dim(qw, (unsigned)(i - 1));
+            const unsigned dh = renderer_post_dim(qh, (unsigned)(i - 1));
+            p1[0] = 1.0f / (float)pw;
+            p1[1] = 1.0f / (float)ph;
+            renderer_post_pass(self, &self->post_conv[i - 1], dw, dh,
+                  self->pipelines.hdr_bloom_up,
+                  image_get_view(ih_get(&self->post_conv[i])), p0, p1, true);
+         }
+         bloom_t = bloom_w = image_get_view(ih_get(&self->post_conv[0]));
+      }
+      else
+      {
+         /* Two bands: a separable blur at a quarter, and the sixteenth band
+          * seeded from it. */
+         p1[2] = p1[3] = 0.0f;
+         p1[0] = 1.0f / (float)qw; p1[1] = 0.0f;
+         renderer_post_pass(self, &self->post_bloom[1], qw, qh, self->pipelines.hdr_bloom_blur,
+               image_get_view(ih_get(&self->post_bloom[0])), NULL, p1, false);
+         p1[0] = 0.0f; p1[1] = 1.0f / (float)qh;
+         renderer_post_pass(self, &self->post_bloom[0], qw, qh, self->pipelines.hdr_bloom_blur,
+               image_get_view(ih_get(&self->post_bloom[1])), NULL, p1, false);
+         p1[0] = 1.0f / (float)sw; p1[1] = 0.0f;
+         renderer_post_pass(self, &self->post_bloom[3], sw, sh, self->pipelines.hdr_bloom_blur,
+               image_get_view(ih_get(&self->post_bloom[0])), NULL, p1, false);
+         p1[0] = 0.0f; p1[1] = 1.0f / (float)sh;
+         renderer_post_pass(self, &self->post_bloom[2], sw, sh, self->pipelines.hdr_bloom_blur,
+               image_get_view(ih_get(&self->post_bloom[3])), NULL, p1, false);
+         bloom_t = image_get_view(ih_get(&self->post_bloom[0]));
+         bloom_w = image_get_view(ih_get(&self->post_bloom[2]));
+      }
+   }
+
+   /* The composite: aberration, bloom, grade, encode. */
+   { struct CompositePush
+   {
+      float   hal_bloom[4];
+      float   band_w[2];
+      float   ca;
+      float   paper_white_nits;
+      float   peak_nits;
+      int32_t expand_gamut;
+      int32_t shoulder;
+      int32_t src_primaries;
+      float   black_pq;
+      int32_t scrgb;
+      float   pad[2];
+      float   to_panel[12];
+   } push;
+   /* Must match hdr_post.frag's push block byte for byte. */
+   enum { hdr_post_push_layout = 1 / (sizeof(struct CompositePush) == 112) };
+   ImageCreateInfo info = image_create_info_render_target(w, h, renderer_hdr_scanout_format(self));
+
+   memset(&push, 0, sizeof(push));
+   memcpy(push.hal_bloom, f.hal_bloom, sizeof(push.hal_bloom));
+   push.band_w[0]        = f.band_w[0];
+   push.band_w[1]        = f.band_w[1];
+   push.ca               = f.ca;
+   push.paper_white_nits = psx_hdr_paper_white_nits;
+   push.peak_nits        = psx_hdr_max_nits;
+   push.expand_gamut     = psx_hdr_expand_gamut;
+   push.shoulder         = psx_hdr_shoulder;
+   push.src_primaries    = psx_src_primaries;
+   push.black_pq         = psx_hdr_black_pq;
+   push.scrgb            = psx_hdr_scrgb;
+   hdr_push_panel(push.to_panel);
+
+   info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+   info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+   renderer_take_image(self, &self->post_out, &info);
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->post_out),
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0]  = image_get_view(ih_get(&self->post_out));
+   rp.num_color_attachments = 1;
+   rp.store_attachments     = 1;
+   rp.clear_attachments     = 1;
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   commandbuffer_set_quad_state(cbh_get(&self->cmd));
+   vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)w; vp.height = (float)h;
+   vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+   commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+   commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.hdr_post);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, scene_view, StockSampler_LinearClamp);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, bloom_t, StockSampler_LinearClamp);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 2, bloom_w, StockSampler_LinearClamp);
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   renderer_bind_display_transform(self);
+   commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+   commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->post_out),
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+
+   ih_assign(&self->last_scanout, &self->post_out);
+   return self->post_out;
+}
+
+/* Whether this frame's HDR output runs through the post effects. */
+static bool renderer_post_active(void)
+{
+   return psx_hdr_active && hdr_post_enabled();
+}
+
 static bool renderer_analog_active(Renderer *self)
 {
    /* Log the transition once rather than every frame. Whether the chain is
@@ -8038,7 +8580,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       ImageCreateInfo info = image_create_info_render_target(native_w, native_h, VK_FORMAT_R16G16B16A16_SFLOAT);
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-      ih_move(&self->analog_native, device_create_image(self->device, &info, NULL));
+      renderer_take_image(self, &self->analog_native, &info);
 
       push.src_size[0]    = (float)out_w;
       push.src_size[1]    = (float)out_h;
@@ -8048,7 +8590,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
       commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_native),
          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
       render_pass_info_defaults(&rp);
@@ -8079,15 +8621,16 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    { ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16_SFLOAT);
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-   ih_move(&self->analog_sig, device_create_image(self->device, &info, NULL));
-   ih_move(&self->analog_sep, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->analog_sig, &info);
+   renderer_take_image(self, &self->analog_sep, &info);
    }
 
    { ImageCreateInfo info = image_create_info_render_target(out_w, out_h,
-         psx_hdr_active ? renderer_hdr_scanout_format(self) : VK_FORMAT_R8G8B8A8_UNORM);
+         renderer_post_active() ? renderer_post_format(self)
+         : psx_hdr_active ? renderer_hdr_scanout_format(self) : VK_FORMAT_R8G8B8A8_UNORM);
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-   ih_move(&self->analog_out, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->analog_out, &info);
    }
 
    /* ---- RGB/SCART: one band-limit pass, then straight to the resolve ----
@@ -8105,7 +8648,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-      ih_move(&self->analog_rgb, device_create_image(self->device, &info, NULL));
+      renderer_take_image(self, &self->analog_rgb, &info);
 
       push.src_size[0] = (float)native_w;
       push.src_size[1] = (float)native_h;
@@ -8113,7 +8656,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
       commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_rgb),
          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
       render_pass_info_defaults(&rp);
@@ -8170,7 +8713,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sig),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8208,7 +8751,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sep),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8253,7 +8796,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-   ih_move(&self->analog_dec, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->analog_dec, &info);
 
    push.sig_size[0] = (float)sig_w;
    push.sig_size[1] = (float)sig_h;
@@ -8269,7 +8812,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_dec),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8321,19 +8864,13 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       float   a1, a2;
       int32_t enable;
    } push;
-   const double wq  = 2.0 * 3.14159265358979323846 * (double)inv_ratio;
-   const double fq  = 0.99;   /* zero radius: depth of the null */
-   const double iq2 = 0.85;   /* pole radius: how narrow the stop band is */
-   double b0 = 1.0, b1 = -2.0 * fq * cos(wq), b2 = fq * fq;
-   const double a1 = -2.0 * iq2 * cos(wq), a2 = iq2 * iq2;
-   /* Normalise the feed-forward for 0 dB at DC against the feedback. */
-   const double g = (1.0 + a1 + a2) / (b0 + b1 + b2);
+   double c[5];
    ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
-   b0 *= g; b1 *= g; b2 *= g;
+   analog_trap_coeffs((double)inv_ratio, c);
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-   ih_move(&self->analog_rgb, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->analog_rgb, &info);
 
    push.sig_size[0] = (float)sig_w;
    push.sig_size[1] = (float)sig_h;
@@ -8355,14 +8892,14 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       push.black_scale  = 1.0f / (1.0f - 0.075f);
       push.black_offset = -0.075f / (1.0f - 0.075f);
    }
-   push.b0 = (float)b0; push.b1 = (float)b1; push.b2 = (float)b2;
-   push.a1 = (float)a1; push.a2 = (float)a2;
+   push.b0 = (float)c[0]; push.b1 = (float)c[1]; push.b2 = (float)c[2];
+   push.a1 = (float)c[3]; push.a2 = (float)c[4];
    /* S-Video luma never shared a wire, so there is no residue to trap. */
    push.enable = svideo ? 0 : 1;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_rgb),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT);
 
    commandbuffer_set_program(cbh_get(&self->cmd),
@@ -8420,7 +8957,7 @@ resolve:
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_out),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8437,6 +8974,14 @@ resolve:
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
       image_get_view(ih_get(&self->analog_rgb)), StockSampler_NearestClamp);
    commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, push_size);
+   if (psx_hdr_active)
+   {
+      renderer_bind_display_transform(self);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+            SpecConstIndex_HdrLinearOut, renderer_post_active() ? 1 : 0);
+      commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
+            1u << SpecConstIndex_HdrLinearOut);
+   }
    commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
@@ -8448,8 +8993,30 @@ resolve:
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
+   if (renderer_post_active())
+      return renderer_hdr_post_apply(self, &self->analog_out, out_w, out_h);
    ih_assign(&self->last_scanout, &self->analog_out);
    return self->analog_out;
+}
+
+/* The HDR post effects' intermediates: RGBA16F, or with Compact
+ * Intermediates the packed 11/11/10 float, which halves their traffic.
+ * Everything they hold is non-negative light, which the unsigned format
+ * carries; the bloom pyramid blends into it. */
+static VkFormat renderer_post_format(Renderer *self)
+{
+   if (!hdr_post_compact())
+      return VK_FORMAT_R16G16B16A16_SFLOAT;
+   if (!self->post_compact_supported)
+      self->post_compact_supported = device_image_format_is_supported(self->device,
+            VK_FORMAT_B10G11R11_UFLOAT_PACK32,
+            VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+            | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT
+            | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
+            | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT,
+            VK_IMAGE_TILING_OPTIMAL) ? 1 : -1;
+   return self->post_compact_supported > 0 ? VK_FORMAT_B10G11R11_UFLOAT_PACK32
+         : VK_FORMAT_R16G16B16A16_SFLOAT;
 }
 
 static VkFormat renderer_hdr_scanout_format(Renderer *self)
@@ -8479,6 +9046,72 @@ static VkFormat renderer_hdr_scanout_format(Renderer *self)
    return self->hdr_scanout_format;
 }
 
+/* Point *dst at an image matching `info`: a cached one nothing else
+ * references any more, or a new one, kept in the cache when a slot is free.
+ * A reused image keeps its old contents, so callers discard them with a
+ * barrier from UNDEFINED - and wait for all earlier work, since reads of it
+ * from a previous frame may still be ahead in the queue. */
+static void renderer_take_image(Renderer *self, ImageHandle *dst,
+      const ImageCreateInfo *info)
+{
+   unsigned i, empty = RENDERER_IMAGE_CACHE, stale = RENDERER_IMAGE_CACHE;
+   ImageHandle img;
+
+   for (i = 0; i < RENDERER_IMAGE_CACHE; i++)
+   {
+      Image *c = ih_get(&self->image_cache[i]);
+      if (!c)
+      {
+         if (empty == RENDERER_IMAGE_CACHE)
+            empty = i;
+         continue;
+      }
+      if (c->reference_count.count != 1)
+         continue;
+      if (c->create_info.width  == info->width
+       && c->create_info.height == info->height
+       && c->create_info.format == info->format
+       && c->create_info.usage  == info->usage
+       && c->create_info.levels == info->levels)
+      {
+         ih_assign(dst, &self->image_cache[i]);
+         return;
+      }
+      stale = i;
+   }
+
+   img = device_create_image(self->device, info, NULL);
+   /* A free image of the wrong size or format makes room. */
+   if (empty == RENDERER_IMAGE_CACHE && stale != RENDERER_IMAGE_CACHE)
+   {
+      ih_reset(&self->image_cache[stale]);
+      empty = stale;
+   }
+   if (empty != RENDERER_IMAGE_CACHE)
+      ih_copy(&self->image_cache[empty], &img);
+   ih_move(dst, img);
+}
+
+/* Everything the display encode reads other than VRAM. */
+static void renderer_output_key(struct RendererOutputKey *k)
+{
+   memset(k, 0, sizeof(*k));
+   k->paper_white_nits = psx_hdr_paper_white_nits;
+   k->max_nits         = psx_hdr_max_nits;
+   k->black_pq         = psx_hdr_black_pq;
+   k->phase_error      = psx_phase_error;
+   memcpy(k->to_panel, psx_hdr_to_panel, sizeof(k->to_panel));
+   k->hdr_active       = psx_hdr_active ? 1 : 0;
+   k->scrgb            = psx_hdr_scrgb;
+   k->expand_gamut     = psx_hdr_expand_gamut;
+   k->shoulder         = psx_hdr_shoulder;
+   k->sdr_eotf         = psx_hdr_sdr_eotf;
+   k->src_primaries    = psx_src_primaries;
+   k->video_cable      = psx_video_cable;
+   k->black_setup      = psx_black_setup;
+   k->dt_serial        = hdr_dt_serial();
+}
+
 static ImageHandle renderer_scanout_to_texture(Renderer *self)
 {
    VkViewport old_vp;
@@ -8492,11 +9125,26 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
     * than psx_hdr_active throughout the tail of this function. */
    const bool analog   = renderer_analog_active(self);
    const bool hdr_quad = psx_hdr_active && !analog;
+   /* With the post effects on, the HDR quad writes scene-linear light to a
+    * half-float image and renderer_hdr_post_apply encodes. */
+   const bool post     = hdr_quad && renderer_post_active();
    fbatlas_flush_render_pass(&self->atlas);
    if (self->texture_tracking_enabled) {
       texture_tracker_endFrame(self->tracker);
    }
 
+   /* The cached scanout is only current while the output encode is: an
+    * option or frontend HDR change on a static picture (a paused game, a
+    * still screen) must re-encode even though VRAM did not change. */
+   {
+      struct RendererOutputKey key;
+      renderer_output_key(&key);
+      if (memcmp(&key, &self->output_key, sizeof(key)))
+      {
+         self->output_key = key;
+         ih_reset(&self->last_scanout);
+      }
+   }
    if (ih_is_valid(&self->last_scanout))
       return self->last_scanout;
 
@@ -8519,7 +9167,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage =
           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-      ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
+      renderer_take_image(self, &self->reuseable_scanout, &info);
 
       { RenderPassInfo rp;
       render_pass_info_defaults(&rp);
@@ -8529,7 +9177,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       rp.store_attachments = 1;
 
       commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
       commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
@@ -8591,12 +9239,13 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          display_rect.width * render_scale,
          display_rect.height * render_scale,
          analog ? VK_FORMAT_R16G16B16A16_SFLOAT
+         : post ? renderer_post_format(self)
          : hdr_quad ? renderer_hdr_scanout_format(self)
             : VK_FORMAT_R8G8B8A8_UNORM);
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-   ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->reuseable_scanout, &info);
 
    render_pass_info_defaults(&rp);
    rp.color_attachments[0] = image_get_view(ih_get(&self->reuseable_scanout));
@@ -8607,8 +9256,10 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    /* rp.clear_color[0] = {60.0f/256.0f, 230.0f/256.0f, 60.0f/256.0f, 0}; */
    rp.clear_attachments = 1;
 
+   /* A reused image may still have reads of an earlier frame ahead of
+    * this pass in the queue: wait for all of them before overwriting. */
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
@@ -8724,6 +9375,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hdr_push_panel(mp.to_panel);
       mp.scrgb            = psx_hdr_scrgb;
       commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
+      renderer_bind_display_transform(self);
    }
    else if (hdr_quad)
    {
@@ -8764,6 +9416,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hpush.scrgb            = psx_hdr_scrgb;
       hdr_push_panel(hpush.to_panel);
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
+      renderer_bind_display_transform(self);
    }
    else if (using_mipmap)
    { struct SdrMipmapPush
@@ -8807,13 +9460,19 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    }
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
          SpecConstIndex_ColorMode, RENDERER_DISPLAY_COLOR_MODE(self));
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+         SpecConstIndex_HdrLinearOut, post ? 1 : 0);
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
-         1u << SpecConstIndex_ColorMode);
+         (1u << SpecConstIndex_ColorMode) | (1u << SpecConstIndex_HdrLinearOut));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
 
    renderer_finish_reuseable_scanout(self);
+
+   if (post)
+      return renderer_hdr_post_apply(self, &self->reuseable_scanout,
+            display_rect.width * render_scale, display_rect.height * render_scale);
 
    if (analog)
    {
@@ -9237,8 +9896,8 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    unsigned min_u = FB_WIDTH;
    unsigned min_v = FB_HEIGHT;
    { unsigned i; for (i = 0; i < count; i++) {
-      float tmp_x = vertices[i].x + self->render_state.draw_offset_x;
-      float tmp_y = vertices[i].y + self->render_state.draw_offset_y;
+      float tmp_x = vertices[i].x + self->render_state.draw_offset_x + self->upscaler_jitter_x;
+      float tmp_y = vertices[i].y + self->render_state.draw_offset_y + self->upscaler_jitter_y;
       max_x = max_(max_x, tmp_x);
       max_y = max_(max_y, tmp_y);
       min_x = min_(min_x, tmp_x);
@@ -9445,47 +10104,38 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    }
 }
 
-static BufferVertexVec * renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture,
+/* Queues the next prims triangles, about to be pushed to queue.vertices,
+ * on the opaque queue their state selects; false when they are drawn only
+ * through the blended path. */
+static bool renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture,
    bool filtering, bool scaled_read, unsigned shift, bool offset_uv){
+   const unsigned first = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
+   PrimitiveInfoVec *queue;
+   unsigned i;
+
    /* For mask testing, force primitives through the serialized blend path. */
    if (self->render_state.mask_test)
-      return NULL;
+      return false;
 
    if (filtering)
       filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaque);
 
    if (self->render_state.texture_mode != TextureMode_None)
-   {
-      if (self->render_state.semi_transparent != SemiTransparentMode_None)
-      {
-         { unsigned i; for (i = 0; i < prims; i++) {
-            PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.semi_transparent_opaque_scissor), scissor, hd_texture,
-               filtering, scaled_read, shift, offset_uv);
-            PrimitiveInfoVec_push(&self->queue.semi_transparent_opaque_scissor, &_pi);
-         } }
-         return &self->queue.semi_transparent_opaque;
-      }
-      else
-      {
-         { unsigned i; for (i = 0; i < prims; i++) {
-            PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_textured_scissor), scissor, hd_texture,
-               filtering, scaled_read, shift, offset_uv);
-            PrimitiveInfoVec_push(&self->queue.opaque_textured_scissor, &_pi);
-         } }
-         return &self->queue.opaque_textured;
-      }
-   }
+      queue = self->render_state.semi_transparent != SemiTransparentMode_None
+         ? &self->queue.semi_transparent_opaque_scissor
+         : &self->queue.opaque_textured_scissor;
    else if (self->render_state.semi_transparent != SemiTransparentMode_None)
-      return NULL;
+      return false;
    else
+      queue = &self->queue.opaque_scissor;
+
+   for (i = 0; i < prims; i++)
    {
-      { unsigned i; for (i = 0; i < prims; i++) {
-         PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), scissor, hd_texture,
+      PrimitiveInfo _pi = primitive_info_make(first + i, scissor, hd_texture,
             filtering, scaled_read, shift, offset_uv);
-         PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi);
-      } }
-      return &self->queue.opaque;
+      PrimitiveInfoVec_push(queue, &_pi);
    }
+   return true;
 }
 
 static void renderer_build_line_quad(Renderer *self,
@@ -9775,6 +10425,164 @@ static void renderer_build_native_interpolants(Renderer *self,
    }
 }
 
+/* Keeps a polygon or sprite for the temporal upscaler, with what tells
+ * it from others: its texture, palette, blending, texture coordinates
+ * and, flat, its colour (a Gouraud polygon's colours change with its
+ * lighting); and its family, the same less the texture coordinates and
+ * colour, for when those are what changed */
+static void renderer_upscaler_keep(Renderer *self, const Vertex *vertices, unsigned count)
+{
+   psx_upscaler_point_t points[4];
+   uint64_t signature;
+   uint64_t family;
+   unsigned flags = 0;
+   unsigned i;
+   bool flat = true;
+
+   if (!psx_upscaler_is_active(self->upscaler))
+      return;
+   for (i = 0; i < count; i++)
+   {
+      points[i].x = vertices[i].x + self->render_state.draw_offset_x;
+      points[i].y = vertices[i].y + self->render_state.draw_offset_y;
+      points[i].w = vertices[i].w;
+      if (vertices[i].color != vertices[0].color)
+         flat = false;
+   }
+   if (self->render_state.semi_transparent != SemiTransparentMode_None)
+      flags |= PSX_UPSCALER_TRANSLUCENT;
+   if (self->render_state.primitive_type == PrimitiveType_Sprite)
+      flags |= PSX_UPSCALER_SPRITE;
+
+   signature = psx_upscaler_hash(psx_upscaler_hash_init(), count | (flags << 8)
+         | ((uint32_t)self->render_state.texture_mode << 16)
+         | ((uint32_t)self->render_state.semi_transparent << 20)
+         | ((uint32_t)self->render_state.mask_test << 24)
+         | ((uint32_t)self->render_state.force_mask_bit << 25)
+         | ((uint32_t)self->render_state.texture_color_modulate << 26));
+   if (self->render_state.texture_mode != TextureMode_None)
+   {
+      signature = psx_upscaler_hash(signature, self->render_state.texture_offset_x | (self->render_state.texture_offset_y << 16));
+      signature = psx_upscaler_hash(signature, self->render_state.palette_offset_x | (self->render_state.palette_offset_y << 16));
+   }
+   family = signature;
+   if (self->render_state.texture_mode != TextureMode_None)
+      for (i = 0; i < count; i++)
+         signature = psx_upscaler_hash(signature, vertices[i].u | ((uint32_t)vertices[i].v << 16));
+   if (flat)
+      signature = psx_upscaler_hash(signature, vertices[0].color);
+   psx_upscaler_primitive(self->upscaler, points, count, flags, signature, family);
+   /* drawn with its record's jitter: a game drawing the other buffer
+    * mid-frame has it from here on */
+   { float jx, jy;
+   psx_upscaler_jitter(self->upscaler, &jx, &jy);
+   self->upscaler_jitter_x = jx / (float)self->scaling;
+   self->upscaler_jitter_y = jy / (float)self->scaling; }
+}
+
+/* Draws the temporal upscaler's pass for the frame shown: its motion
+ * vectors, depth and transparency mask, @width x @height render pixels,
+ * into @mv, @depth and @mask */
+static void renderer_upscaler_pass(Renderer *self, const psx_upscaler_geometry_t *g,
+      unsigned width, unsigned height, Image *mv, Image *depth, Image *mask)
+{
+   RenderPassInfo rp;
+   psx_upscaler_vertex_t *dst;
+   struct Push
+   {
+      float inv_resolution[2];
+      float translucent;
+      float pad;
+      /* primitive.vert's half pixel at 1x: the PSX rasterizes a pixel
+       * as its top left corner */
+      float offset[2];
+   } push;
+   unsigned i;
+
+   renderer_ensure_command_buffer(self);
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0] = image_get_view(mv);
+   rp.color_attachments[1] = image_get_view(depth);
+   rp.color_attachments[2] = image_get_view(mask);
+   rp.num_color_attachments = 3;
+   rp.store_attachments = 7;
+   rp.clear_attachments = 7;
+   memset(rp.clear_color, 0, sizeof(rp.clear_color));
+   rp.clear_color[1].float32[0] = 1.0f;
+   rp.clear_depth_stencil.depth = 1.0f;
+   rp.clear_depth_stencil.stencil = 0;
+   rp.depth_stencil = device_get_transient_attachment(self->device, width, height,
+         device_get_default_depth_format(self->device), 0, 1, 1);
+   rp.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
+
+   /* A reused image may still have reads of an earlier frame ahead of
+    * this pass in the queue: wait for all of them before overwriting. */
+   commandbuffer_image_barrier(cbh_get(&self->cmd), mv, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+   commandbuffer_image_barrier(cbh_get(&self->cmd), depth, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+   commandbuffer_image_barrier(cbh_get(&self->cmd), mask, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   if (g->num_vertices)
+   {
+      dst = (psx_upscaler_vertex_t *)commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0,
+            (VkDeviceSize)g->num_vertices * sizeof(*dst), sizeof(*dst), VK_VERTEX_INPUT_RATE_VERTEX);
+      if (dst)
+      {
+         VkViewport vp;
+         VkRect2D sc;
+         memcpy(dst, g->vertices, (size_t)g->num_vertices * sizeof(*dst));
+         commandbuffer_set_opaque_state(cbh_get(&self->cmd));
+         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.upscaler_motion);
+         commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), 0);
+         commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(psx_upscaler_vertex_t, x));
+         commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(psx_upscaler_vertex_t, motion_x));
+         commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+         commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
+         commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS_OR_EQUAL);
+         vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)width; vp.height = (float)height;
+         vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+         commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+         sc.offset.x = 0; sc.offset.y = 0; sc.extent.width = width; sc.extent.height = height;
+         commandbuffer_set_scissor(cbh_get(&self->cmd), &sc);
+         push.inv_resolution[0] = 1.0f / (float)width;
+         push.inv_resolution[1] = 1.0f / (float)height;
+         push.pad               = 0.0f;
+         push.offset[0]         = self->scaling == 1 ? 0.5f : 0.0f;
+         push.offset[1]         = push.offset[0];
+         for (i = 0; i < g->num_draws; i++)
+         {
+            const psx_upscaler_draw_t *d = &g->draws[i];
+            bool translucent = (d->flags & PSX_UPSCALER_TRANSLUCENT) != 0;
+            /* what is blended over writes no depth: the upscaler takes
+             * this frame's colour there over its history */
+            commandbuffer_set_depth_test(cbh_get(&self->cmd), true, !translucent);
+            push.translucent = translucent ? 1.0f : 0.0f;
+            commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+            commandbuffer_draw(cbh_get(&self->cmd), d->count, 1, d->first, 0);
+         }
+      }
+   }
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), mv, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+         VK_ACCESS_SHADER_READ_BIT);
+   commandbuffer_image_barrier(cbh_get(&self->cmd), depth, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+         VK_ACCESS_SHADER_READ_BIT);
+   commandbuffer_image_barrier(cbh_get(&self->cmd), mask, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+         VK_ACCESS_SHADER_READ_BIT);
+}
+
 static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 {
    HdTextureHandle hd_texture_index;
@@ -9783,6 +10591,7 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
       return;
 
    ih_reset(&self->last_scanout);
+   renderer_upscaler_keep(self, vertices, 3);
 
    hd_texture_index = hd_handle_make_none();
    { bool filtering = false;
@@ -9792,25 +10601,18 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
    renderer_build_attribs(self, vert, vertices, 3, &hd_texture_index, &filtering, &scaled_read, &shift, &offset_uv);
    renderer_build_native_interpolants(self, vert, vertices);
    { const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
-   BufferVertexVec *out = renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
-   if (out)
-   {
-      {
-         unsigned i;
-         for (i = 0; i < 3; i++) BufferVertexVec_push(out, &vert[i]);
-      }
-   }
+   const unsigned triangle = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
+   unsigned i;
+
+   renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+   for (i = 0; i < 3; i++)
+      BufferVertexVec_push(&self->queue.vertices, &vert[i]);
 
    if (self->render_state.mask_test || self->render_state.semi_transparent != SemiTransparentMode_None)
    {
       if (filtering)
          filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaqueAndSemiTrans);
 
-      {
-         unsigned i;
-         for (i = 0; i < 3; i++)
-            BufferVertexVec_push(&self->queue.semi_transparent, &vert[i]);
-      }
       {
          SemiTransparentState _sts = { scissor_index, hd_texture_index, self->render_state.semi_transparent,
                                                self->render_state.texture_mode != TextureMode_None,
@@ -9821,6 +10623,7 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
                                                scaled_read,
                                      shift,
                                      offset_uv };
+         _sts.triangle_index = triangle;
          SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &_sts);
       }
 
@@ -9842,6 +10645,8 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool poly
       return;
 
    ih_reset(&self->last_scanout);
+   if (!line_vertices)
+      renderer_upscaler_keep(self, vertices, 4);
 
    /* build_attribs may flush the queues, thus calling reset_queue and
     * invalidating any pre-existing HdTextureHandle. self->tracker.no_hd_texture
@@ -9879,24 +10684,22 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool poly
       renderer_build_native_interpolants(self, vert + 3, vertices + 1);
    }
    { const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
-   BufferVertexVec *out = renderer_select_pipeline(self, 2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+   const unsigned triangle = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
 
-   if (out)
-   {
-      BufferVertexVec_push(out, &vert[0]);
-      BufferVertexVec_push(out, &vert[1]);
-      BufferVertexVec_push(out, &vert[2]);
-      BufferVertexVec_push(out, &vert[5]);
-      BufferVertexVec_push(out, &vert[4]);
-      BufferVertexVec_push(out, &vert[3]);
-   }
+   renderer_select_pipeline(self, 2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+   BufferVertexVec_push(&self->queue.vertices, &vert[0]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[1]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[2]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[5]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[4]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[3]);
 
    if (self->render_state.mask_test || self->render_state.semi_transparent != SemiTransparentMode_None)
    {
       if (filtering)
          filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaqueAndSemiTrans);
 
-      { const SemiTransparentState state = {
+      { SemiTransparentState state = {
          scissor_index, hd_texture_index, self->render_state.semi_transparent,
          self->render_state.texture_mode != TextureMode_None,
          self->render_state.mask_test,
@@ -9906,13 +10709,9 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool poly
          scaled_read,
          shift,
          offset_uv };
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[0]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[1]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[2]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[5]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[4]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[3]);
+      state.triangle_index = triangle;
       SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &state);
+      state.triangle_index = triangle + 1;
       SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &state);
 
       /* We've hit the dragon path, we'll need programmable blending for this render pass. */
@@ -9948,18 +10747,19 @@ static void renderer_clear_quad(Renderer *self,
    BufferVertex pos1 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
    BufferVertex pos2 = { (float)(rect->x), (float)(rect->y) + (float)(rect->height), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
    BufferVertex pos3 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y) + (float)(rect->height), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
-   BufferVertexVec_push(&self->queue.opaque, &pos0);
-   BufferVertexVec_push(&self->queue.opaque, &pos1);
-   BufferVertexVec_push(&self->queue.opaque, &pos2);
-   BufferVertexVec_push(&self->queue.opaque, &pos3);
-   BufferVertexVec_push(&self->queue.opaque, &pos2);
-   BufferVertexVec_push(&self->queue.opaque, &pos1);
+   const unsigned triangle = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
+   BufferVertexVec_push(&self->queue.vertices, &pos0);
+   BufferVertexVec_push(&self->queue.vertices, &pos1);
+   BufferVertexVec_push(&self->queue.vertices, &pos2);
+   BufferVertexVec_push(&self->queue.vertices, &pos3);
+   BufferVertexVec_push(&self->queue.vertices, &pos2);
+   BufferVertexVec_push(&self->queue.vertices, &pos1);
    {
-      PrimitiveInfo _pi0 = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), -1, hd_handle_make_none(), false, false, 0, false);
+      PrimitiveInfo _pi0 = primitive_info_make(triangle, -1, hd_handle_make_none(), false, false, 0, false);
       PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi0);
    }
    {
-      PrimitiveInfo _pi1 = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), -1, hd_handle_make_none(), false, false, 0, false);
+      PrimitiveInfo _pi1 = primitive_info_make(triangle + 1, -1, hd_handle_make_none(), false, false, 0, false);
       PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi1);
    }
 
@@ -10098,6 +10898,49 @@ static void renderer_snapshot_scaled_texture_reads(Renderer *self)
          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 }
 
+/* The render pass's queued vertices, staged once, for every queue to draw
+ * from by index. On the 16F target, with blended primitives queued, the
+ * full-framebuffer quad the subtractive floor draws (renderer_emit_sub_floor)
+ * follows them: depth is a don't-care, the floor pass disables the depth
+ * test. False when there is nothing to draw or nowhere to stage it. */
+static bool renderer_upload_queued_vertices(Renderer *self)
+{
+   const unsigned nverts = (unsigned)BufferVertexVec_size(&self->queue.vertices);
+   const bool     floor  = !SemiTransparentStateVec_empty(&self->queue.semi_transparent_state)
+      && self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT
+      && !psx_hdr_multipass;
+   BufferVertex  *dst;
+
+   if (!nverts)
+      return false;
+   dst = (BufferVertex *)commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0,
+         (VkDeviceSize)(nverts + (floor ? 6 : 0)) * sizeof(BufferVertex),
+         sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX);
+   if (!dst)
+      return false;
+
+   memcpy(dst, BufferVertexVec_data(&self->queue.vertices),
+         (size_t)nverts * sizeof(BufferVertex));
+   if (floor)
+   {
+      BufferVertex *fv = dst + nverts;
+      unsigned fi;
+      memset(fv, 0, 6 * sizeof(BufferVertex));
+      fv[1].x = (float)FB_WIDTH;
+      fv[2].y = (float)FB_HEIGHT;
+      fv[3].x = (float)FB_WIDTH;
+      fv[3].y = (float)FB_HEIGHT;
+      fv[4] = fv[2];
+      fv[5] = fv[1];
+      for (fi = 0; fi < 6; fi++)
+      {
+         fv[fi].z = 0.5f;
+         fv[fi].w = 1.0f;
+      }
+   }
+   return true;
+}
+
 static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
 {
    RenderPassInfo_Subpass subpasses[2];
@@ -10175,12 +11018,18 @@ static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
    self->queue.default_scissor = info.render_area;
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 5, image_get_view(ih_get(&self->palette_cache)), StockSampler_NearestClamp);
 
-   renderer_render_opaque_primitives(self);
-   renderer_render_opaque_texture_primitives(self);
-   renderer_render_semi_transparent_opaque_texture_primitives(self);
+   { const bool staged = renderer_upload_queued_vertices(self);
+   if (staged)
+   {
+      renderer_render_opaque_primitives(self);
+      renderer_render_opaque_texture_primitives(self);
+      renderer_render_semi_transparent_opaque_texture_primitives(self);
+   }
    if (self->render_pass_is_feedback)
       commandbuffer_next_subpass(cbh_get(&self->cmd));
-   renderer_render_semi_transparent_primitives(self);
+   if (staged)
+      renderer_render_semi_transparent_primitives(self);
+   }
 
    commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
@@ -10258,40 +11107,43 @@ static int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb){
 }
 
 static void renderer_dispatch(Renderer *self,
-      const BufferVertexVec *vertices,
       PrimitiveInfoVec *scissors,
       bool textured){
+   const PrimitiveInfo *pi;
    unsigned to_draw;
-   qsort(PrimitiveInfoVec_data(scissors), PrimitiveInfoVec_size(scissors), sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
-
-   /* Render flat-shaded primitives. */
-   { BufferVertex *vert = (BufferVertex *)(
-       commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size(vertices) * sizeof(BufferVertex), sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX));
-
-   int scissor = (*PrimitiveInfoVec_front(scissors)).scissor_index;
-   HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(scissors)).hd_texture_index;
-   bool filtering = (*PrimitiveInfoVec_front(scissors)).filtering;
-   bool scaled_read = (*PrimitiveInfoVec_front(scissors)).scaled_read;
-   unsigned shift = (*PrimitiveInfoVec_front(scissors)).shift;
-   bool offset_uv = (*PrimitiveInfoVec_front(scissors)).offset_uv;
-   unsigned last_draw = 0;
-   unsigned i = 1;
+   uint32_t *index;
+   unsigned i, k, last_draw = 0;
    unsigned size = PrimitiveInfoVec_size(scissors);
-   unsigned avail = (unsigned)BufferVertexVec_size(vertices) / 3;
+   /* A triangle the vertices do not hold is drawn degenerate */
+   const unsigned avail = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
+   int scissor;
+   HdTextureHandle hd_texture;
+   bool filtering, scaled_read, offset_uv;
+   unsigned shift;
 
-   /* A vertex block allocation can come back empty when the device is out
-    * of host-visible memory; the staging writes below have nowhere to go. */
-   if (!vert)
-      return;
-
-   /* One PrimitiveInfo per three queued vertices. The two queues grow
-    * independently, so bound the walk by the vertices actually present:
-    * the loop writes three vertices per entry into an allocation sized
-    * from the vertex queue, and indexes the source by triangle_index. */
-   if (size > avail)
-      size = avail;
    if (!size)
       return;
+   qsort(PrimitiveInfoVec_data(scissors), size, sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
+
+   /* The queue's triangles, in the order sorted, as indices into the
+    * render pass's vertices. NULL when the device is out of host-visible
+    * memory: there is nowhere to stage them. */
+   if (!(index = commandbuffer_allocate_index_data(cbh_get(&self->cmd), 3 * size)))
+      return;
+   for (i = 0; i < size; i++)
+   {
+      const unsigned t = PrimitiveInfoVec_at(scissors, i)->triangle_index;
+      for (k = 0; k < 3; k++)
+         index[3 * i + k] = t < avail ? 3 * t + k : 0;
+   }
+
+   pi          = PrimitiveInfoVec_front(scissors);
+   scissor     = pi->scissor_index;
+   hd_texture  = pi->hd_texture_index;
+   filtering   = pi->filtering;
+   scaled_read = pi->scaled_read;
+   shift       = pi->shift;
+   offset_uv   = pi->offset_uv;
 
    if (textured)
       renderer_hd_texture_uniforms(self, hd_texture);
@@ -10300,59 +11152,55 @@ static void renderer_dispatch(Renderer *self,
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
    renderer_dispatch_set_scaled_read_texture(self, scaled_read, textured);
-   memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)vertices) + 3 * (*PrimitiveInfoVec_front(scissors)).triangle_index, 3 * sizeof(BufferVertex));
-   vert += 3;
 
-   for (; i < size; i++, vert += 3)
+   for (i = 1; i < size; i++)
    {
-      if ((*PrimitiveInfoVec_at(scissors, i)).scissor_index != scissor || hd_handle_ne(&(*PrimitiveInfoVec_at(scissors, i)).hd_texture_index, &hd_texture) ||
-         (*PrimitiveInfoVec_at(scissors, i)).filtering != filtering || (*PrimitiveInfoVec_at(scissors, i)).scaled_read != scaled_read || (*PrimitiveInfoVec_at(scissors, i)).shift != shift ||
-         (*PrimitiveInfoVec_at(scissors, i)).offset_uv != offset_uv)
+      pi = PrimitiveInfoVec_at(scissors, i);
+      if (pi->scissor_index != scissor || hd_handle_ne(&pi->hd_texture_index, &hd_texture) ||
+         pi->filtering != filtering || pi->scaled_read != scaled_read || pi->shift != shift ||
+         pi->offset_uv != offset_uv)
       {
-         unsigned to_draw = i - last_draw;
+         to_draw = i - last_draw;
          commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
-         commandbuffer_draw(cbh_get(&self->cmd), 3 * to_draw, 1, 3 * last_draw, 0);
+         commandbuffer_draw_indexed(cbh_get(&self->cmd), 3 * to_draw, 3 * last_draw);
          last_draw = i;
 
-         if ((*PrimitiveInfoVec_at(scissors, i)).scissor_index != scissor) {
-            scissor = (*PrimitiveInfoVec_at(scissors, i)).scissor_index;
+         if (pi->scissor_index != scissor) {
+            scissor = pi->scissor_index;
             commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? &self->queue.default_scissor : Rect2DVec_at(&self->queue.scissors, scissor));
          }
-         if (hd_handle_ne(&(*PrimitiveInfoVec_at(scissors, i)).hd_texture_index, &hd_texture)) {
-            hd_texture = (*PrimitiveInfoVec_at(scissors, i)).hd_texture_index;
+         if (hd_handle_ne(&pi->hd_texture_index, &hd_texture)) {
+            hd_texture = pi->hd_texture_index;
             if (textured)
                renderer_hd_texture_uniforms(self, hd_texture);
          }
-         if ((*PrimitiveInfoVec_at(scissors, i)).filtering != filtering) {
-            filtering = (*PrimitiveInfoVec_at(scissors, i)).filtering;
+         if (pi->filtering != filtering) {
+            filtering = pi->filtering;
             commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, filtering ? self->primitive_filter_mode : FilterMode_NearestNeighbor);
          }
-         if ((*PrimitiveInfoVec_at(scissors, i)).scaled_read != scaled_read) {
-            scaled_read = (*PrimitiveInfoVec_at(scissors, i)).scaled_read;
+         if (pi->scaled_read != scaled_read) {
+            scaled_read = pi->scaled_read;
             renderer_dispatch_set_scaled_read_texture(self, scaled_read, textured);
          }
-         if ((*PrimitiveInfoVec_at(scissors, i)).shift != shift) {
-            shift = (*PrimitiveInfoVec_at(scissors, i)).shift;
+         if (pi->shift != shift) {
+            shift = pi->shift;
             commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
          }
-         if ((*PrimitiveInfoVec_at(scissors, i)).offset_uv != offset_uv) {
-            offset_uv = (*PrimitiveInfoVec_at(scissors, i)).offset_uv;
+         if (pi->offset_uv != offset_uv) {
+            offset_uv = pi->offset_uv;
             commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
          }
       }
-      memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)vertices) + 3 * (*PrimitiveInfoVec_at(scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
    }
 
    to_draw = size - last_draw;
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
-   commandbuffer_draw(cbh_get(&self->cmd), 3 * to_draw, 1, 3 * last_draw, 0);
-   }
+   commandbuffer_draw_indexed(cbh_get(&self->cmd), 3 * to_draw, 3 * last_draw);
 }
 
 static void renderer_render_opaque_primitives(Renderer *self){
-   BufferVertexVec *vertices = &self->queue.opaque;
    PrimitiveInfoVec *scissors = &self->queue.opaque_scissor;
-   if (BufferVertexVec_empty(vertices))
+   if (PrimitiveInfoVec_empty(scissors))
       return;
 
    commandbuffer_set_opaque_state(cbh_get(&self->cmd));
@@ -10363,7 +11211,7 @@ static void renderer_render_opaque_primitives(Renderer *self){
    renderer_set_opaque_primitive_spec_constants(self, TransMode_Opaque);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-   renderer_dispatch(self, vertices, scissors, false);
+   renderer_dispatch(self, scissors, false);
 }
 
 static void renderer_hd_texture_uniforms(Renderer *self,
@@ -10506,7 +11354,7 @@ static void renderer_emit_sub_ceiling(Renderer *self, const SemiTransparentState
    commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO,
          VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE);
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
-   commandbuffer_draw(cbh_get(&self->cmd), count * 3, 1, first_prim * 3, 0);
+   commandbuffer_draw_indexed(cbh_get(&self->cmd), count * 3, first_prim * 3);
    renderer_semi_transparent_set_state(self, state);
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 }
@@ -10531,49 +11379,20 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-   { bool append_floor = self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT &&
-         !psx_hdr_multipass;
-   unsigned nverts = (unsigned)BufferVertexVec_size(&self->queue.semi_transparent);
-   size_t size = (size_t)nverts * sizeof(BufferVertex);
-   void *verts = commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0,
-         size + (append_floor ? 6 * sizeof(BufferVertex) : 0),
-         sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX);
-
-   /* Out of host-visible memory: nothing to stage into. */
-   if (!verts)
+   { const unsigned nverts = (unsigned)BufferVertexVec_size(&self->queue.vertices);
+   const unsigned avail  = nverts / 3;
+   unsigned i, k;
+   /* In the order queued, as indices into the render pass's vertices; a
+    * triangle the vertices do not hold is drawn degenerate. NULL when out
+    * of host-visible memory: nowhere to stage them. */
+   uint32_t *index = commandbuffer_allocate_index_data(cbh_get(&self->cmd), 3 * prims);
+   if (!index)
       return;
-
-   /* One SemiTransparentState per three queued vertices. The two queues
-    * grow independently, so bound the batch walk and every draw range by
-    * the vertices actually present. */
-   if (prims > nverts / 3)
-      prims = nverts / 3;
-   if (!prims)
-      return;
-
-   memcpy(verts, BufferVertexVec_data(&self->queue.semi_transparent), size);
-
-   /* Multipass off: one full-framebuffer quad at the tail of the vertex
-    * data, drawn with MAX blending after each fixed-function subtractive
-    * batch (renderer_emit_sub_floor). 96 bytes, appended only on the 16F
-    * target; depth is a don't-care because the floor pass disables the
-    * depth test. */
-   if (append_floor)
+   for (i = 0; i < prims; i++)
    {
-      BufferVertex *fv = (BufferVertex *)verts + nverts;
-      unsigned fi;
-      memset(fv, 0, 6 * sizeof(BufferVertex));
-      fv[1].x = (float)FB_WIDTH;
-      fv[2].y = (float)FB_HEIGHT;
-      fv[3].x = (float)FB_WIDTH;
-      fv[3].y = (float)FB_HEIGHT;
-      fv[4] = fv[2];
-      fv[5] = fv[1];
-      for (fi = 0; fi < 6; fi++)
-      {
-         fv[fi].z = 0.5f;
-         fv[fi].w = 1.0f;
-      }
+      const unsigned t = SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i)->triangle_index;
+      for (k = 0; k < 3; k++)
+         index[3 * i + k] = t < avail ? 3 * t + k : 0;
    }
 
    last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, 0);
@@ -10582,7 +11401,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
 
    /* These pixels are blended, so we have to render them in-order.
     * Batch up as long as we can. */
-   { unsigned i; for (i = 1; i < prims; i++) {
+   { for (i = 1; i < prims; i++) {
       /* Preserve per-primitive boundaries for feedback reads and native-
        * colour draws; later primitives may overlap earlier ones. */
       if (renderer_semi_trans_needs_separate_draw(self, &last_state) ||
@@ -10604,7 +11423,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
 
          if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
             renderer_emit_sub_ceiling(self, &last_state, last_draw_offset, to_draw);
-         commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
+         commandbuffer_draw_indexed(cbh_get(&self->cmd), to_draw * 3, last_draw_offset * 3);
          if (self->msaa > 1)
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
          if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
@@ -10620,7 +11439,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
    if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
       renderer_emit_sub_ceiling(self, &last_state, last_draw_offset, to_draw);
-   commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
+   commandbuffer_draw_indexed(cbh_get(&self->cmd), to_draw * 3, last_draw_offset * 3);
    if (self->msaa > 1)
       commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
    if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
@@ -10810,6 +11629,24 @@ static ImageHandle renderer_upload_texture(Renderer *self,
    info.misc = 0u;
    info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+   if (levels->staging) {
+      /* Decoded straight into upload memory (vk_tt_staging_alloc): record
+       * the copy from it, nothing to copy here. Flushes it first when the
+       * memory is not coherent. */
+      Buffer *buffer = (Buffer *)levels->staging;
+      InitialImageBuffer staging;
+      TextureFormatLayout layout;
+      tfl_init(&layout);
+      tfl_set_2d(&layout, info.format, info.width, info.height, 1, n);
+      buffer_add_reference(buffer);
+      staging.buffer = bh_make(buffer);
+      tfl_build_buffer_image_copies(&layout, staging.blits, &staging.num_blits);
+      device_unmap_host_buffer(self->device, buffer, MEMORY_ACCESS_WRITE_BIT);
+      image = device_create_image_from_staging_buffer(self->device, &info, &staging);
+      bh_reset(&staging.buffer);
+      return image;
+   }
+
    for (i = 0; i < n; i++) {
       initial[i].data = levels->levels[i].owned_data;
       initial[i].row_length = 0;
@@ -10850,6 +11687,58 @@ static TTGpuImage *vk_tt_upload_levels(void *ctx, const LoadedLevels *levels)
    Renderer *self = (Renderer *)ctx;
    ImageHandle h = renderer_upload_texture(self, (LoadedLevels *)levels);
    return (TTGpuImage *)ih_get(&h); /* carries the +1 from device_create_image */
+}
+
+/* Upload memory for a decoded chain: one persistently mapped, cached
+ * host buffer laid out as the copy into the image wants it, so the decoder
+ * writes the levels where the GPU copies them from. The buffer's last
+ * reference goes through the device's deferred destruction, so its memory is
+ * not reused before the frame that recorded a copy from it has retired.
+ * Without cached host memory (reading the level above to build each mip
+ * from uncached memory would be slow) there is none, and the levels go
+ * through device_create_image's staging copy as before. */
+static TTStaging *vk_tt_staging_alloc(void *ctx, int width, int height,
+      int levels, uint8_t **level_data)
+{
+   Renderer *self = (Renderer *)ctx;
+   Device   *device = self->device;
+   TextureFormatLayout layout;
+   BufferCreateInfo info;
+   BufferHandle buffer;
+   uint8_t *mapped;
+   int i;
+   if (self->hd_staging_uncached || levels <= 0 || levels > 16)
+      return NULL;
+   tfl_init(&layout);
+   tfl_set_2d(&layout, VK_FORMAT_R8G8B8A8_UNORM, width, height, 1, levels);
+   memset(&info, 0, sizeof(info));
+   info.domain = BufferDomain_CachedHost;
+   info.size   = tfl_get_required_size(&layout);
+   info.usage  = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+   buffer = device_create_buffer(device, &info, NULL);
+   if (!bh_get(&buffer))
+      return NULL;
+   if (!(device->mem_props.memoryTypes[bh_get(&buffer)->alloc.memory_type].propertyFlags
+            & VK_MEMORY_PROPERTY_HOST_CACHED_BIT)) {
+      self->hd_staging_uncached = true;
+      bh_reset(&buffer);
+      return NULL;
+   }
+   mapped = (uint8_t *)device_map_host_buffer(device, bh_get(&buffer), MEMORY_ACCESS_WRITE_BIT);
+   if (!mapped) {
+      bh_reset(&buffer);
+      return NULL;
+   }
+   tfl_set_buffer(&layout, mapped, tfl_get_required_size(&layout));
+   for (i = 0; i < levels; i++)
+      level_data[i] = (uint8_t *)tfl_data(&layout, 0, (unsigned)i);
+   return (TTStaging *)bh_get(&buffer); /* the buffer's one reference */
+}
+
+static void vk_tt_staging_release(void *ctx, TTStaging *staging)
+{
+   (void)ctx;
+   buffer_release_reference((Buffer *)staging);
 }
 
 static void vk_tt_image_addref(void *ctx, TTGpuImage *img)
@@ -10995,12 +11884,86 @@ static TTGpuBackend vk_tt_make_backend(Renderer *self)
    vt.page_begin       = vk_tt_page_begin;
    vt.page_blit        = vk_tt_page_blit;
    vt.page_end         = vk_tt_page_end;
+   vt.staging_alloc    = vk_tt_staging_alloc;
+   vt.staging_release  = vk_tt_staging_release;
    return vt;
 }
 
-static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect){
-   VkDeviceSize size;
-   BufferHandle buffer;
+/* Space for one upload in the current frame context's ring; NULL when the
+ * ring cannot hold it. *elem receives its texel offset in the ring's view. */
+static uint16_t *renderer_upload_ring_alloc(Renderer *self, VkDeviceSize size,
+      struct UploadRing **out, uint32_t *elem)
+{
+   const unsigned slot = self->device->frame_context_index;
+   struct UploadRing *r;
+   VkDeviceSize      off;
+   uint8_t          *base;
+
+   if (slot >= RENDERER_UPLOAD_RINGS)
+      return NULL;
+   r = &self->upload_ring[slot];
+   if (!bh_get(&r->buf))
+   {
+      const VkDeviceSize limit = (VkDeviceSize)device_get_gpu_properties(self->device)
+            ->limits.maxTexelBufferElements * sizeof(uint16_t);
+      BufferCreateInfo     info;
+      BufferViewCreateInfo view_info;
+      VkDeviceSize         want = 4u * 1024u * 1024u;
+      if (want > limit)
+         want = limit & ~(VkDeviceSize)0xffff;
+      if (!want)
+         return NULL;
+      info.domain = BufferDomain_Host;
+      info.size   = want;
+      info.usage  = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+      bh_move(&r->buf, device_create_buffer(self->device, &info, NULL));
+      if (!bh_get(&r->buf))
+         return NULL;
+      memset(&view_info, 0, sizeof(view_info));
+      view_info.buffer = bh_get(&r->buf);
+      view_info.format = VK_FORMAT_R16_UINT;
+      view_info.offset = 0;
+      view_info.range  = want;
+      r->view   = device_create_buffer_view(self->device, &view_info);
+      r->size   = want;
+      r->used   = 0;
+      r->serial = self->upload_serial;
+   }
+   if (r->serial != self->upload_serial)
+   {
+      r->serial = self->upload_serial;
+      r->used   = 0;
+   }
+   off = (r->used + 63u) & ~(VkDeviceSize)63u;
+   if (off + size > r->size || !bvh_get(&r->view))
+      return NULL;
+   base = (uint8_t *)device_map_host_buffer(self->device, bh_get(&r->buf), MEMORY_ACCESS_WRITE_BIT);
+   if (!base)
+      return NULL;
+   r->used = off + size;
+   *out    = r;
+   *elem   = (uint32_t)(off / sizeof(uint16_t));
+   return (uint16_t *)(base + off);
+}
+
+/* Record the copy of `rect` from a staging buffer into VRAM and return
+ * where the caller writes the pixels, mapped. The staging comes from the
+ * frame's upload ring; *owned receives a buffer of its own only when the
+ * ring cannot hold the rect, and *mapped the buffer to unmap afterwards. */
+static uint16_t *renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect,
+      BufferHandle *owned, const Buffer **mapped)
+{
+   VkDeviceSize       size;
+   struct UploadRing *ring = NULL;
+   uint32_t           elem = 0;
+   uint16_t          *dst;
+   struct Push
+   {
+      TTRect   rect;
+      uint32_t offset;
+      uint32_t mask_or;
+   };
+
    ih_reset(&self->last_scanout);
    fbatlas_load_image(&self->atlas, rect);
    /* CPU-uploaded pixels replace any GPU-written provenance. */
@@ -11008,26 +11971,35 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect
          (int)rect->width, (int)rect->height, 0);
    size = rect->width * rect->height * sizeof(uint16_t);
 
-   /* TODO: Chain allocate this. */
-   { BufferCreateInfo buffer_create_info;
-   buffer_create_info.domain = BufferDomain_Host;
-   buffer_create_info.size = size;
-   buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-   buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
-
-   { BufferViewCreateInfo view_info = {};
-   view_info.buffer = bh_get(&buffer);
-
-   { struct Push
-   {
-      TTRect rect;
-      uint32_t offset;
-      uint32_t mask_or;
-   };
-
    renderer_ensure_command_buffer(self);
    commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? self->pipelines.copy_to_vram_masked : self->pipelines.copy_to_vram);
    commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
+
+   dst = renderer_upload_ring_alloc(self, size, &ring, &elem);
+   if (dst)
+   {
+      struct Push push;
+      push.rect    = *rect;
+      push.offset  = elem;
+      push.mask_or = self->render_state.force_mask_bit ? 0x8000u : 0u;
+      commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&ring->view));
+      commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+      commandbuffer_dispatch(cbh_get(&self->cmd), (rect->width + 7) >> 3, (rect->height + 7) >> 3, 1);
+      *mapped = bh_get(&ring->buf);
+      return dst;
+   }
+
+   { BufferCreateInfo buffer_create_info;
+   BufferViewCreateInfo view_info;
+   buffer_create_info.domain = BufferDomain_Host;
+   buffer_create_info.size = size;
+   buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+   bh_move(owned, device_create_buffer(self->device, &buffer_create_info, NULL));
+   if (!bh_get(owned))
+      return NULL;
+
+   memset(&view_info, 0, sizeof(view_info));
+   view_info.buffer = bh_get(owned);
 
    /* Vulkan minimum limit, for large buffer views, split up the work. */
    if (rect->width * rect->height > device_get_gpu_properties(self->device)->limits.maxTexelBufferElements)
@@ -11063,22 +12035,21 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect
 
       { struct Push push = { *rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
       commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
-
-      /* TODO: Batch up work. */
       commandbuffer_dispatch(cbh_get(&self->cmd), (rect->width + 7) >> 3, (rect->height + 7) >> 3, 1);
       bvh_reset(&view);
       }
    }
+   }
 
-   return buffer;
-   }
-   }
-   }
+   *mapped = bh_get(owned);
+   return (uint16_t *)device_map_host_buffer(self->device, bh_get(owned), MEMORY_ACCESS_WRITE_BIT);
 }
 
 static void renderer_fini(Renderer *self)
 {
    renderer_flush(self);
+   psx_upscaler_free(self->upscaler);
+   self->upscaler = NULL;
    texture_tracker_free(self->tracker); /* heap tracker: explicit teardown */
    self->tracker = NULL;
    /* Release the ImageHandle members (previously dropped by implicit member
@@ -11101,16 +12072,38 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->analog_dec);
    ih_reset(&self->analog_rgb);
    ih_reset(&self->analog_out);
+   ih_reset(&self->dt_aces2_lut);
+   ih_reset(&self->dt_aces2_cube);
+   ih_reset(&self->dt_dummy_3d);
+   ih_reset(&self->dt_film_lut);
+   ih_reset(&self->dt_film_desat);
+   ih_reset(&self->dt_dummy);
+   bh_reset(&self->readback);
+   { unsigned i;
+   for (i = 0; i < RENDERER_IMAGE_CACHE; i++)
+      ih_reset(&self->image_cache[i]);
+   }
+   { unsigned i;
+   for (i = 0; i < RENDERER_UPLOAD_RINGS; i++)
+   {
+      bvh_reset(&self->upload_ring[i].view);
+      bh_reset(&self->upload_ring[i].buf);
+   }
+   }
+   { unsigned i;
+   for (i = 0; i < 4; i++)
+      ih_reset(&self->post_bloom[i]);
+   for (i = 0; i < HDR_POST_CONV_MAX; i++)
+      ih_reset(&self->post_conv[i]);
+   }
+   ih_reset(&self->post_out);
    bh_reset(&self->quad);
    imageview_vec_destroy(&self->scaled_views); /* release scaled image views (was member teardown) */
    /* Free the per-frame draw-self->queue arrays (POD_VEC backing storage). */
-   BufferVertexVec_free_storage(&self->queue.opaque);
+   BufferVertexVec_free_storage(&self->queue.vertices);
    PrimitiveInfoVec_free_storage(&self->queue.opaque_scissor);
-   BufferVertexVec_free_storage(&self->queue.opaque_textured);
    PrimitiveInfoVec_free_storage(&self->queue.opaque_textured_scissor);
-   BufferVertexVec_free_storage(&self->queue.semi_transparent_opaque);
    PrimitiveInfoVec_free_storage(&self->queue.semi_transparent_opaque_scissor);
-   BufferVertexVec_free_storage(&self->queue.semi_transparent);
    SemiTransparentStateVec_free_storage(&self->queue.semi_transparent_state);
    Rect2DVec_free_storage(&self->queue.scaled_resolves);
    Rect2DVec_free_storage(&self->queue.unscaled_resolves);
@@ -11138,13 +12131,10 @@ static void renderer_reset_scissor_queue(Renderer *self)
 
 static void renderer_reset_queue(Renderer *self)
 {
-   BufferVertexVec_clear(&self->queue.opaque);
+   BufferVertexVec_clear(&self->queue.vertices);
    PrimitiveInfoVec_clear(&self->queue.opaque_scissor);
-   BufferVertexVec_clear(&self->queue.opaque_textured);
    PrimitiveInfoVec_clear(&self->queue.opaque_textured_scissor);
-   BufferVertexVec_clear(&self->queue.semi_transparent);
    SemiTransparentStateVec_clear(&self->queue.semi_transparent_state);
-   BufferVertexVec_clear(&self->queue.semi_transparent_opaque);
    PrimitiveInfoVec_clear(&self->queue.semi_transparent_opaque_scissor);
    ClearCandidateVec_clear(&self->queue.clear_candidates);
    Rect2DVec_clear(&self->queue.scaled_texture_reads);
@@ -14880,14 +15870,49 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       commandbuffer_begin_compute(self);
    }
 
-   static VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self,
-         Hash hash)
+   /* What a pipeline is built from: the state a command buffer holds when
+    * it needs one, or the same state read back from the pipeline list
+    * (see the pipeline warm-up below). Everything it points at is
+    * immutable once made, so a thread other than the renderer's can build
+    * from it. */
+   /* Kept out of the flush that calls it: a pipeline that has to be made
+    * is the cold path. */
+#ifndef RHI_NOINLINE
+#if defined(_MSC_VER)
+#define RHI_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__)
+#define RHI_NOINLINE __attribute__((noinline))
+#else
+#define RHI_NOINLINE
+#endif
+#endif
+
+   typedef struct PipelineDesc
    {
-      VkPipeline compute_pipeline;
+      Device                  *device;
+      Program                 *program;
+      const RenderPass        *rp;            /* graphics only */
+      const PipelineState     *static_state;
+      const PotentialState    *potential;
+      const VertexAttribState *attribs;       /* VULKAN_NUM_VERTEX_ATTRIBS */
+      const VkDeviceSize      *strides;       /* VULKAN_NUM_VERTEX_BUFFERS */
+      const VkVertexInputRate *input_rates;   /* VULKAN_NUM_VERTEX_BUFFERS */
+      unsigned                 subpass;
+   } PipelineDesc;
+
+   static int  device_warm_take(Device *self, Program *program, Hash hash,
+         VkPipeline *out);
+   static void device_warm_record(Device *self, const PipelineDesc *d,
+         Hash hash, bool compute);
+
+   static VkPipeline pipeline_build_compute(const PipelineDesc *d)
+   {
+      const PipelineLayout *layout = program_get_pipeline_layout(d->program);
+      VkPipeline compute_pipeline = VK_NULL_HANDLE;
       VkResult res;
-      const Shader *shader = program_get_shader(self->current_program, ShaderStage_Compute);
+      const Shader *shader = program_get_shader(d->program, ShaderStage_Compute);
       VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-      info.layout = pipeline_layout_get_layout(program_get_pipeline_layout(self->current_program));
+      info.layout = pipeline_layout_get_layout(program_get_pipeline_layout(d->program));
       info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
       info.stage.module = shader_get_module(shader);
       info.stage.pName = "main";
@@ -14901,14 +15926,14 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       { VkSpecializationInfo spec_info = {};
       VkSpecializationMapEntry spec_entries[VULKAN_NUM_SPEC_CONSTANTS];
-      uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->combined_spec_constant_mask &
-         self->static_state.state.spec_constant_mask;
+      uint32_t mask = pipeline_layout_get_resource_layout(layout)->combined_spec_constant_mask &
+         d->static_state->state.spec_constant_mask;
 
       if (mask)
       {
          info.stage.pSpecializationInfo = &spec_info;
-         spec_info.pData = self->potential_static_state.spec_constants;
-         spec_info.dataSize = sizeof(self->potential_static_state.spec_constants);
+         spec_info.pData = d->potential->spec_constants;
+         spec_info.dataSize = sizeof(d->potential->spec_constants);
          spec_info.pMapEntries = spec_entries;
 
          { uint32_t _feit, bit; FOR_EACH_BIT(mask, _feit, bit)
@@ -14922,21 +15947,23 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
 
 
-      res = vkCreateComputePipelines(device_get_device(self->device),
-            device_get_pipeline_cache(self->device), 1, &info, NULL,
+      res = vkCreateComputePipelines(device_get_device(d->device),
+            device_get_pipeline_cache(d->device), 1, &info, NULL,
             &compute_pipeline);
       if (res != VK_SUCCESS)
+      {
          LOGE("Failed to create compute pipeline!\n");
-
-      return program_add_pipeline(self->current_program, hash, compute_pipeline);
+         compute_pipeline = VK_NULL_HANDLE;
+      }
+      return compute_pipeline;
       }
    }
 
-   static VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self,
-         Hash hash)
+   static VkPipeline pipeline_build_graphics(const PipelineDesc *d)
    {
+      const PipelineLayout *layout = program_get_pipeline_layout(d->program);
       uint32_t attr_mask;
-      VkPipeline pipeline;
+      VkPipeline pipeline = VK_NULL_HANDLE;
       VkResult res;
       /* Viewport state */
       VkPipelineViewportStateCreateInfo vp = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
@@ -14954,51 +15981,51 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       /* Blend state */
       { VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
       VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-      blend.attachmentCount = render_pass_get_num_color_attachments(self->compatible_render_pass, self->current_subpass);
+      blend.attachmentCount = render_pass_get_num_color_attachments(d->rp, d->subpass);
       blend.pAttachments = blend_attachments;
       { unsigned i; for (i = 0; i < blend.attachmentCount; i++) {
          VkPipelineColorBlendAttachmentState *att = &blend_attachments[i];
          memset(att, 0, sizeof(*att));
 
-         if (render_pass_get_color_attachment(self->compatible_render_pass, self->current_subpass, i)->attachment != VK_ATTACHMENT_UNUSED &&
-               (pipeline_layout_get_resource_layout(self->current_layout)->render_target_mask & (1u << i)))
+         if (render_pass_get_color_attachment(d->rp, d->subpass, i)->attachment != VK_ATTACHMENT_UNUSED &&
+               (pipeline_layout_get_resource_layout(layout)->render_target_mask & (1u << i)))
          {
             att->colorWriteMask = 0xf;
-            att->blendEnable = self->static_state.state.blend_enable;
+            att->blendEnable = d->static_state->state.blend_enable;
             if (att->blendEnable)
             {
-               att->alphaBlendOp = (VkBlendOp)(self->static_state.state.alpha_blend_op);
-               att->colorBlendOp = (VkBlendOp)(self->static_state.state.color_blend_op);
-               att->dstAlphaBlendFactor = (VkBlendFactor)(self->static_state.state.dst_alpha_blend);
-               att->srcAlphaBlendFactor = (VkBlendFactor)(self->static_state.state.src_alpha_blend);
-               att->dstColorBlendFactor = (VkBlendFactor)(self->static_state.state.dst_color_blend);
-               att->srcColorBlendFactor = (VkBlendFactor)(self->static_state.state.src_color_blend);
+               att->alphaBlendOp = (VkBlendOp)(d->static_state->state.alpha_blend_op);
+               att->colorBlendOp = (VkBlendOp)(d->static_state->state.color_blend_op);
+               att->dstAlphaBlendFactor = (VkBlendFactor)(d->static_state->state.dst_alpha_blend);
+               att->srcAlphaBlendFactor = (VkBlendFactor)(d->static_state->state.src_alpha_blend);
+               att->dstColorBlendFactor = (VkBlendFactor)(d->static_state->state.dst_color_blend);
+               att->srcColorBlendFactor = (VkBlendFactor)(d->static_state->state.src_color_blend);
             }
          }
       } }
-      memcpy(blend.blendConstants, self->potential_static_state.blend_constants, sizeof(blend.blendConstants));
+      memcpy(blend.blendConstants, d->potential->blend_constants, sizeof(blend.blendConstants));
 
       /* Depth state */
       { VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-      ds.depthTestEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_test;
-      ds.depthWriteEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_write;
+      ds.depthTestEnable = render_pass_has_depth(d->rp, d->subpass) && d->static_state->state.depth_test;
+      ds.depthWriteEnable = render_pass_has_depth(d->rp, d->subpass) && d->static_state->state.depth_write;
 
       if (ds.depthTestEnable)
-         ds.depthCompareOp = (VkCompareOp)(self->static_state.state.depth_compare);
+         ds.depthCompareOp = (VkCompareOp)(d->static_state->state.depth_compare);
 
       /* Vertex input */
       { VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
       VkVertexInputAttributeDescription vi_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
       vi.pVertexAttributeDescriptions = vi_attribs;
-      attr_mask = pipeline_layout_get_resource_layout(self->current_layout)->attribute_mask;
+      attr_mask = pipeline_layout_get_resource_layout(layout)->attribute_mask;
       { uint32_t binding_mask = 0;
       { uint32_t _feit, bit; FOR_EACH_BIT(attr_mask, _feit, bit)
       {
          VkVertexInputAttributeDescription *attr = &vi_attribs[vi.vertexAttributeDescriptionCount++];
          attr->location = bit;
-         attr->binding = self->attribs[bit].binding;
-         attr->format = self->attribs[bit].format;
-         attr->offset = self->attribs[bit].offset;
+         attr->binding = d->attribs[bit].binding;
+         attr->format = d->attribs[bit].format;
+         attr->offset = d->attribs[bit].offset;
          binding_mask |= 1u << attr->binding;
       }
       }
@@ -15009,30 +16036,30 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       {
          VkVertexInputBindingDescription *bind = &vi_bindings[vi.vertexBindingDescriptionCount++];
          bind->binding = bit;
-         bind->inputRate = self->vbo.input_rates[bit];
-         bind->stride = self->vbo.strides[bit];
+         bind->inputRate = d->input_rates[bit];
+         bind->stride = d->strides[bit];
       }
       }
 
       /* Input assembly */
       { VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-      ia.topology = (VkPrimitiveTopology)(self->static_state.state.topology);
+      ia.topology = (VkPrimitiveTopology)(d->static_state->state.topology);
 
       /* Multisample */
       { VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-      ms.rasterizationSamples = (VkSampleCountFlagBits)(render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass));
+      ms.rasterizationSamples = (VkSampleCountFlagBits)(render_pass_get_sample_count(d->rp, d->subpass));
 
-      if (render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass) > 1)
+      if (render_pass_get_sample_count(d->rp, d->subpass) > 1)
       {
-         ms.alphaToCoverageEnable = self->static_state.state.alpha_to_coverage;
-         ms.alphaToOneEnable = self->static_state.state.alpha_to_one;
-         ms.sampleShadingEnable = self->static_state.state.sample_shading;
+         ms.alphaToCoverageEnable = d->static_state->state.alpha_to_coverage;
+         ms.alphaToOneEnable = d->static_state->state.alpha_to_one;
+         ms.sampleShadingEnable = d->static_state->state.sample_shading;
          ms.minSampleShading = 1.0f;
       }
 
       /* Raster */
       { VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-      raster.cullMode = (VkCullModeFlags)(self->static_state.state.cull_mode);
+      raster.cullMode = (VkCullModeFlags)(d->static_state->state.cull_mode);
       raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
       raster.lineWidth = 1.0f;
       raster.polygonMode = VK_POLYGON_MODE_FILL;
@@ -15046,27 +16073,27 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       { unsigned i; for (i = 0; i < (unsigned)(ShaderStage_Count); i++) {
          ShaderStage stage = (ShaderStage)(i);
-         if (program_get_shader(self->current_program, stage))
+         if (program_get_shader(d->program, stage))
          {
             VkPipelineShaderStageCreateInfo *s = &stages[num_stages++];
             memset(s, 0, sizeof(*s)); s->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            s->module = shader_get_module(program_get_shader(self->current_program, stage));
+            s->module = shader_get_module(program_get_shader(d->program, stage));
 #ifdef GRANITE_SPIRV_DUMP
             LOGI("Compiling SPIR-V file: (%s) %s\n",
                   shader_stage_to_name(stage),
-                  (to_string(program_get_shader(self->current_program, stage)->intrusive_node.key) + ".spv").c_str());
+                  (to_string(program_get_shader(d->program, stage)->intrusive_node.key) + ".spv").c_str());
 #endif
             s->pName = "main";
             s->stage = (VkShaderStageFlagBits)(1u << i);
 
-            { uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->spec_constant_mask[i] &
-               self->static_state.state.spec_constant_mask;
+            { uint32_t mask = pipeline_layout_get_resource_layout(layout)->spec_constant_mask[i] &
+               d->static_state->state.spec_constant_mask;
 
             if (mask)
             {
                s->pSpecializationInfo = &spec_info[i];
-               spec_info[i].pData = self->potential_static_state.spec_constants;
-               spec_info[i].dataSize = sizeof(self->potential_static_state.spec_constants);
+               spec_info[i].pData = d->potential->spec_constants;
+               spec_info[i].dataSize = sizeof(d->potential->spec_constants);
                spec_info[i].pMapEntries = spec_entries[i];
 
                { uint32_t _feit, bit; FOR_EACH_BIT(mask, _feit, bit)
@@ -15083,9 +16110,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       } }
 
       { VkGraphicsPipelineCreateInfo pipe = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-      pipe.layout = self->current_pipeline_layout;
-      pipe.renderPass = render_pass_get_render_pass(self->compatible_render_pass);
-      pipe.subpass = self->current_subpass;
+      pipe.layout = pipeline_layout_get_layout(layout);
+      pipe.renderPass = render_pass_get_render_pass(d->rp);
+      pipe.subpass = d->subpass;
 
       pipe.pViewportState = &vp;
       pipe.pDynamicState = &dyn;
@@ -15099,24 +16126,78 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       pipe.stageCount = num_stages;
 
 
-      res = vkCreateGraphicsPipelines(device_get_device(self->device),
-            device_get_pipeline_cache(self->device), 1, &pipe, NULL, &pipeline);
+      res = vkCreateGraphicsPipelines(device_get_device(d->device),
+            device_get_pipeline_cache(d->device), 1, &pipe, NULL, &pipeline);
       if (res != VK_SUCCESS)
+      {
          LOGE("Failed to create graphics pipeline!\n");
+         pipeline = VK_NULL_HANDLE;
+      }
+      return pipeline;
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+   }
 
+   static void commandbuffer_pipeline_desc(struct CommandBuffer *self,
+         PipelineDesc *d)
+   {
+      d->device       = self->device;
+      d->program      = self->current_program;
+      d->rp           = self->compatible_render_pass;
+      d->static_state = &self->static_state;
+      d->potential    = &self->potential_static_state;
+      d->attribs      = self->attribs;
+      d->strides      = self->vbo.strides;
+      d->input_rates  = self->vbo.input_rates;
+      d->subpass      = self->current_subpass;
+   }
+
+   /* A pipeline the program does not have yet: one the warm-up thread has
+    * built, else built here. Either way it goes on the pipeline list. */
+   static RHI_NOINLINE VkPipeline commandbuffer_build_compute_pipeline(
+         struct CommandBuffer *self, Hash hash)
+   {
+      PipelineDesc d;
+      VkPipeline   pipeline;
+
+      commandbuffer_pipeline_desc(self, &d);
+      if (device_warm_take(self->device, self->current_program, hash, &pipeline))
+      {
+         device_warm_record(self->device, &d, hash, true);
+         return pipeline;
+      }
+      pipeline = pipeline_build_compute(&d);
+      if (pipeline != VK_NULL_HANDLE)
+         device_warm_record(self->device, &d, hash, true);
       return program_add_pipeline(self->current_program, hash, pipeline);
+   }
+
+   static RHI_NOINLINE VkPipeline commandbuffer_build_graphics_pipeline(
+         struct CommandBuffer *self, Hash hash)
+   {
+      PipelineDesc d;
+      VkPipeline   pipeline;
+
+      commandbuffer_pipeline_desc(self, &d);
+      if (device_warm_take(self->device, self->current_program, hash, &pipeline))
+      {
+         device_warm_record(self->device, &d, hash, false);
+         return pipeline;
       }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
+      pipeline = pipeline_build_graphics(&d);
+      if (pipeline != VK_NULL_HANDLE)
+         device_warm_record(self->device, &d, hash, false);
+      return program_add_pipeline(self->current_program, hash, pipeline);
    }
 
    static void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self)
@@ -15424,6 +16505,25 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       return data.host;
    }
 
+   /* count 32-bit indices out of the vertex block, bound as the index
+    * buffer; NULL when the device is out of host-visible memory */
+   static uint32_t *commandbuffer_allocate_index_data(struct CommandBuffer *self,
+         uint32_t count)
+   {
+      const VkDeviceSize size = (VkDeviceSize)count * sizeof(uint32_t);
+      BufferBlockAllocation data = bufferblock_allocate(&self->vbo_block, size);
+      if (!data.host)
+      {
+         device_request_vertex_block(self->device, &self->vbo_block, size);
+         data = bufferblock_allocate(&self->vbo_block, size);
+      }
+      if (!data.host)
+         return NULL;
+      vkCmdBindIndexBuffer(self->cmd, buffer_get_buffer(bh_get(&self->vbo_block.gpu)),
+            data.offset, VK_INDEX_TYPE_UINT32);
+      return (uint32_t *)data.host;
+   }
+
    static void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer *buffer, VkDeviceSize offset,
          VkDeviceSize range)
    {
@@ -15431,6 +16531,24 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
       VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
       VK_ASSERT(buffer_get_create_info(buffer)->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+      b = &self->bindings.bindings[set][binding];
+
+      if (buffer->cookie_base.cookie == self->bindings.cookies[set][binding] && b->buffer.offset == offset && b->buffer.range == range)
+         return;
+
+      b->buffer.buffer = buffer_get_buffer(buffer); b->buffer.offset = offset; b->buffer.range = range;
+      self->bindings.cookies[set][binding] = buffer->cookie_base.cookie;
+      self->bindings.secondary_cookies[set][binding] = 0;
+      self->dirty_sets |= 1u << set;
+   }
+
+   static void commandbuffer_set_storage_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer *buffer, VkDeviceSize offset,
+         VkDeviceSize range)
+   {
+      ResourceBinding * b;
+      VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
+      VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
+      VK_ASSERT(buffer_get_create_info(buffer)->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
       b = &self->bindings.bindings[set][binding];
 
       if (buffer->cookie_base.cookie == self->bindings.cookies[set][binding] && b->buffer.offset == offset && b->buffer.range == range)
@@ -15811,6 +16929,18 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       VK_ASSERT(!self->is_compute);
       commandbuffer_flush_render_state(self);
       vkCmdDraw(self->cmd, vertex_count, instance_count, first_vertex, first_instance);
+   }
+
+   /* Draws index_count 32-bit indices from first_index of the index buffer
+    * commandbuffer_allocate_index_data bound last */
+   static void commandbuffer_draw_indexed(struct CommandBuffer *self,
+         uint32_t index_count,
+         uint32_t first_index)
+   {
+      VK_ASSERT(self->current_program);
+      VK_ASSERT(!self->is_compute);
+      commandbuffer_flush_render_state(self);
+      vkCmdDrawIndexed(self->cmd, index_count, 1, first_index, 0, 0);
    }
 
    static void commandbuffer_dispatch(struct CommandBuffer *self,
@@ -16705,6 +17835,1012 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       free(buf);
    }
 
+   /* Pipeline warm-up.
+    *
+    * Every pipeline the renderer makes is recorded by the state it was
+    * made from - program, compatible render pass and subpass (by their
+    * keys, which hash their contents), fixed-function state, blend and
+    * spec constants, vertex layout - and every compatible render pass by
+    * what it was made from: attachment formats and sample counts, which
+    * are transient, and the subpasses. None of it says anything of the
+    * driver. The records are kept in a file of their own beside the
+    * pipeline cache blob, <save>/Beetle PSX HW/
+    * vulkan_pipeline_list_<vendor><device>.bin, which a driver update
+    * leaves standing.
+    *
+    * When a device is made, the listed render passes are made again
+    * (compatibility goes by formats, samples and subpasses alone, so
+    * 1x1 stand-ins for the attachments make the same pass, which its key
+    * confirms). A thread then builds every listed pipeline, as its
+    * program comes to exist, into the device's pipeline cache, and hands
+    * the VkPipeline back through a queue. The renderer looks there before
+    * it builds one itself, so a pipeline the thread got to first costs the
+    * render thread nothing. One it has not got to yet is built on the
+    * spot, as it always was: a draw is never skipped. Compute programs
+    * without spec constants have one pipeline, which the thread builds as
+    * soon as the program is made, after the listed ones.
+    *
+    * The thread only reads what does not change once made (programs,
+    * render passes, pipeline layouts, shader modules) and the pipeline
+    * cache, which Vulkan synchronises itself; the program tables are only
+    * ever touched by the render thread. Jobs go to it through a waitable
+    * SPSC queue and pipelines come back through a plain one: nothing locks
+    * and neither side waits on the other. */
+#define PIPELINE_LIST_FILE_MAGIC   "BPSXVKL1"
+#define PIPELINE_LIST_FILE_VERSION 1u
+#define PIPELINE_LIST_FILE_HEADER  32u
+#define PIPELINE_LIST_MAX          4096u
+#define PIPELINE_LIST_PASSES_MAX   256u
+#define PIPELINE_LIST_KNOWN        (PIPELINE_LIST_MAX * 4u)
+#define PIPELINE_PASS_SUBPASSES    4u
+   /* hash, program, render pass (2 words each), compute, subpass, the
+    * state words, blend constants, spec constants, attributes (binding,
+    * format, offset), strides, input rates */
+#define PIPELINE_RECORD_WORDS (6u + 2u + 4u + 4u + VULKAN_NUM_SPEC_CONSTANTS \
+      + 3u * VULKAN_NUM_VERTEX_ATTRIBS + 2u * VULKAN_NUM_VERTEX_BUFFERS)
+   /* key (2), colour attachments, their formats, depth format, samples of
+    * each attachment and of the depth one, transient mask, op flags,
+    * subpasses, then per subpass: colour, input, resolve counts, depth
+    * mode and the three index lists */
+#define PIPELINE_SUBPASS_WORDS (4u + 3u * VULKAN_NUM_ATTACHMENTS)
+#define PIPELINE_PASS_WORDS (2u + 1u + VULKAN_NUM_ATTACHMENTS + 1u \
+      + (VULKAN_NUM_ATTACHMENTS + 1u) + 3u \
+      + PIPELINE_PASS_SUBPASSES * PIPELINE_SUBPASS_WORDS)
+
+   typedef struct PipelineRecord
+   {
+      uint64_t          hash;          /* its key in the program's table */
+      uint64_t          program;
+      uint64_t          render_pass;   /* compatible; 0 for compute */
+      uint32_t          compute;
+      uint32_t          subpass;
+      PipelineState     static_state;
+      PotentialState    potential;
+      VertexAttribState attribs[VULKAN_NUM_VERTEX_ATTRIBS];
+      uint32_t          strides[VULKAN_NUM_VERTEX_BUFFERS];
+      uint32_t          input_rates[VULKAN_NUM_VERTEX_BUFFERS];
+   } PipelineRecord;
+
+   typedef struct PipelinePass
+   {
+      uint64_t               key;
+      uint32_t               formats[VULKAN_NUM_ATTACHMENTS];
+      uint32_t               samples[VULKAN_NUM_ATTACHMENTS + 1];
+      uint32_t               num_color;
+      uint32_t               depth_format;   /* VK_FORMAT_UNDEFINED: none */
+      uint32_t               lazy;
+      uint32_t               op_flags;
+      uint32_t               num_subpasses;  /* 0: the default one */
+      RenderPassInfo_Subpass subpasses[PIPELINE_PASS_SUBPASSES];
+   } PipelinePass;
+
+#ifdef HAVE_THREADS
+   typedef struct PipelineWarmJob
+   {
+      Program              *program;
+      const RenderPass     *rp;      /* NULL for compute */
+      const PipelineRecord *rec;     /* NULL: compute without spec constants */
+      Hash                  hash;
+   } PipelineWarmJob;
+
+   typedef struct PipelineWarmResult
+   {
+      Program   *program;
+      Hash       hash;
+      VkPipeline pipeline;
+      uint32_t   plain;   /* a compute pipeline without spec constants */
+   } PipelineWarmResult;
+
+   struct PipelineWarm
+   {
+      Device                *device;
+      sthread_t             *thread;
+      retro_waitable_spsc_t  jobs;     /* render thread -> warm thread */
+      retro_spsc_t           results;  /* warm thread -> render thread */
+      /* The list as read at start: not changed while the thread lives. */
+      PipelineRecord        *loaded;
+      uint8_t               *released; /* per loaded record */
+      unsigned               num_loaded;
+      unsigned               num_pending;
+      /* Records made this session: render thread only. */
+      PipelineRecord        *added;
+      unsigned               num_added;
+      unsigned               cap_added;
+      /* Hashes of every record, loaded or added (0 = empty slot). */
+      uint64_t              *known;
+      /* Every compatible render pass seen, read or made. */
+      PipelinePass          *passes;
+      unsigned               num_passes;
+      unsigned               cap_passes;
+      /* Compute jobs held back until the listed ones are queued. */
+      PipelineWarmJob       *held;
+      unsigned               num_held;
+      unsigned               cap_held;
+      uint32_t               saved_crc;
+      bool                   dirty;
+   };
+
+   static uint32_t *pipeline_words_put64(uint32_t *w, uint64_t v)
+   {
+      w[0] = (uint32_t)v;
+      w[1] = (uint32_t)(v >> 32);
+      return w + 2;
+   }
+
+   static uint64_t pipeline_words_get64(const uint32_t *w)
+   {
+      return (uint64_t)w[0] | ((uint64_t)w[1] << 32);
+   }
+
+   static void pipeline_record_write(const PipelineRecord *r, uint32_t *w)
+   {
+      unsigned i;
+      w = pipeline_words_put64(w, r->hash);
+      w = pipeline_words_put64(w, r->program);
+      w = pipeline_words_put64(w, r->render_pass);
+      *w++ = r->compute;
+      *w++ = r->subpass;
+      for (i = 0; i < 4; i++)
+         *w++ = r->static_state.words[i];
+      for (i = 0; i < 4; i++)
+      {
+         uint32_t bits;
+         memcpy(&bits, &r->potential.blend_constants[i], sizeof(bits));
+         *w++ = bits;
+      }
+      for (i = 0; i < VULKAN_NUM_SPEC_CONSTANTS; i++)
+         *w++ = r->potential.spec_constants[i];
+      for (i = 0; i < VULKAN_NUM_VERTEX_ATTRIBS; i++)
+      {
+         *w++ = r->attribs[i].binding;
+         *w++ = (uint32_t)r->attribs[i].format;
+         *w++ = r->attribs[i].offset;
+      }
+      for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         *w++ = r->strides[i];
+      for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         *w++ = r->input_rates[i];
+   }
+
+   static void pipeline_record_read(PipelineRecord *r, const uint32_t *w)
+   {
+      unsigned i;
+      memset(r, 0, sizeof(*r));
+      r->hash        = pipeline_words_get64(w);
+      r->program     = pipeline_words_get64(w + 2);
+      r->render_pass = pipeline_words_get64(w + 4);
+      w += 6;
+      r->compute = *w++;
+      r->subpass = *w++;
+      for (i = 0; i < 4; i++)
+         r->static_state.words[i] = *w++;
+      for (i = 0; i < 4; i++)
+      {
+         uint32_t bits = *w++;
+         memcpy(&r->potential.blend_constants[i], &bits, sizeof(bits));
+      }
+      for (i = 0; i < VULKAN_NUM_SPEC_CONSTANTS; i++)
+         r->potential.spec_constants[i] = *w++;
+      for (i = 0; i < VULKAN_NUM_VERTEX_ATTRIBS; i++)
+      {
+         r->attribs[i].binding = *w++;
+         r->attribs[i].format  = (VkFormat)*w++;
+         r->attribs[i].offset  = *w++;
+      }
+      for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         r->strides[i] = *w++;
+      for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         r->input_rates[i] = *w++;
+   }
+
+   static void pipeline_pass_write(const PipelinePass *p, uint32_t *w)
+   {
+      unsigned i, j;
+      w = pipeline_words_put64(w, p->key);
+      *w++ = p->num_color;
+      for (i = 0; i < VULKAN_NUM_ATTACHMENTS; i++)
+         *w++ = p->formats[i];
+      *w++ = p->depth_format;
+      for (i = 0; i < VULKAN_NUM_ATTACHMENTS + 1; i++)
+         *w++ = p->samples[i];
+      *w++ = p->lazy;
+      *w++ = p->op_flags;
+      *w++ = p->num_subpasses;
+      for (i = 0; i < PIPELINE_PASS_SUBPASSES; i++)
+      {
+         const RenderPassInfo_Subpass *s = &p->subpasses[i];
+         *w++ = s->num_color_attachments;
+         *w++ = s->num_input_attachments;
+         *w++ = s->num_resolve_attachments;
+         *w++ = (uint32_t)s->depth_stencil_mode;
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            *w++ = s->color_attachments[j];
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            *w++ = s->input_attachments[j];
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            *w++ = s->resolve_attachments[j];
+      }
+   }
+
+   /* False for a pass this cannot be made from (counts out of range). */
+   static bool pipeline_pass_read(PipelinePass *p, const uint32_t *w)
+   {
+      unsigned i, j;
+      memset(p, 0, sizeof(*p));
+      p->key = pipeline_words_get64(w);
+      w += 2;
+      p->num_color = *w++;
+      for (i = 0; i < VULKAN_NUM_ATTACHMENTS; i++)
+         p->formats[i] = *w++;
+      p->depth_format = *w++;
+      for (i = 0; i < VULKAN_NUM_ATTACHMENTS + 1; i++)
+         p->samples[i] = *w++;
+      p->lazy          = *w++;
+      p->op_flags      = *w++;
+      p->num_subpasses = *w++;
+      for (i = 0; i < PIPELINE_PASS_SUBPASSES; i++)
+      {
+         RenderPassInfo_Subpass *s = &p->subpasses[i];
+         s->num_color_attachments   = *w++;
+         s->num_input_attachments   = *w++;
+         s->num_resolve_attachments = *w++;
+         s->depth_stencil_mode      = (RenderPassInfo_DepthStencil)*w++;
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            s->color_attachments[j] = *w++;
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            s->input_attachments[j] = *w++;
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            s->resolve_attachments[j] = *w++;
+         if (   s->num_color_attachments > VULKAN_NUM_ATTACHMENTS
+             || s->num_input_attachments > VULKAN_NUM_ATTACHMENTS
+             || s->num_resolve_attachments > VULKAN_NUM_ATTACHMENTS)
+            return false;
+         /* an attachment a subpass names is one the pass has */
+         for (j = 0; j < s->num_color_attachments; j++)
+            if (s->color_attachments[j] >= p->num_color)
+               return false;
+         for (j = 0; j < s->num_input_attachments; j++)
+            if (s->input_attachments[j] > p->num_color)
+               return false;
+         for (j = 0; j < s->num_resolve_attachments; j++)
+            if (s->resolve_attachments[j] >= p->num_color)
+               return false;
+      }
+      return p->num_color <= VULKAN_NUM_ATTACHMENTS
+         && (p->num_color || p->depth_format != VK_FORMAT_UNDEFINED)
+         && p->num_subpasses <= PIPELINE_PASS_SUBPASSES;
+   }
+
+   /* The key commandbuffer_flush_graphics_pipeline / _compute_pipeline
+    * give the state in @r on @program: a record whose stored key is not
+    * this one is not built (a list from another build of the core). The
+    * attribute bindings it names are checked to be in range as well. */
+   static bool pipeline_record_key(const PipelineRecord *r,
+         const Program *program, Hash *out)
+   {
+      const CombinedResourceLayout *layout =
+         pipeline_layout_get_resource_layout(program_get_pipeline_layout(program));
+      uint32_t combined_spec_constant;
+      uint32_t active_vbos = 0;
+      uint32_t _feit, bit;
+      Hasher   h;
+
+      hasher_init(&h);
+      if (r->compute)
+         hasher_u64(&h, r->program);
+      else
+      {
+         FOR_EACH_BIT(layout->attribute_mask, _feit, bit)
+         {
+            if (r->attribs[bit].binding >= VULKAN_NUM_VERTEX_BUFFERS)
+               return false;
+            hasher_u32(&h, bit);
+            active_vbos |= 1u << r->attribs[bit].binding;
+            hasher_u32(&h, r->attribs[bit].binding);
+            hasher_u32(&h, r->attribs[bit].format);
+            hasher_u32(&h, r->attribs[bit].offset);
+         }
+         FOR_EACH_BIT(active_vbos, _feit, bit)
+         {
+            hasher_u32(&h, r->input_rates[bit]);
+            hasher_u32(&h, r->strides[bit]);
+         }
+         hasher_u64(&h, r->render_pass);
+         hasher_u32(&h, r->subpass);
+         hasher_u64(&h, r->program);
+         hasher_data(&h, r->static_state.words, sizeof(r->static_state.words));
+         if (r->static_state.state.blend_enable)
+         {
+            bool b0 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(r->static_state.state.src_color_blend));
+            bool b1 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(r->static_state.state.src_alpha_blend));
+            bool b2 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(r->static_state.state.dst_color_blend));
+            bool b3 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(r->static_state.state.dst_alpha_blend));
+            if (b0 || b1 || b2 || b3)
+               hasher_data(&h, (const uint32_t *)(r->potential.blend_constants),
+                     sizeof(r->potential.blend_constants));
+         }
+      }
+      combined_spec_constant = layout->combined_spec_constant_mask
+         & r->static_state.state.spec_constant_mask;
+      hasher_u32(&h, combined_spec_constant);
+      FOR_EACH_BIT(combined_spec_constant, _feit, bit)
+         hasher_u32(&h, r->potential.spec_constants[bit]);
+      *out = hasher_get(&h);
+      return true;
+   }
+
+   /* Open-addressed set of the hashes on the list: true when @hash was
+    * not in it (and now is). */
+   static bool pipeline_warm_known_insert(struct PipelineWarm *w, uint64_t hash)
+   {
+      uint32_t i = (uint32_t)(hash ^ (hash >> 32)) & (PIPELINE_LIST_KNOWN - 1u);
+      if (!hash)
+         hash = 1; /* 0 marks an empty slot */
+      for (;;)
+      {
+         if (w->known[i] == hash)
+            return false;
+         if (!w->known[i])
+         {
+            w->known[i] = hash;
+            return true;
+         }
+         i = (i + 1u) & (PIPELINE_LIST_KNOWN - 1u);
+      }
+   }
+
+   static bool pipeline_warm_known(const struct PipelineWarm *w, uint64_t hash)
+   {
+      uint32_t i = (uint32_t)(hash ^ (hash >> 32)) & (PIPELINE_LIST_KNOWN - 1u);
+      if (!hash)
+         hash = 1;
+      while (w->known[i])
+      {
+         if (w->known[i] == hash)
+            return true;
+         i = (i + 1u) & (PIPELINE_LIST_KNOWN - 1u);
+      }
+      return false;
+   }
+
+   static void pipeline_warm_build(struct PipelineWarm *w,
+         const PipelineWarmJob *job, PipelineWarmResult *res)
+   {
+      static const PipelineState     no_state;
+      static const PotentialState    no_potential;
+      static const VertexAttribState no_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
+      VkDeviceSize      strides[VULKAN_NUM_VERTEX_BUFFERS];
+      VkVertexInputRate input_rates[VULKAN_NUM_VERTEX_BUFFERS];
+      PipelineDesc      d;
+      unsigned          i;
+
+      d.device       = w->device;
+      d.program      = job->program;
+      d.rp           = job->rp;
+      d.subpass      = 0;
+      d.static_state = &no_state;
+      d.potential    = &no_potential;
+      d.attribs      = no_attribs;
+      d.strides      = strides;
+      d.input_rates  = input_rates;
+      memset(strides, 0, sizeof(strides));
+      memset(input_rates, 0, sizeof(input_rates));
+      if (job->rec)
+      {
+         d.subpass      = job->rec->subpass;
+         d.static_state = &job->rec->static_state;
+         d.potential    = &job->rec->potential;
+         d.attribs      = job->rec->attribs;
+         for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         {
+            strides[i]     = job->rec->strides[i];
+            input_rates[i] = (VkVertexInputRate)job->rec->input_rates[i];
+         }
+      }
+      res->program  = job->program;
+      res->hash     = job->hash;
+      res->plain    = job->rec ? 0 : 1;
+      res->pipeline = job->rp ? pipeline_build_graphics(&d)
+                              : pipeline_build_compute(&d);
+   }
+
+   static void pipeline_warm_thread(void *data)
+   {
+      struct PipelineWarm *w = (struct PipelineWarm *)data;
+      PipelineWarmJob      job;
+      PipelineWarmResult   res;
+
+      for (;;)
+      {
+         /* Parked until a job is written or the queue is cancelled,
+          * both of which notify the readable eventcount: no bound, no
+          * clock read. */
+         while (retro_spsc_read_avail(&w->jobs.queue) < sizeof(job))
+         {
+            const int key = retro_eventcount_prepare_wait(&w->jobs.readable);
+            if (retro_waitable_spsc_cancelled(&w->jobs))
+            {
+               retro_eventcount_cancel_wait(&w->jobs.readable);
+               return;
+            }
+            if (retro_spsc_read_avail(&w->jobs.queue) >= sizeof(job))
+               retro_eventcount_cancel_wait(&w->jobs.readable);
+            else
+               retro_eventcount_commit_wait(&w->jobs.readable, key);
+         }
+         if (retro_waitable_spsc_cancelled(&w->jobs))
+            return;
+         retro_waitable_spsc_read_quiet(&w->jobs, &job, sizeof(job));
+         pipeline_warm_build(w, &job, &res);
+         if (res.pipeline == VK_NULL_HANDLE)
+            continue;
+         /* Room for every job was made at the start; a full queue only
+          * loses this one, which the render thread then builds. */
+         if (retro_spsc_write_avail(&w->results) < sizeof(res)
+               || retro_spsc_write(&w->results, &res, sizeof(res)) != sizeof(res))
+            vkDestroyPipeline(device_get_device(w->device), res.pipeline, NULL);
+      }
+   }
+
+   static void pipeline_warm_submit(struct PipelineWarm *w,
+         const PipelineWarmJob *job)
+   {
+      if (retro_spsc_write_avail(&w->jobs.queue) >= sizeof(*job))
+         retro_waitable_spsc_write(&w->jobs, job, sizeof(*job));
+   }
+
+   /* Hands the thread every listed pipeline whose program and render pass
+    * exist now. Render thread; called when either kind of object is made. */
+   static void pipeline_warm_release(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      unsigned i;
+
+      if (!w || !w->num_pending)
+         return;
+      for (i = 0; i < w->num_loaded; i++)
+      {
+         const PipelineRecord *r = &w->loaded[i];
+         PipelineWarmJob       job;
+         Hash                  key;
+
+         if (w->released[i])
+            continue;
+         if (!(job.program = program_map_find(&self->programs, r->program)))
+            continue;
+         job.rp = NULL;
+         if (!r->compute
+               && !(job.rp = render_pass_map_find(&self->render_passes, r->render_pass)))
+            continue;
+         w->released[i] = 1;
+         w->num_pending--;
+         /* the right kind of program, a subpass the pass has, and the key
+          * this build gives that state */
+         if (   (r->compute != 0) != (program_get_shader(job.program, ShaderStage_Compute) != NULL)
+             || (job.rp && r->subpass >= SubpassInfoVec_size(&job.rp->subpasses))
+             || !pipeline_record_key(r, job.program, &key) || key != r->hash
+             || program_get_pipeline(job.program, r->hash) != VK_NULL_HANDLE)
+            continue;
+         job.rec  = r;
+         job.hash = r->hash;
+         pipeline_warm_submit(w, &job);
+      }
+   }
+
+   /* Queues the compute jobs held back. Render thread, once per frame. */
+   static void device_warm_flush_held(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      unsigned i;
+      if (!w || !w->num_held)
+         return;
+      for (i = 0; i < w->num_held; i++)
+         if (program_get_pipeline(w->held[i].program, w->held[i].hash) == VK_NULL_HANDLE)
+            pipeline_warm_submit(w, &w->held[i]);
+      w->num_held = 0;
+   }
+
+   /* A program was made: the listed pipelines of it are released, and a
+    * compute one without spec constants, which has only the one pipeline,
+    * is built too - straight away with no list to come first, else after
+    * the listed ones are queued. */
+   static void device_warm_program_made(Device *self, Program *program)
+   {
+      struct PipelineWarm *w = self->warm;
+      if (!w)
+         return;
+      pipeline_warm_release(self);
+      if (program_get_shader(program, ShaderStage_Compute)
+            && !pipeline_layout_get_resource_layout(
+               program_get_pipeline_layout(program))->combined_spec_constant_mask)
+      {
+         PipelineWarmJob job;
+         Hasher          h;
+         hasher_init(&h);
+         hasher_u64(&h, program->intrusive_node.key);
+         hasher_u32(&h, 0);
+         job.program = program;
+         job.rp      = NULL;
+         job.rec     = NULL;
+         job.hash    = hasher_get(&h);
+         if (pipeline_warm_known(w, job.hash))
+            return; /* listed: released above */
+         if (!w->num_loaded)
+            pipeline_warm_submit(w, &job);
+         else
+         {
+            if (w->num_held == w->cap_held)
+            {
+               unsigned         cap = w->cap_held ? w->cap_held * 2 : 32;
+               PipelineWarmJob *n   = (PipelineWarmJob *)realloc(w->held, cap * sizeof(*n));
+               if (!n)
+                  return;
+               w->held     = n;
+               w->cap_held = cap;
+            }
+            w->held[w->num_held++] = job;
+         }
+      }
+   }
+
+   /* A compatible render pass was made: what it was made from is kept for
+    * the list, and the listed pipelines in it are released. */
+   static void device_warm_pass_made(Device *self, Hash key,
+         const RenderPassInfo *info, const VkFormat *formats, uint32_t lazy)
+   {
+      struct PipelineWarm *w = self->warm;
+      PipelinePass        *p;
+      unsigned             i;
+
+      if (!w)
+         return;
+      for (i = 0; i < w->num_passes; i++)
+         if (w->passes[i].key == key)
+            break;
+      if (i == w->num_passes && w->num_passes < PIPELINE_LIST_PASSES_MAX
+            && info->num_subpasses <= PIPELINE_PASS_SUBPASSES)
+      {
+         if (w->num_passes == w->cap_passes)
+         {
+            unsigned      cap = w->cap_passes ? w->cap_passes * 2 : 16;
+            PipelinePass *n   = (PipelinePass *)realloc(w->passes, cap * sizeof(*n));
+            if (!n)
+               goto release;
+            w->passes     = n;
+            w->cap_passes = cap;
+         }
+         p = &w->passes[w->num_passes++];
+         memset(p, 0, sizeof(*p));
+         p->key       = key;
+         p->num_color = info->num_color_attachments;
+         for (i = 0; i < info->num_color_attachments; i++)
+         {
+            p->formats[i] = (uint32_t)formats[i];
+            p->samples[i] = (uint32_t)image_get_create_info(
+                  imageview_get_image(info->color_attachments[i]))->samples;
+         }
+         if (info->depth_stencil)
+         {
+            p->depth_format = (uint32_t)imageview_get_format(info->depth_stencil);
+            p->samples[VULKAN_NUM_ATTACHMENTS] = (uint32_t)image_get_create_info(
+                  imageview_get_image(info->depth_stencil))->samples;
+         }
+         p->lazy          = lazy;
+         p->op_flags      = info->op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT;
+         p->num_subpasses = info->subpasses ? info->num_subpasses : 0;
+         for (i = 0; i < p->num_subpasses; i++)
+            p->subpasses[i] = info->subpasses[i];
+         w->dirty = true;
+      }
+release:
+      pipeline_warm_release(self);
+   }
+
+   /* A 1x1 attachment of @format: what a listed pass is made from again. */
+   static ImageHandle pipeline_pass_stand_in(Device *self, VkFormat format,
+         uint32_t samples, bool lazy)
+   {
+      ImageCreateInfo info = lazy
+         ? image_create_info_transient_render_target(1, 1, format)
+         : image_create_info_render_target(1, 1, format);
+      info.samples = (VkSampleCountFlagBits)(samples ? samples : 1);
+      return device_create_image(self, &info, NULL);
+   }
+
+   /* Makes the listed compatible render passes again. Render thread, once
+    * the device can make images; before any program exists. */
+   static void device_warm_make_passes(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      unsigned             i, j;
+
+      if (!w)
+         return;
+      for (i = 0; i < w->num_passes; i++)
+      {
+         const PipelinePass *p = &w->passes[i];
+         ImageHandle    images[VULKAN_NUM_ATTACHMENTS + 1];
+         RenderPassInfo info;
+         bool           ok = true;
+
+         if (render_pass_map_find(&self->render_passes, p->key))
+            continue;
+         memset(images, 0, sizeof(images));
+         render_pass_info_defaults(&info);
+         for (j = 0; ok && j < p->num_color; j++)
+         {
+            images[j] = pipeline_pass_stand_in(self, (VkFormat)p->formats[j],
+                  p->samples[j], (p->lazy >> j) & 1);
+            if ((ok = ih_is_valid(&images[j])))
+               info.color_attachments[j] = image_get_view(ih_get(&images[j]));
+         }
+         if (ok && p->depth_format != VK_FORMAT_UNDEFINED)
+         {
+            images[VULKAN_NUM_ATTACHMENTS] = pipeline_pass_stand_in(self,
+                  (VkFormat)p->depth_format, p->samples[VULKAN_NUM_ATTACHMENTS],
+                  (p->lazy >> p->num_color) & 1);
+            if ((ok = ih_is_valid(&images[VULKAN_NUM_ATTACHMENTS])))
+               info.depth_stencil = image_get_view(ih_get(&images[VULKAN_NUM_ATTACHMENTS]));
+         }
+         if (ok)
+         {
+            info.num_color_attachments = p->num_color;
+            info.op_flags              = p->op_flags;
+            info.num_subpasses         = p->num_subpasses;
+            info.subpasses             = p->num_subpasses ? p->subpasses : NULL;
+            /* (a pass that came out under another key is someone else's,
+             * and harmless: it is only ever found by its own) */
+            device_request_render_pass(self, &info, true);
+         }
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS + 1; j++)
+            ih_reset(&images[j]);
+      }
+   }
+
+   static void device_warm_record_plain(Device *self, Program *program, Hash hash)
+   {
+      static const PipelineState  no_state;
+      static const PotentialState no_potential;
+      PipelineDesc d;
+      memset(&d, 0, sizeof(d));
+      d.program      = program;
+      d.static_state = &no_state;
+      d.potential    = &no_potential;
+      device_warm_record(self, &d, hash, true);
+   }
+
+   /* The pipelines the thread has handed back, into their programs' tables
+    * (where one the render thread built meanwhile is kept, and the
+    * thread's dropped). */
+   static unsigned pipeline_warm_drain(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      PipelineWarmResult   res;
+      unsigned             n = 0;
+
+      while (retro_spsc_read_avail(&w->results) >= sizeof(res))
+      {
+         retro_spsc_read(&w->results, &res, sizeof(res));
+         program_add_pipeline(res.program, res.hash, res.pipeline);
+         /* (a listed one is on the list; one that was not, built because
+          * its program was made, goes on it here, as the render thread
+          * finds it in the table from now on) */
+         if (res.plain)
+            device_warm_record_plain(self, res.program, res.hash);
+         n++;
+      }
+      return n;
+   }
+
+   static int device_warm_take(Device *self, Program *program, Hash hash,
+         VkPipeline *out)
+   {
+      VkPipeline pipeline;
+      if (!self->warm || !pipeline_warm_drain(self))
+         return 0;
+      if ((pipeline = program_get_pipeline(program, hash)) == VK_NULL_HANDLE)
+         return 0;
+      *out = pipeline;
+      return 1;
+   }
+
+   static void device_warm_record(Device *self, const PipelineDesc *d,
+         Hash hash, bool compute)
+   {
+      struct PipelineWarm *w = self->warm;
+      PipelineRecord      *r;
+      unsigned             i;
+
+      if (!w || w->num_loaded + w->num_added >= PIPELINE_LIST_MAX
+            || !pipeline_warm_known_insert(w, hash))
+         return;
+      if (w->num_added == w->cap_added)
+      {
+         unsigned        cap = w->cap_added ? w->cap_added * 2 : 64;
+         PipelineRecord *n   = (PipelineRecord *)realloc(w->added, cap * sizeof(*n));
+         if (!n)
+            return;
+         w->added     = n;
+         w->cap_added = cap;
+      }
+      r = &w->added[w->num_added++];
+      memset(r, 0, sizeof(*r));
+      r->hash         = hash;
+      r->program      = d->program->intrusive_node.key;
+      r->render_pass  = compute ? 0 : d->rp->intrusive_node.key;
+      r->compute      = compute ? 1 : 0;
+      r->subpass      = compute ? 0 : d->subpass;
+      r->static_state = *d->static_state;
+      r->potential    = *d->potential;
+      if (!compute)
+      {
+         memcpy(r->attribs, d->attribs, sizeof(r->attribs));
+         for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         {
+            r->strides[i]     = (uint32_t)d->strides[i];
+            r->input_rates[i] = (uint32_t)d->input_rates[i];
+         }
+      }
+      w->dirty = true;
+   }
+
+   static char *device_pipeline_list_path(const Device *self, bool create)
+   {
+      char   *path = device_pipeline_cache_path(self, create);
+      char   *name;
+      char    hex[17];
+      uint8_t id[8];
+      size_t  room;
+
+      if (!path)
+         return NULL;
+      /* the cache blob's name, without the driver's UUID: shorter than it,
+       * so written over it in the same buffer */
+      name = (char *)path_basename(path);
+      room = strlen(name) + 1;
+      id[0] = (uint8_t)(self->gpu_props.vendorID >> 24);
+      id[1] = (uint8_t)(self->gpu_props.vendorID >> 16);
+      id[2] = (uint8_t)(self->gpu_props.vendorID >> 8);
+      id[3] = (uint8_t)(self->gpu_props.vendorID);
+      id[4] = (uint8_t)(self->gpu_props.deviceID >> 24);
+      id[5] = (uint8_t)(self->gpu_props.deviceID >> 16);
+      id[6] = (uint8_t)(self->gpu_props.deviceID >> 8);
+      id[7] = (uint8_t)(self->gpu_props.deviceID);
+      pipeline_cache_hex(hex, id, 8);
+      strlcpy(name, "vulkan_pipeline_list_", room);
+      strlcat(name, hex, room);
+      strlcat(name, ".bin", room);
+      return path;
+   }
+
+   /* The list on disk: header (magic, version, words per record, records,
+    * words per pass, passes, CRC32 of what follows), then the records and
+    * the passes as little-endian words. Anything else - another version, a
+    * truncated or damaged file - is not read, and is replaced by the next
+    * save. */
+   static void device_pipeline_list_load(Device *self, struct PipelineWarm *w)
+   {
+      char          *path = device_pipeline_list_path(self, false);
+      void          *buf  = NULL;
+      int64_t        len  = 0;
+      const char    *why  = NULL;
+      const uint8_t *d;
+      uint32_t       count = 0, passes = 0;
+      uint64_t       body  = 0;
+
+      if (!path)
+         return;
+      if (!path_is_valid(path)
+            || filestream_read_file(path, &buf, &len) != 1 || !buf)
+      {
+         free(path);
+         free(buf);
+         return;
+      }
+      d = (const uint8_t *)buf;
+      if (len < (int64_t)PIPELINE_LIST_FILE_HEADER)
+         why = "too short";
+      else if (memcmp(d, PIPELINE_LIST_FILE_MAGIC, 8) != 0)
+         why = "bad magic";
+      else if (pipeline_cache_rd32(d + 8) != PIPELINE_LIST_FILE_VERSION
+            || pipeline_cache_rd32(d + 12) != PIPELINE_RECORD_WORDS
+            || pipeline_cache_rd32(d + 20) != PIPELINE_PASS_WORDS)
+         why = "another version";
+      else if ((count = pipeline_cache_rd32(d + 16)) > PIPELINE_LIST_MAX
+            || (passes = pipeline_cache_rd32(d + 24)) > PIPELINE_LIST_PASSES_MAX
+            || len != (int64_t)(PIPELINE_LIST_FILE_HEADER
+               + (body = ((uint64_t)count * PIPELINE_RECORD_WORDS
+                     + (uint64_t)passes * PIPELINE_PASS_WORDS) * 4u)))
+         why = "size mismatch";
+      else if (encoding_crc32(0, d + PIPELINE_LIST_FILE_HEADER, (size_t)body)
+            != pipeline_cache_rd32(d + 28))
+         why = "CRC mismatch";
+      else if ((count && (!(w->loaded = (PipelineRecord *)calloc(count, sizeof(*w->loaded)))
+               || !(w->released = (uint8_t *)calloc(count, 1))))
+            || (passes && !(w->passes = (PipelinePass *)calloc(passes, sizeof(*w->passes)))))
+         why = "out of memory";
+
+      if (why)
+      {
+         LOGI("[Vulkan pipeline list] ignoring %s: %s\n", path, why);
+         free(w->loaded);
+         free(w->released);
+         free(w->passes);
+         w->loaded   = NULL;
+         w->released = NULL;
+         w->passes   = NULL;
+      }
+      else
+      {
+         uint32_t       words[PIPELINE_PASS_WORDS > PIPELINE_RECORD_WORDS
+            ? PIPELINE_PASS_WORDS : PIPELINE_RECORD_WORDS];
+         const uint8_t *p = d + PIPELINE_LIST_FILE_HEADER;
+         uint32_t       i, j;
+         for (i = 0; i < count; i++)
+         {
+            for (j = 0; j < PIPELINE_RECORD_WORDS; j++, p += 4)
+               words[j] = pipeline_cache_rd32(p);
+            pipeline_record_read(&w->loaded[w->num_loaded], words);
+            if (pipeline_warm_known_insert(w, w->loaded[w->num_loaded].hash))
+               w->num_loaded++;
+         }
+         w->cap_passes = passes;
+         for (i = 0; i < passes; i++)
+         {
+            for (j = 0; j < PIPELINE_PASS_WORDS; j++, p += 4)
+               words[j] = pipeline_cache_rd32(p);
+            if (pipeline_pass_read(&w->passes[w->num_passes], words))
+               w->num_passes++;
+         }
+         w->num_pending = w->num_loaded;
+         w->saved_crc   = pipeline_cache_rd32(d + 28);
+         LOGI("[Vulkan pipeline list] %u pipelines in %u render passes listed in %s\n",
+               w->num_loaded, w->num_passes, path);
+      }
+      free(path);
+      free(buf);
+   }
+
+   static void device_pipeline_list_save(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      uint32_t words[PIPELINE_PASS_WORDS > PIPELINE_RECORD_WORDS
+         ? PIPELINE_PASS_WORDS : PIPELINE_RECORD_WORDS];
+      unsigned count, i, j;
+      size_t   body;
+      uint8_t *buf;
+      uint8_t *p;
+      uint32_t crc;
+      char    *path;
+
+      if (!w || !w->dirty)
+         return;
+      w->dirty = false;
+      count = w->num_loaded + w->num_added;
+      body  = ((size_t)count * PIPELINE_RECORD_WORDS
+            + (size_t)w->num_passes * PIPELINE_PASS_WORDS) * 4u;
+      if (!(buf = (uint8_t *)malloc(PIPELINE_LIST_FILE_HEADER + body)))
+         return;
+      p = buf + PIPELINE_LIST_FILE_HEADER;
+      for (i = 0; i < count; i++)
+      {
+         pipeline_record_write(i < w->num_loaded ? &w->loaded[i]
+               : &w->added[i - w->num_loaded], words);
+         for (j = 0; j < PIPELINE_RECORD_WORDS; j++, p += 4)
+            pipeline_cache_wr32(p, words[j]);
+      }
+      for (i = 0; i < w->num_passes; i++)
+      {
+         pipeline_pass_write(&w->passes[i], words);
+         for (j = 0; j < PIPELINE_PASS_WORDS; j++, p += 4)
+            pipeline_cache_wr32(p, words[j]);
+      }
+      crc = encoding_crc32(0, buf + PIPELINE_LIST_FILE_HEADER, body);
+      memcpy(buf, PIPELINE_LIST_FILE_MAGIC, 8);
+      pipeline_cache_wr32(buf + 8, PIPELINE_LIST_FILE_VERSION);
+      pipeline_cache_wr32(buf + 12, PIPELINE_RECORD_WORDS);
+      pipeline_cache_wr32(buf + 16, count);
+      pipeline_cache_wr32(buf + 20, PIPELINE_PASS_WORDS);
+      pipeline_cache_wr32(buf + 24, w->num_passes);
+      pipeline_cache_wr32(buf + 28, crc);
+      if (crc != w->saved_crc && (path = device_pipeline_list_path(self, true)))
+      {
+         if (filestream_write_file_atomic(path, buf,
+                  (int64_t)(PIPELINE_LIST_FILE_HEADER + body)))
+            w->saved_crc = crc;
+         else
+            LOGE("[Vulkan pipeline list] write failed: %s\n", path);
+         free(path);
+      }
+      free(buf);
+   }
+
+   static void device_warm_start(Device *self)
+   {
+      struct PipelineWarm *w = (struct PipelineWarm *)calloc(1, sizeof(*w));
+      size_t room;
+
+      self->warm = NULL;
+      if (!w)
+         return;
+      w->device = self;
+      if (!(w->known = (uint64_t *)calloc(PIPELINE_LIST_KNOWN, sizeof(*w->known))))
+      {
+         free(w);
+         return;
+      }
+      device_pipeline_list_load(self, w);
+      /* Room for a job and a result for every listed pipeline, and for
+       * every compute program a renderer makes. */
+      room = (size_t)w->num_loaded + 256u;
+      if (!retro_waitable_spsc_init(&w->jobs, room * sizeof(PipelineWarmJob)))
+         goto fail_jobs;
+      if (!retro_spsc_init(&w->results, room * sizeof(PipelineWarmResult)))
+         goto fail_results;
+      if (!(w->thread = sthread_create(pipeline_warm_thread, w)))
+         goto fail_thread;
+      self->warm = w;
+      return;
+
+fail_thread:
+      retro_spsc_free(&w->results);
+fail_results:
+      retro_waitable_spsc_free(&w->jobs);
+fail_jobs:
+      free(w->loaded);
+      free(w->released);
+      free(w->passes);
+      free(w->known);
+      free(w);
+   }
+
+   /* Stops and joins the thread (it finishes the pipeline it is building),
+    * and destroys what it built that nobody took. Before anything it reads
+    * is destroyed. The list stays for the save that follows. */
+   static void device_warm_stop(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      PipelineWarmResult   res;
+
+      if (!w || !w->thread)
+         return;
+      retro_waitable_spsc_cancel(&w->jobs);
+      sthread_join(w->thread);
+      w->thread = NULL;
+      while (retro_spsc_read_avail(&w->results) >= sizeof(res))
+      {
+         retro_spsc_read(&w->results, &res, sizeof(res));
+         vkDestroyPipeline(self->device, res.pipeline, NULL);
+      }
+   }
+
+   static void device_warm_free(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      if (!w)
+         return;
+      device_warm_stop(self);
+      retro_spsc_free(&w->results);
+      retro_waitable_spsc_free(&w->jobs);
+      free(w->loaded);
+      free(w->released);
+      free(w->added);
+      free(w->passes);
+      free(w->held);
+      free(w->known);
+      free(w);
+      self->warm = NULL;
+   }
+#else
+   static int device_warm_take(Device *self, Program *program, Hash hash,
+         VkPipeline *out)
+   {
+      return 0;
+   }
+   static void device_warm_record(Device *self, const PipelineDesc *d,
+         Hash hash, bool compute) { }
+#endif
+
    static void device_init(Device *self)
    {
       /* Device is malloc'd with uninitialised storage; in the C++ source it was
@@ -16780,8 +18916,15 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
     * implicit member destruction used to perform, deepest-owned last. */
    static void device_deinit(Device *self)
    {
+#ifdef HAVE_THREADS
+      device_warm_stop(self);
+#endif
       device_wait_idle_nolock(self);
       device_pipeline_cache_save(self);
+#ifdef HAVE_THREADS
+      device_pipeline_list_save(self);
+      device_warm_free(self);
+#endif
 
       framebuffer_allocator_clear(&self->framebuffer_allocator);
       attachment_allocator_clear(&self->transient_allocator);
@@ -16875,7 +19018,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       hash = hasher_get(&hasher);
       ret = program_map_find(&self->programs, hash);
       if (!ret)
+      {
          ret = program_map_emplace_yield_compute(&self->programs, hash, self, compute);
+#ifdef HAVE_THREADS
+         device_warm_program_made(self, ret);
+#endif
+      }
       return ret;
    }
 
@@ -16901,7 +19049,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       ret = program_map_find(&self->programs, hash);
 
       if (!ret)
+      {
          ret = program_map_emplace_yield_graphics(&self->programs, hash, self, vertex, fragment);
+#ifdef HAVE_THREADS
+         device_warm_program_made(self, ret);
+#endif
+      }
       return ret;
    }
 
@@ -17064,6 +19217,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       /* Needs gpu_props: the on-disk blob is matched against the GPU. */
       device_pipeline_cache_create(self);
+#ifdef HAVE_THREADS
+      device_warm_start(self);
+#endif
 
       self->graphics_queue_family_index = context_get_graphics_queue_family(context);
       self->graphics_queue = context_get_graphics_queue(context);
@@ -17088,9 +19244,19 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       deviceallocator_set_supports_dedicated_allocation(&self->managers.memory, self->ext.supports_dedicated);
       semaphoremanager_init(&self->managers.semaphore, self->device);
       fencemanager_init(&self->managers.fence, self->device);
-      bufferpool_init(&self->managers.vbo, self, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+      /* Sized for a whole frame's primitive batches. A request larger than
+       * a block gets a dedicated buffer that is never recycled, and a
+       * 4 KiB block made that every flush of more than ~100 quads: a
+       * buffer and memory allocation per batch, every frame. */
+      bufferpool_init(&self->managers.vbo, self, 512 * 1024, 16,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
       bufferpool_init(&self->managers.ubo, self, 256 * 1024, max_((VkDeviceSize)16u, self->gpu_props.limits.minUniformBufferOffsetAlignment),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+#ifdef HAVE_THREADS
+      /* Can make images now: the listed render passes, before the renderer
+       * makes its programs and with them releases the listed pipelines. */
+      device_warm_make_passes(self);
+#endif
    }
 
    static void device_init_stock_samplers(Device *self){
@@ -17319,6 +19485,18 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
    }
 
    POD_VEC_DECLARE(VkFlagsVec, VkFlags);
+   /* The queue's tail fence, once a later submit follows it: waited and
+    * recycled with the frame, as any fence of the frame. */
+   static void device_retire_tail_fence(Device *self, QueueData *data)
+   {
+      if (data->tail_fence != VK_NULL_HANDLE)
+      {
+         FenceVec_push(&device_frame(self)->wait_fences, &data->tail_fence);
+         FenceVec_push(&device_frame(self)->recycle_fences, &data->tail_fence);
+         data->tail_fence = VK_NULL_HANDLE;
+      }
+   }
+
    static void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence,
          unsigned semaphore_count, Semaphore *semaphores){
             VkResult result;
@@ -17386,6 +19564,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       { bool queue_locked = device_queue_lock(self, queue);
       result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
       device_queue_unlock(self, queue_locked); }
+      device_retire_tail_fence(self, data);
 
       if (result != VK_SUCCESS)
          LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
@@ -17619,7 +19798,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          }
       }
 
-      cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
+      /* Asked for or not, the submit carries a fence: unasked, it becomes
+       * the queue's tail fence. */
+      cleared_fence = fencemanager_request_cleared_fence(&self->managers.fence);
 
       { unsigned i; for (i = 0; i < semaphore_count; i++) {
          VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
@@ -17665,6 +19846,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       device_queue_unlock(self, queue_locked); }
       if (result != VK_SUCCESS)
          LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
+      device_retire_tail_fence(self, data);
       cbhvec_clear(submissions);
 
       CommandBufferVec_free_storage(&cmds);
@@ -17694,7 +19876,14 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          data->need_fence = false;
       }
       else
+      {
+         /* A fence handed to a failed submit never signals: never a tail. */
+         if (result == VK_SUCCESS)
+            data->tail_fence = cleared_fence;
+         else if (cleared_fence != VK_NULL_HANDLE)
+            fencemanager_recycle_fence(&self->managers.fence, cleared_fence);
          data->need_fence = true;
+      }
       }
       }
    }
@@ -17740,36 +19929,36 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       device_submit_staging(self, &cmd, usage, false);
    }
 
-   static void device_end_frame_nolock(Device *self){
-      /* Make sure we have a fence which covers all submissions in the frame. */
+   /* The frame's fence for a queue: the tail fence when nothing was
+    * submitted or left waiting since, which covers the whole frame, else a
+    * submit of its own as ever. */
+   static void device_end_frame_queue(Device *self, CommandBufferType type)
+   {
+      QueueData *data = device_get_queue_data(self, type);
       VkFence fence;
 
-      if (self->transfer.need_fence || !cbhvec_empty(&device_frame(self)->transfer_submissions))
+      if (!data->need_fence && cbhvec_empty(device_get_queue_submissions(self, type)))
+         return;
+      if (data->tail_fence != VK_NULL_HANDLE
+            && cbhvec_empty(device_get_queue_submissions(self, type))
+            && sem_handle_vec_size(&data->wait_semaphores) == 0)
       {
-         fence = VK_NULL_HANDLE;
-         device_submit_queue(self, Type_AsyncTransfer, &fence, 0, NULL);
-         if (fence != VK_NULL_HANDLE)
-            FenceVec_push(&device_frame(self)->recycle_fences, &fence);
-         self->transfer.need_fence = false;
+         device_retire_tail_fence(self, data);
+         data->need_fence = false;
+         return;
       }
+      fence = VK_NULL_HANDLE;
+      device_submit_queue(self, type, &fence, 0, NULL);
+      if (fence != VK_NULL_HANDLE)
+         FenceVec_push(&device_frame(self)->recycle_fences, &fence);
+      data->need_fence = false;
+   }
 
-      if (self->graphics.need_fence || !cbhvec_empty(&device_frame(self)->graphics_submissions))
-      {
-         fence = VK_NULL_HANDLE;
-         device_submit_queue(self, Type_Generic, &fence, 0, NULL);
-         if (fence != VK_NULL_HANDLE)
-            FenceVec_push(&device_frame(self)->recycle_fences, &fence);
-         self->graphics.need_fence = false;
-      }
-
-      if (self->compute.need_fence || !cbhvec_empty(&device_frame(self)->compute_submissions))
-      {
-         fence = VK_NULL_HANDLE;
-         device_submit_queue(self, Type_AsyncCompute, &fence, 0, NULL);
-         if (fence != VK_NULL_HANDLE)
-            FenceVec_push(&device_frame(self)->recycle_fences, &fence);
-         self->compute.need_fence = false;
-      }
+   static void device_end_frame_nolock(Device *self){
+      /* Make sure we have a fence which covers all submissions in the frame. */
+      device_end_frame_queue(self, Type_AsyncTransfer);
+      device_end_frame_queue(self, Type_Generic);
+      device_end_frame_queue(self, Type_AsyncCompute);
    }
 
    static void device_flush_frame_nolock(Device *self){
@@ -18090,9 +20279,17 @@ static void device_next_frame_context(Device *self)
 
    /* Debounced pipeline cache flush: write once compilation has been quiet
     * for PIPELINE_CACHE_FLUSH_FRAMES frames. */
+#ifdef HAVE_THREADS
+   device_warm_flush_held(self);
+#endif
    if (self->pipeline_cache_dirty &&
        ++self->pipeline_cache_quiet_frames >= PIPELINE_CACHE_FLUSH_FRAMES)
+   {
       device_pipeline_cache_save(self);
+#ifdef HAVE_THREADS
+      device_pipeline_list_save(self);
+#endif
+   }
 }
 
    static void per_frame_begin(struct PerFrame *self)
@@ -19283,7 +21480,13 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
       ret = render_pass_map_find(&self->render_passes, hash);
       if (!ret)
+      {
          ret = render_pass_map_emplace_yield(&self->render_passes, hash, self, info);
+#ifdef HAVE_THREADS
+         if (compatible)
+            device_warm_pass_made(self, hash, info, formats, lazy);
+#endif
+      }
       return ret;
       }
    }
@@ -20103,6 +22306,19 @@ extern retro_log_printf_t log_cb;
 static struct retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
 
+/* The frontend's temporal upscaler; see upscaler_poll below */
+static void upscaler_override_options(void);
+static void upscaler_get_interface(void);
+static void upscaler_release_ring(void);
+static void upscaler_poll(void);
+static unsigned upscaler_jitter_phase(void);
+static void upscaler_hand_over(Renderer *r, Image *scanout, unsigned index);
+static const struct retro_hw_render_upscaler_interface *upscaler_iface;
+static bool upscaler_on;
+static bool upscaler_reset_pending = true;
+/* What the renderer was built for (it may have settled for less) */
+static unsigned built_scaling, built_msaa;
+
 /* Owning vector of retro_vulkan_image (POD), replacing A dynamic array of
  * retro_vulkan_image. resize() grows/shrinks the backing array; grown slots are
  * zero-initialised. */
@@ -20377,6 +22593,8 @@ static void vk_context_reset(void)
    device_set_context(device, *&context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
+   built_scaling = scaling;
+   built_msaa    = msaa;
    renderer_init(renderer, device, scaling, msaa, owned_u32_empty(&save_state.vram) ? NULL : &save_state);
    if (!renderer_is_valid(renderer))
    {
@@ -20392,6 +22610,7 @@ static void vk_context_reset(void)
 
    tt_log_startup("vk renderer init: scaling=%u msaa=%u has_software_fb=%d\n",
          (unsigned)scaling, (unsigned)msaa, (int)has_software_fb);
+   upscaler_get_interface();
 
    /* Replay any rhi_vulkan_* state-sets / VRAM uploads that arrived
     * between rhi_vulkan_open's SET_HW_RENDER and this context_reset
@@ -20419,6 +22638,8 @@ static void vk_context_destroy(void)
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
    vulkan     = NULL;
+   upscaler_iface = NULL;
+   upscaler_release_ring();
    scanouthandlevec_free_storage(&scanout_handles);
    swapchainimagevec_free_storage(&swapchain_images);
 
@@ -20546,6 +22767,11 @@ bool rhi_vulkan_open(bool is_pal)
    hw_render.cache_context   = false;
    if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
       return false;
+
+   /* Asked for here so the frontend makes the context for its temporal
+    * upscaler; the interface comes after context_reset */
+   { const struct retro_hw_render_upscaler_interface *iface = NULL;
+   environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_UPSCALER_INTERFACE, &iface); }
 
    /* v2 where the frontend has it, so it makes the device and can add
     * what it needs; a frontend that predates v2 rejects a v2 interface. */
@@ -20712,6 +22938,7 @@ void rhi_vulkan_refresh_variables(void)
    {
       msaa = strtoul(var.value, NULL, 0);
    }
+   upscaler_override_options();
 
    var.key = BEETLE_OPT(mdec_yuv);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -20956,6 +23183,258 @@ void rhi_vulkan_refresh_variables(void)
    }
 }
 
+/* The frontend's temporal upscaler (RETRO_ENVIRONMENT_GET_HW_RENDER_UPSCALER_INTERFACE).
+ * While it takes the frames, the internal resolution is the factor that
+ * fits the size it asks for, without multisampling or supersampling,
+ * which would blur what it antialiases itself (adaptive smoothing
+ * stays: it smooths native-resolution 2D art, which an upscaler keeps
+ * as the detail it is), and the renderer jitters the primitives and
+ * hands over their motion vectors, depth and transparency mask with
+ * each frame. */
+static struct retro_hw_upscaler_request upscaler_request;
+static struct retro_hw_upscaler_inputs upscaler_inputs;
+static bool upscaler_options_hidden;
+/* The factor it picked, for frames of this native size, the size of
+ * the frame shown last */
+static unsigned upscaler_factor;
+static unsigned upscaler_picked_width, upscaler_picked_height;
+static unsigned upscaler_native_width = 320, upscaler_native_height = 240;
+/* Its pass's images per sync index: motion vectors, depth, mask. They
+ * live as long as the colour image of the same frame. */
+#define UPSCALER_RING 16
+static ImageHandle upscaler_ring[UPSCALER_RING][3];
+
+static void upscaler_release_ring(void)
+{
+   unsigned i, k;
+   for (i = 0; i < UPSCALER_RING; i++)
+      for (k = 0; k < 3; k++)
+         ih_reset(&upscaler_ring[i][k]);
+}
+
+/* Halton (2, 3) over the frames the ratio of the sizes wants: at least
+ * 8, at most 64 */
+static unsigned upscaler_jitter_phase(void)
+{
+   float ratio;
+   unsigned phase;
+   if (!upscaler_native_width || !upscaler_factor)
+      return 8;
+   ratio = (float)upscaler_request.output_width / (float)(upscaler_native_width * upscaler_factor);
+   phase = (unsigned)ceilf(8.0f * ratio * ratio);
+   return phase < 8 ? 8 : phase > 64 ? 64 : phase;
+}
+
+/* The options the upscaler overrides while it draws, and hides */
+static void upscaler_override_options(void)
+{
+   static const char *const keys[] = {
+      BEETLE_OPT(internal_resolution),
+      BEETLE_OPT(msaa),
+      BEETLE_OPT(super_sampling),
+      NULL
+   };
+   struct retro_core_option_display display;
+   unsigned i;
+
+   if (upscaler_on)
+   {
+      scaling        = upscaler_factor;
+      msaa           = 1;
+      super_sampling = false;
+   }
+   if (upscaler_on == upscaler_options_hidden)
+      return;
+   upscaler_options_hidden = upscaler_on;
+   display.visible         = !upscaler_on;
+   for (i = 0; keys[i]; i++)
+   {
+      display.key = keys[i];
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &display);
+   }
+}
+
+/* Says what the upscaler asked for and what came of it, when that
+ * changes */
+static void upscaler_log(bool requested, bool on, unsigned factor)
+{
+   static bool last_requested, last_on;
+   static unsigned last_factor, last_w, last_h;
+   const struct retro_hw_upscaler_request *r = &upscaler_request;
+   if (requested == last_requested && on == last_on && factor == last_factor
+         && (!on || (last_w == upscaler_native_width && last_h == upscaler_native_height)))
+      return;
+   last_requested = requested;
+   last_on        = on;
+   last_factor    = factor;
+   last_w         = upscaler_native_width;
+   last_h         = upscaler_native_height;
+   if (!requested)
+      LOGI("[Vulkan]: Temporal upscaler: no request, rendering as usual.\n");
+   else if (!on)
+      LOGI("[Vulkan]: Temporal upscaler: asks for %ux%u (%ux%u to %ux%u) for %ux%u; "
+            "no factor of %ux%u fits, rendering as usual.\n",
+            r->render_width, r->render_height, r->min_render_width, r->min_render_height,
+            r->max_render_width, r->max_render_height, r->output_width, r->output_height,
+            upscaler_native_width, upscaler_native_height);
+   else
+      LOGI("[Vulkan]: Temporal upscaler: drawing at %ux, %ux%u, for %ux%u "
+            "(asks for %ux%u, %ux%u to %ux%u).\n",
+            factor, upscaler_native_width * factor, upscaler_native_height * factor,
+            r->output_width, r->output_height, r->render_width, r->render_height,
+            r->min_render_width, r->min_render_height, r->max_render_width, r->max_render_height);
+}
+
+/* Once a frame, before it is drawn: whether it is drawn for the
+ * upscaler and at what factor. A factor other than the renderer's is a
+ * geometry change, applied before the next frame as an option's is. */
+static void upscaler_poll(void)
+{
+   bool requested = false;
+   bool on        = false;
+   unsigned factor = 0;
+
+   if (upscaler_iface && upscaler_iface->get_request(upscaler_iface->handle, &upscaler_request))
+   {
+      static struct retro_hw_upscaler_request last_request;
+      psx_upscaler_range_t range;
+      /* a changed request (the output changed) is picked for afresh */
+      bool changed      = memcmp(&last_request, &upscaler_request, sizeof(last_request)) != 0;
+      last_request      = upscaler_request;
+      requested         = true;
+      range.want_width  = upscaler_request.render_width;
+      range.min_width   = upscaler_request.min_render_width;
+      range.min_height  = upscaler_request.min_render_height;
+      range.max_width   = upscaler_request.max_render_width;
+      range.max_height  = upscaler_request.max_render_height;
+      factor = psx_upscaler_factor(&range, upscaler_native_width, upscaler_native_height, 16,
+            upscaler_on && !changed ? upscaler_factor : 0, upscaler_picked_width, upscaler_picked_height);
+      on = factor != 0;
+   }
+   if (on != upscaler_on)
+      upscaler_reset_pending = true;
+   if (on && (factor != upscaler_factor || !upscaler_on))
+   {
+      upscaler_factor        = factor;
+      upscaler_picked_width  = upscaler_native_width;
+      upscaler_picked_height = upscaler_native_height;
+   }
+   if (upscaler_on && !on)
+   {
+      /* back to the options as set (a geometry change when they differ) */
+      upscaler_on = false;
+      rhi_vulkan_refresh_variables();
+   }
+   else if (on)
+   {
+      /* the renderer follows at the frame boundary
+       * (rhi_vulkan_apply_pending_geometry); the maximum size reported
+       * stays the options', which only sizes a frontend's software
+       * frame scratch */
+      upscaler_on = true;
+      upscaler_override_options();
+   }
+   if (upscaler_iface)
+      upscaler_log(requested, on, factor);
+}
+
+static void upscaler_get_interface(void)
+{
+   const struct retro_hw_render_upscaler_interface *iface = NULL;
+   if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_UPSCALER_INTERFACE, &iface) || !iface
+         || iface->interface_version != RETRO_HW_RENDER_UPSCALER_INTERFACE_VERSION)
+      iface = NULL;
+   upscaler_iface         = iface;
+   upscaler_reset_pending = true;
+}
+
+static uint64_t upscaler_vk_handle(const void *handle, size_t size)
+{
+   uint64_t value = 0;
+   memcpy(&value, handle, size < sizeof(value) ? size : sizeof(value));
+   return value;
+}
+
+static void upscaler_image(struct retro_hw_upscaler_image *out, Image *image)
+{
+   VkImage img      = image_get_image(image);
+   VkImageView view = imageview_get_view(image_get_view(image));
+   out->image  = upscaler_vk_handle(&img, sizeof(img));
+   out->view   = upscaler_vk_handle(&view, sizeof(view));
+   out->format = image_get_format(image);
+   out->state  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+   out->width  = image_get_width(image, 0);
+   out->height = image_get_height(image, 0);
+}
+
+/* The frame's pass, in the images of its sync index, and its inputs
+ * handed over; nothing when the frame is not one the upscaler can take
+ * (VRAM shown whole, a black screen) */
+static void upscaler_hand_over(Renderer *r, Image *scanout, unsigned index)
+{
+   static const VkFormat formats[3] = { VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_R32_SFLOAT, VK_FORMAT_R8_UNORM };
+   unsigned width  = image_get_width(scanout, 0);
+   unsigned height = image_get_height(scanout, 0);
+   unsigned scale  = r->scaling;
+   psx_upscaler_geometry_t geometry;
+   DisplayRect display_rect;
+   unsigned k;
+
+   if (!upscaler_on || !upscaler_iface || show_vram || index >= UPSCALER_RING
+         || !r->render_state.display_on || !r->render_state.display_fb_rect.width
+         || width < scale || height < scale)
+   {
+      if (upscaler_iface)
+         upscaler_iface->set_inputs(upscaler_iface->handle, NULL);
+      return;
+   }
+
+   for (k = 0; k < 3; k++)
+   {
+      Image *img = ih_get(&upscaler_ring[index][k]);
+      if (!img || image_get_width(img, 0) != width || image_get_height(img, 0) != height)
+      {
+         ImageCreateInfo info = image_create_info_render_target(width, height, formats[k]);
+         info.initial_layout  = VK_IMAGE_LAYOUT_UNDEFINED;
+         info.usage           = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+         ih_move(&upscaler_ring[index][k], device_create_image(r->device, &info, NULL));
+         if (!ih_get(&upscaler_ring[index][k]))
+         {
+            upscaler_iface->set_inputs(upscaler_iface->handle, NULL);
+            return;
+         }
+      }
+   }
+
+   /* The image's pixel (0, 0) shows the VRAM pixel the display's window
+    * starts at, as the scanout places its framebuffer rectangle */
+   display_rect = renderer_compute_display_rect(r);
+   psx_upscaler_resolve(r->upscaler,
+         (int)r->render_state.display_fb_rect.x - display_rect.x,
+         (int)r->render_state.display_fb_rect.y - display_rect.y,
+         width / scale, height / scale, scale, &geometry);
+   upscaler_native_width  = width / scale;
+   upscaler_native_height = height / scale;
+   renderer_upscaler_pass(r, &geometry, width, height,
+         ih_get(&upscaler_ring[index][0]), ih_get(&upscaler_ring[index][1]), ih_get(&upscaler_ring[index][2]));
+
+   memset(&upscaler_inputs, 0, sizeof(upscaler_inputs));
+   upscaler_inputs.flags = geometry.reset ? RETRO_HW_UPSCALER_RESET : 0;
+   if (psx_hdr_active && psx_hdr_scrgb)
+      upscaler_inputs.flags |= RETRO_HW_UPSCALER_HDR;
+   upscaler_image(&upscaler_inputs.motion_vectors, ih_get(&upscaler_ring[index][0]));
+   upscaler_image(&upscaler_inputs.depth, ih_get(&upscaler_ring[index][1]));
+   upscaler_image(&upscaler_inputs.transparency_mask, ih_get(&upscaler_ring[index][2]));
+   upscaler_inputs.jitter_x       = geometry.jitter_x;
+   upscaler_inputs.jitter_y       = geometry.jitter_y;
+   upscaler_inputs.mv_scale_x     = 1.0f;
+   upscaler_inputs.mv_scale_y     = 1.0f;
+   upscaler_inputs.pre_exposure   = 1.0f;
+   upscaler_inputs.exposure_scale = 1.0f;
+   upscaler_inputs.frame_time_ms  = (float)(1000.0 / rhi_common_get_timing_fps());
+   upscaler_iface->set_inputs(upscaler_iface->handle, &upscaler_inputs);
+}
+
 static void ensure_sync_index_resources(void)
 {
    unsigned mask = vulkan->get_sync_index_mask(vulkan->handle);
@@ -20971,24 +23450,57 @@ static void ensure_sync_index_resources(void)
    }
 }
 
-/* Perform a renderer rebuild that rhi_vulkan_refresh_variables deferred (a
- * scaling / super_sampling / msaa change). Called from the top of prepare_frame
- * BEFORE the frame is begun on the device, so the renderer is torn down and
- * rebuilt between frames -- never under work already submitted for an in-flight
- * frame. Preserves VRAM across the rebuild exactly as vk_context_reset does
- * (save -> idle -> release scanout handles -> fini -> init with the saved
- * state). */
+/* Rebuilds the renderer at the scaling and msaa now set, on the same
+ * device and context, with VRAM and its state carried over as
+ * vk_context_reset carries them: no frontend reinit, no swapchain or
+ * upscaler feature torn down, the programs and pipelines kept. Between
+ * frames only. */
+static void rhi_vulkan_rebuild_renderer(void)
+{
+   SaveState st;
+   if (!renderer || !device)
+      return;
+   renderer_save_vram_state(renderer, &st);
+   renderer_fini(renderer);
+   free(renderer);
+   renderer = (Renderer *)malloc(sizeof(Renderer));
+   built_scaling = scaling;
+   built_msaa    = msaa;
+   renderer_init(renderer, device, scaling, msaa, &st);
+   savestate_destroy(&st);
+   if (!renderer_is_valid(renderer))
+   {
+      renderer_fini(renderer);
+      free(renderer);
+      renderer = NULL;
+      return;
+   }
+   upscaler_reset_pending = true;
+   tt_log_startup("vk renderer rebuilt: scaling=%u msaa=%u\n",
+         (unsigned)scaling, (unsigned)msaa);
+}
+
+/* Fire a geometry change rhi_vulkan_refresh_variables deferred, and
+ * rebuild the renderer where it no longer matches the scaling or msaa
+ * set (the frontend reinitialises its video only when the maximum size
+ * changed; the temporal upscaler's factor never goes through it).
+ * Called from the top of retro_run BEFORE prepare_frame begins a frame,
+ * so the frontend's synchronous video-driver reinit
+ * (context_destroy/context_reset) and the rebuild run with no frame in
+ * flight and nothing from this core on the call stack below it. */
 void rhi_vulkan_apply_pending_geometry(void)
 {
-   /* Fire a deferred geometry change recorded by refresh_variables. Called from
-    * the top of retro_run BEFORE prepare_frame begins a frame, so the frontend's
-    * synchronous video-driver reinit (context_destroy/context_reset) runs with
-    * no frame in flight and nothing from this core on the call stack below it. */
    if (geometry_change_pending)
    {
       struct retro_system_av_info info = pending_av_info;
       geometry_change_pending = false;
       environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+   }
+   if (device && renderer)
+   {
+      upscaler_poll();
+      if (renderer && (built_scaling != scaling || built_msaa != msaa))
+         rhi_vulkan_rebuild_renderer();
    }
 }
 
@@ -21034,6 +23546,12 @@ static void renderer_reduce_cached_color(Renderer *self)
    ih_reset(&self->last_scanout);
 }
 
+/* Out of line: a frame rarely starts with work recorded. */
+static RHI_NOINLINE void renderer_flush_between_frames(Renderer *self)
+{
+   renderer_flush(self);
+}
+
 void rhi_vulkan_prepare_frame(void)
 {
    enum dither_mode pattern = psx_hdr_active ? DITHER_OFF : psx_gpu_dither_mode;
@@ -21056,6 +23574,9 @@ void rhi_vulkan_prepare_frame(void)
       return;
    }
 
+   /* Uploads recorded between frames, a state load's, go first. */
+   if (renderer && cbh_is_valid(&renderer->cmd))
+      renderer_flush_between_frames(renderer);
    inside_frame = true;
    device_flush_frame_nolock(device);
    vulkan->wait_sync_index(vulkan->handle);
@@ -21066,6 +23587,13 @@ void rhi_vulkan_prepare_frame(void)
     * don't dereference it. */
    if (renderer == NULL)
       return;
+   renderer->upload_serial++;
+
+   psx_upscaler_configure(renderer->upscaler, upscaler_on && !show_vram,
+         upscaler_jitter_phase(), upscaler_reset_pending);
+   upscaler_reset_pending = false;
+   if (!psx_upscaler_is_active(renderer->upscaler))
+      renderer->upscaler_jitter_x = renderer->upscaler_jitter_y = 0.0f;
 
    renderer->scaled_uv_offset = scaled_uv_offset;
    renderer->primitive_filter_mode = (FilterMode)(filter_mode);
@@ -21228,6 +23756,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    image->image_view                                  = 
       imageview_get_view(image_get_view(ih_get(&scanout)));
 
+   upscaler_hand_over(renderer, ih_get(&scanout), index);
    vulkan->set_image(vulkan->handle, image, 0,
          NULL, VK_QUEUE_FAMILY_IGNORED);
    renderer_flush(renderer);
@@ -21612,9 +24141,18 @@ void rhi_vulkan_load_image(
    renderer->render_state.mask_test      = mask_test;
    renderer->render_state.force_mask_bit = set_mask;
    {
-      TTRect _r = { x, y, w, h };
-      BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
-      uint16_t *tmp = (uint16_t*)(device_map_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
+      TTRect        _r = { x, y, w, h };
+      BufferHandle  handle;
+      const Buffer *mapped = NULL;
+      uint16_t     *tmp;
+      bool          dual_copy, y_wrap;
+      handle.data = NULL;
+      tmp = renderer_copy_cpu_to_vram(renderer, &_r, &handle, &mapped);
+      if (!tmp)
+      {
+         bh_reset(&handle);
+         return;
+      }
 
       /* The row loop has two independent invariants: x-wrap (dual_copy)
        * and y-wrap. Both are determined entirely by (x, y, w, h) before
@@ -21627,8 +24165,8 @@ void rhi_vulkan_load_image(
        * case for upload rects), but the compiler can't prove that without
        * splitting the loop.
        */
-      const bool dual_copy = x + w > FB_WIDTH;
-      const bool y_wrap    = y + h > FB_HEIGHT;
+      dual_copy = x + w > FB_WIDTH;
+      y_wrap    = y + h > FB_HEIGHT;
 
       if (dual_copy)
       {
@@ -21672,15 +24210,10 @@ void rhi_vulkan_load_image(
                      w * sizeof(uint16_t));
          }
       }
-      device_unmap_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
+      device_unmap_host_buffer(renderer->device, mapped, MEMORY_ACCESS_WRITE_BIT);
 
-      /* This is called on state loading. */
-      if (!inside_frame)
-         renderer_flush(renderer);
-      /* renderer_copy_cpu_to_vram produced an owning BufferHandle and
-       * device_unmap_host_buffer only unmaps it; the former handle released it
-       * at scope end (after the flush above), so drop that
-       * reference here. */
+      /* The staging buffer of its own, when the ring could not hold the
+       * rect; the recorded copy keeps its own reference. */
       bh_reset(&handle);
    }
 }
@@ -21695,6 +24228,24 @@ bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
       TTRect _r = { x, y, w, h };
       renderer_copy_vram_to_cpu_synchronous(renderer, &_r, vram);
    }
+   return true;
+}
+
+bool rhi_vulkan_read_vram_rects(const uint16_t (*rects)[4], unsigned count,
+                                uint16_t *vram)
+{
+   TTRect   r[8];
+   unsigned i;
+   if (!renderer || count > 8)
+      return false;
+   for (i = 0; i < count; i++)
+   {
+      r[i].x      = rects[i][0];
+      r[i].y      = rects[i][1];
+      r[i].width  = rects[i][2];
+      r[i].height = rects[i][3];
+   }
+   renderer_copy_vram_to_cpu_rects(renderer, r, count, vram);
    return true;
 }
 

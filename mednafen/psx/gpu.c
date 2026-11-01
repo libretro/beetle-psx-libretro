@@ -139,6 +139,11 @@ MDFN_ALIGN(64) PS_GPU GPU;
 static uint32_t  TexCache_Tag[256];
 static uint16_t  TexCache_Data[256][4];
 static uint16_t *vram_new = NULL;
+/* 1x savestate staging for upscaled VRAM; kept across states so runahead
+ * and rewind do not allocate 1 MiB per frame. */
+static uint16_t *state_vram_1x = NULL;
+/* Rows of VRAM a savestate load changed (MDFNSS_SetDiffMap entries). */
+static uint16_t  state_vram_rows[512];
 
 /*
  * Deferred SW-renderer scanout records.
@@ -1212,6 +1217,8 @@ void GPU_Destroy(void)
 {
    free(GPU.vram);
    GPU.vram = NULL;
+   free(state_vram_1x);
+   state_vram_1x = NULL;
 }
 
 /* Rescale the GPU with a different upscale_shift.
@@ -1303,6 +1310,9 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
    GPU.DataReadBufferEx = 0;
    GPU.InCmd = INCMD_NONE;
 
+   GPU.off_u = GPU.off_v = 0;
+   GPU.may_be_2d = false;
+
    GPU.DisplayOff = 1;
    GPU.DisplayFB_XStart = 0;
    GPU.DisplayFB_YStart = 0;
@@ -1311,6 +1321,7 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
 
    GPU.HorizStart = 0x200;
    GPU.HorizEnd = 0xC00;
+   GPU.crop_window = 608u | (2560u << 16);
 
    GPU.VertStart = 0x10;
    GPU.VertEnd = 0x100;
@@ -1404,11 +1415,7 @@ void GPU_Power(void)
    GPU.DataReadBufferEx = 0;
    GPU.InCmd = INCMD_NONE;
    GPU.InCmd_CC = 0;
-   /* Mid-cmd quad state. Power doesn't strictly need to clear these
-    * because they're only consumed when InCmd == INCMD_QUAD (and we
-    * just zeroed InCmd above), but explicit clears match the saved
-    * state and make cold-reset behavior deterministic regardless of
-    * BSS contents. */
+   /* Clear pending-quad state; GPU_SoftReset() clears UV corrections. */
    GPU.InQuad_clut = 0;
    GPU.InQuad_invalidW = false;
    GPU.killQuadPart = 0;
@@ -1429,6 +1436,7 @@ void GPU_Power(void)
 
    GPU.HorizStart = 0;
    GPU.HorizEnd = 0;
+   GPU.crop_window = 608u | (2560u << 16);
 
    GPU.VertStart = 0;
    GPU.VertEnd = 0;
@@ -1683,12 +1691,19 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
 
          case 0x06:  /* Horizontal display range */
+            /* A new range is a new picture, even with VRAM unchanged */
+            if (   GPU.HorizStart != (V & 0xFFF)
+                || GPU.HorizEnd   != ((V >> 12) & 0xFFF))
+               GPU.display_change_count++;
             GPU.HorizStart = V & 0xFFF;
             GPU.HorizEnd = (V >> 12) & 0xFFF;
             rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
             break;
 
          case 0x07:
+            if (   GPU.VertStart != (V & 0x3FF)
+                || GPU.VertEnd   != ((V >> 10) & 0x3FF))
+               GPU.display_change_count++;
             GPU.VertStart = V & 0x3FF;
             GPU.VertEnd = (V >> 10) & 0x3FF;
             rhi_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
@@ -2502,15 +2517,37 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                   && GPU.scanline < (FirstVisibleLine + VisibleLineCount))
             {
                int32_t fb_x      = GPU.DisplayFB_XStart * 2;
-               /* Restore old center behaviour if GPU.HorizStart is intentionally very high. */
-               /* 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird), */
-               /* but this value should be lowered in the future if necessary. */
-               /* Additionally cut off everything after GPU.HorizEnd that shouldn't be */
-               /* in the viewport (the hardware renderers already takes care of this). */
-               int32_t dx_start  = (crop_overscan == 2 && GPU.HorizStart < 938 ? 608 : GPU.HorizStart), dx_end = (crop_overscan == 2 && GPU.HorizStart < 938 ? GPU.HorizEnd - GPU.HorizStart + 608 : GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1));
+               int32_t dx_start, dx_end;
+               /* A field's lines interleave with the other field's,
+                * unless they are bobbed */
                int32_t dest_line =
-                  ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
-                  + GPU.espec->InterlaceField;
+                  (GPU.espec->InterlaceOn && psx_gpu_bob_scanout)
+                  ? (int32_t)(GPU.scanline - FirstVisibleLine)
+                  : ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
+                     + GPU.espec->InterlaceField;
+
+               /* One crop window for the whole frame */
+               if (GPU.scanline == FirstVisibleLine)
+                  GPU.crop_window = rhi_common_crop_window(crop_overscan,
+                        (int32_t)GPU.HorizStart, (int32_t)GPU.HorizEnd);
+
+               /* The dynamic crop moves the picture to the start of the
+                * crop window, unless GPU.HorizStart is intentionally very
+                * high: 938 fixes Gunbird (1008) and Mobile Light Force (EU
+                * release of Gunbird), but this value should be lowered in
+                * the future if necessary.  Additionally cut off everything
+                * after GPU.HorizEnd that shouldn't be in the viewport (the
+                * hardware renderers already take care of this). */
+               if (crop_overscan == 2 && GPU.HorizStart < 938)
+               {
+                  dx_start = RHI_CROP_WIN_START(GPU.crop_window);
+                  dx_end   = dx_start + GPU.HorizEnd - GPU.HorizStart;
+               }
+               else
+               {
+                  dx_start = GPU.HorizStart;
+                  dx_end   = GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1);
+               }
 
                if(dx_end < dx_start)
                   dx_end = dx_start;
@@ -2551,7 +2588,8 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                   if (     dest_line == 0
                         && GPU.espec->loan
                         && GPU.surface == GPU.espec->loan
-                        && (int32_t)dmw != GPU.espec->loan_dmw)
+                        && (   (int32_t)dmw != GPU.espec->loan_dmw
+                            || GPU.crop_window != GPU.espec->loan_win))
                      LeaveLoan();
                   on_loan = GPU.espec->loan && GPU.surface == GPU.espec->loan;
                   ScanoutCacheTarget(GPU.surface);
@@ -2808,7 +2846,43 @@ void GPU_StartFrame(EmulateSpecStruct *espec_arg)
  * the immediate-scanout path in Update() is what runs unless
  * psx_gpu_rasterize_both_fields is set + SW renderer + 480i).
  */
-void GPU_FlushDeferredScanout(void)
+bool GPU_DeferredScanoutWhole(int32_t lines, int32_t *dmw)
+{
+   uint8_t  seen[GPU_DEST_LINE_MAX];
+   int32_t  filled = 0;
+   unsigned r;
+
+   if (!deferred_scanout_count || lines <= 0 || lines > GPU_DEST_LINE_MAX)
+      return false;
+
+   memset(seen, 0, (size_t)lines);
+   *dmw = deferred_scanouts[0].dmw;
+
+   for (r = 0; r < deferred_scanout_count; r++)
+   {
+      const GPU_DeferredScanline *rec = &deferred_scanouts[r];
+      int32_t line[2];
+      int     k;
+
+      if (rec->dmw != *dmw)
+         return false;
+      line[0] = rec->dest_line;
+      line[1] = rec->dest_line_other;
+      for (k = 0; k < 2; k++)
+      {
+         if (line[k] < 0 || line[k] >= lines)
+            return false;
+         if (!seen[line[k]])
+         {
+            seen[line[k]] = 1;
+            filled++;
+         }
+      }
+   }
+   return filled == lines;
+}
+
+void GPU_FlushDeferredScanout(MDFN_Surface *target)
 {
    const unsigned s = GPU.upscale_shift;
    const unsigned up = 1u << s;
@@ -2824,6 +2898,42 @@ void GPU_FlushDeferredScanout(void)
     * needed". */
    if (deferred_scanout_count == 0)
       return;
+
+   if (target)
+   {
+      /* A frontend buffer the picture is cut to; every row of it is
+       * written (GPU_DeferredScanoutWhole), margins included. The
+       * core's own surface and its margin cache are left alone. */
+      for (r = 0; r < deferred_scanout_count; r++)
+      {
+         const GPU_DeferredScanline *rec = &deferred_scanouts[r];
+         int field;
+
+         for (field = 0; field < 2; field++)
+         {
+            const int32_t  dest_line = field ? rec->dest_line_other : rec->dest_line;
+            const uint32_t y_up      = (uint32_t)(field ? rec->vram_y_other
+                                                        : rec->vram_y_native) << s;
+            unsigned i;
+
+            for (i = 0; i < up; i++)
+            {
+               const int32_t row = (dest_line << s) + (int32_t)i;
+               if (row >= target->h)
+                  break;
+               ScanoutRow(target,
+                     target->pixels + (size_t)row * target->pitchinpix,
+                     rec->rgb24, GPU.vram + ((y_up + i) << (10 + s)),
+                     rec->dx_start << s, rec->dx_end << s,
+                     (uint32_t)rec->dmw << s, rec->fb_x << s,
+                     s, up, false);
+            }
+         }
+         GPU.LineWidths[rec->dest_line_other] = rec->dmw;
+      }
+      deferred_scanout_count = 0;
+      return;
+   }
 
    ScanoutCacheTarget(GPU.surface);
    pitch_pix = GPU.surface->pitch32;
@@ -2926,7 +3036,25 @@ void GPU_RestoreStateP1(bool load)
        * the savestate below (which reads GPU.vram) serializes that stale
        * data as garbage, and it reloads corrupt in every colour mode. Sync
        * the whole framebuffer back from the GPU before capture; the coherence
-       * tracker still skips the transfer for regions that are already clean. */
+       * tracker still skips the transfer for regions that are already clean.
+       *
+       * A CPU->VRAM transfer still in flight has written its pixels so far to
+       * GPU.vram but reaches the GPU only when it completes, so the readback
+       * would overwrite them with what the GPU held before. Hand the written
+       * part to the GPU first. The completing upload sends the whole rect
+       * again, which writes the same values. */
+      if (GPU.InCmd == INCMD_FBWRITE)
+      {
+         const uint32_t rows = (GPU.FBRW_CurY - GPU.FBRW_Y) & 511;
+         const bool     mt   = GPU.MaskEvalAND != 0;
+         const bool     ms   = GPU.MaskSetOR != 0;
+         if (rows)
+            rhi_intf_load_image(GPU.FBRW_X, GPU.FBRW_Y, GPU.FBRW_W, rows,
+                  GPU.vram, mt, ms);
+         if (GPU.FBRW_CurX != GPU.FBRW_X)
+            rhi_intf_load_image(GPU.FBRW_X, GPU.FBRW_CurY,
+                  (GPU.FBRW_CurX - GPU.FBRW_X) & 1023, 1, GPU.vram, mt, ms);
+      }
       rhi_intf_read_vram(0, 0, 1024, 512, GPU.vram);
    }
 
@@ -2943,7 +3071,9 @@ void GPU_RestoreStateP1(bool load)
       /* fails the SFARRAY16N would deref NULL, so we leave vram_new */
       /* at NULL and the StateAction caller is responsible for noticing */
       /* (an upcoming change will surface the failure to libretro). */
-      vram_new = (uint16_t *)malloc(1024 * 512 * sizeof(uint16_t));
+      if (!state_vram_1x)
+         state_vram_1x = (uint16_t *)malloc(1024 * 512 * sizeof(uint16_t));
+      vram_new = state_vram_1x;
 
       if (vram_new && !load)
       {
@@ -2980,12 +3110,117 @@ void GPU_RestoreStateP2(bool load)
          }
       }
 
-      free(vram_new);
       vram_new = NULL;
    }
 }
 
+static void gpu_restore_state_p3(bool upload_all);
+
+static int gpu_full_upload = -1;
+
+static bool gpu_full_vram_upload(void)
+{
+   if (gpu_full_upload < 0)
+   {
+      const char *e   = getenv("BEETLE_FULL_VRAM_UPLOAD");
+      gpu_full_upload = (e && *e && *e != '0') ? 1 : 0;
+   }
+   return gpu_full_upload != 0;
+}
+
 void GPU_RestoreStateP3(void)
+{
+   gpu_restore_state_p3(true);
+}
+
+/* Upload rows [y0, y1) of each run of set 32-pixel column groups. */
+static void gpu_upload_cols(uint32_t cols, unsigned y0, unsigned y1)
+{
+   unsigned g = 0;
+   while (cols)
+   {
+      unsigned n = 0;
+      while (!(cols & 1u))
+      {
+         cols >>= 1;
+         g++;
+      }
+      while (cols & 1u)
+      {
+         cols >>= 1;
+         n++;
+      }
+      rhi_intf_load_image(g * 32, y0, n * 32, y1 - y0, GPU.vram,
+            false, false);
+      g += n;
+   }
+}
+
+/* Hand the hardware renderer the VRAM rows a diff load changed, in bands
+ * of 16 rows cut to runs of changed 32-pixel column groups, a band joining
+ * the one above when it continues it over the same columns. Rows the load
+ * left alone already hold the same pixels on the GPU - at its internal
+ * resolution, which a re-upload of the 1x copy would throw away. With
+ * `dirty` the GPU matches GPU.vram only where the coherence map says so,
+ * and its dirty blocks go up as well. */
+static void gpu_upload_changed_rows(bool dirty)
+{
+   unsigned band, py0 = 0, py1 = 0;
+   uint32_t pcols = 0;
+
+   for (band = 0; band < 512; band += 16)
+   {
+      unsigned y, y0 = 512, y1 = 0;
+      uint32_t cols = 0;
+
+      if (dirty)
+      {
+         uint32_t d0 = rhi_intf_vram_dirty_groups(band >> 3);
+         uint32_t d1 = rhi_intf_vram_dirty_groups((band >> 3) + 1);
+         if (d0)
+         {
+            y0 = band;
+            y1 = band + 8;
+         }
+         if (d1)
+         {
+            if (!d0)
+               y0 = band + 8;
+            y1 = band + 16;
+         }
+         cols = d0 | d1;
+      }
+
+      for (y = band; y < band + 16; y++)
+      {
+         uint16_t e = state_vram_rows[y];
+         if (!(e & MDFNSS_DIFF_CHANGED))
+            continue;
+         /* 64-byte blocks are the 32-pixel groups. */
+         cols |= (uint32_t)(2u << MDFNSS_DIFF_LAST(e))
+               - (1u << MDFNSS_DIFF_FIRST(e));
+         if (y < y0)
+            y0 = y;
+         if (y1 < y + 1)
+            y1 = y + 1;
+      }
+
+      if (!cols)
+         continue;
+      if (cols == pcols && y0 == py1)
+      {
+         py1 = y1;
+         continue;
+      }
+      gpu_upload_cols(pcols, py0, py1);
+      pcols = cols;
+      py0   = y0;
+      py1   = y1;
+   }
+   gpu_upload_cols(pcols, py0, py1);
+}
+
+static void gpu_restore_state_p3(bool upload_all)
 {
    for(unsigned i = 0; i < 256; i++)
    {
@@ -3031,9 +3266,12 @@ void GPU_RestoreStateP3(void)
    rhi_intf_set_draw_area( GPU.ClipX0, GPU.ClipY0,
                            GPU.ClipX1, GPU.ClipY1);
 
-   rhi_intf_load_image( 0,    0,
-                        1024, 512,
-                        GPU.vram, false, false);
+   if (upload_all)
+      rhi_intf_load_image( 0,    0,
+                           1024, 512,
+                           GPU.vram, false, false);
+   else
+      gpu_upload_changed_rows(!rhi_intf_has_software_renderer());
 
    rhi_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
    rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
@@ -3044,7 +3282,36 @@ void GPU_RestoreStateP3(void)
 
 int GPU_StateAction(StateMem *sm, int load, int data_only)
 {
+   /* Retain pending UV corrections; adjusted vertices cannot reconstruct them.
+    * Neutral defaults keep older states from inheriting a previous draw. */
+   uint16_t off_u = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_u : 0;
+   uint16_t off_v = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_v : 0;
+   bool may_be_2d = !load && GPU.InCmd == INCMD_QUAD && GPU.may_be_2d;
+   /* A load only has to hand the hardware renderer the VRAM it changed,
+    * plus, without the software framebuffer, the blocks the coherence map
+    * does not know to match GPU.vram. The context must be up. With
+    * BEETLE_FULL_VRAM_UPLOAD=1 every load uploads all of VRAM. */
+   bool diff_load = load && GPU.upscale_shift == 0
+         && rhi_intf_is_type() != RHI_SOFTWARE
+         && rhi_intf_context_ready()
+         && !gpu_full_vram_upload();
+   /* The one exception: a CPU->VRAM transfer half way through has put its
+    * pixels in GPU.vram but not yet on the GPU, so what it has written
+    * goes up too, whether the load changes it or not. */
+   bool     fbw      = diff_load && GPU.InCmd == INCMD_FBWRITE;
+   uint32_t fbw_x    = GPU.FBRW_X, fbw_y = GPU.FBRW_Y, fbw_w = GPU.FBRW_W;
+   uint32_t fbw_rows = (GPU.FBRW_CurY - GPU.FBRW_Y) & 511;
+   uint32_t fbw_cury = GPU.FBRW_CurY;
+   uint32_t fbw_curx = (GPU.FBRW_CurX - GPU.FBRW_X) & 1023;
+   int      ret;
    GPU_RestoreStateP1(load);
+
+   /* Invalidate cache tags missing from older states. */
+   if (load)
+   {
+      GPU.CLUT_Cache_VB = ~0U;
+      memset(TexCache_Tag, 0xFF, sizeof(TexCache_Tag));
+   }
 
    SFORMAT StateRegs[] =
    {
@@ -3189,15 +3456,54 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
 
       SFVARN(GPU.DrawTimeAvail, "DrawTimeAvail"),
 
+      /* Append so older positional fast states keep their existing order. */
+      SFVARN(off_u, "InQuad_off_u"),
+      SFVARN(off_v, "InQuad_off_v"),
+      SFVARN(may_be_2d, "InQuad_may_be_2d"),
+
+      /* Retained PS1 cache contents can differ from VRAM. */
+      SFARRAY16N(GPU.CLUT_Cache, 256, "CLUT_Cache"),
+      SFVARN(GPU.CLUT_Cache_VB, "CLUT_Cache_VB"),
+      SFARRAY32N(TexCache_Tag, 256, "TexCache_Tag"),
+      SFARRAY16N(&TexCache_Data[0][0], 256 * 4, "TexCache_Data"),
+
       SFEND
    };
 
-   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
+   if (load && GPU.upscale_shift == 0)
+   {
+      /* Compare before copying: a state one frame old leaves most of VRAM
+       * as it is. */
+      StateRegs[0].flags |= MDFNSTATE_DIFF;
+      memset(state_vram_rows, 0, sizeof(state_vram_rows));
+      MDFNSS_SetDiffMap(state_vram_rows, 1024 * sizeof(uint16_t));
+   }
+
+   ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
+   MDFNSS_SetDiffMap(NULL, 0);
+
+   if(load && ret)
+   {
+      GPU.off_u = off_u;
+      GPU.off_v = off_v;
+      GPU.may_be_2d = may_be_2d;
+   }
 
    GPU_RestoreStateP2(load);
 
    if(load)
-      GPU_RestoreStateP3();
+   {
+      gpu_restore_state_p3(!(diff_load && ret));
+      if (fbw && ret)
+      {
+         if (fbw_rows)
+            rhi_intf_load_image(fbw_x, fbw_y, fbw_w, fbw_rows, GPU.vram,
+                  false, false);
+         if (fbw_curx)
+            rhi_intf_load_image(fbw_x, fbw_cury, fbw_curx, 1, GPU.vram,
+                  false, false);
+      }
+   }
 
    return(ret);
 }
@@ -3235,6 +3541,11 @@ uint8_t GPU_get_upscale_shift(void)
 uint32_t GPU_get_vertical_range_lines(void)
 {
    return GPU.VertEnd - GPU.VertStart;
+}
+
+uint32_t GPU_get_crop_window(void)
+{
+   return GPU.crop_window;
 }
 
 bool GPU_DMACanWrite(void)

@@ -44,11 +44,18 @@ void main()
 	/* The trilinear resolve interpolates the 8-bit source, producing
 	 * sub-8-bit precision that 10-bit output preserves - so no debanding is
 	 * needed (or wanted) here; just encode. */
-	FragColor = vec4(encode_hdr_output(rgb, registers.paper_white_nits, registers.peak_nits,
-	                                   registers.expand_gamut, registers.shoulder,
-	                                   registers.sdr_eotf, registers.src_primaries,
-	                                   registers.black_pq, registers.to_panel,
-	                                   registers.scrgb), 1.0);
+	if (HDR_LINEAR_OUT != 0)
+	{
+		FragColor = vec4(sdr_to_linear(max(rgb, vec3(0.0)), registers.sdr_eotf), 1.0);
+	}
+	else
+	{
+		FragColor = vec4(encode_hdr_output(rgb, registers.paper_white_nits, registers.peak_nits,
+		                                   registers.expand_gamut, registers.shoulder,
+		                                   registers.sdr_eotf, registers.src_primaries,
+		                                   registers.black_pq, registers.to_panel,
+		                                   registers.scrgb), 1.0);
+	}
 #else
 	rgb = psx_display_color(rgb, COLOR_MODE);
 	FragColor = vec4(sdr_apply_src_primaries(rgb, registers.sdr_eotf,

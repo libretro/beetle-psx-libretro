@@ -202,12 +202,24 @@ void VCD_SetPadState(uint16_t buttons);
  */
 bool VCD_RunFrame(void);
 
-/* Current picture, in the pixel format the core was configured with.
- * Returns NULL when nothing has been decoded yet. */
+/* The new picture VCD_RunFrame decoded, while it is still unconverted:
+ * true, with its size. */
+bool VCD_PendingVideo(unsigned *w, unsigned *h);
+
+/* Converts the new picture to XRGB8888 straight into dst (a buffer of the
+ * frontend's, say), at least its size. VCD_GetVideo then has no picture
+ * until the next. */
+void VCD_ConvertVideo(void *dst, size_t pitch);
+
+/* Current picture, XRGB8888, converted on first call after a new one.
+ * Returns NULL when there is none. */
 const void *VCD_GetVideo(unsigned *w, unsigned *h, size_t *pitch);
 
-/* Drain decoded MP2 audio. Writes interleaved s16 stereo, returns frames. */
-size_t VCD_GetAudio(int16_t *out, size_t max_frames);
+/* The decoded MP2 audio waiting, interleaved s16 stereo: a span of
+ * *frames frames, NULL when there is none. The rest of it, past the
+ * ring's wrap, comes from the next call once this has been consumed. */
+const int16_t *VCD_PeekAudio(size_t *frames);
+void VCD_ConsumeAudio(size_t frames);
 
 unsigned VCD_GetSampleRate(void);
 double   VCD_GetFrameRate(void);

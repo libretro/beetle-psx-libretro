@@ -108,7 +108,9 @@ void rhi_intf_push_triangle(float p0x, float p0y, float p0w,
                              * FFI */
                             int blend_mode,
                             bool mask_test,
-                            bool set_mask);
+                            bool set_mask,
+                            /* Sprite-like geometry: no enhanced UV offset. */
+                            bool may_be_2d);
 
 /* Quad UVs include the decoder's floating-interpolation bias. Pass that
  * bias separately, packed as u | v << 16, so native interpolation can
@@ -177,8 +179,17 @@ void rhi_intf_toggle_display(bool status);
 
 bool rhi_intf_has_software_renderer(void);
 bool rhi_intf_context_ready(void);
+uint32_t rhi_intf_vram_dirty_groups(unsigned br);
 
 double rhi_common_get_timing_fps(void);
+
+/* Horizontal window the overscan crop keeps, in GPU clocks on the
+ * scanline: start in the low 16 bits, width in the high 16 bits.  It is
+ * the standard 2560-clock window from clock 608, or, for a game whose
+ * GP1(06h) range is wider, that range clamped to the 2800-clock line. */
+#define RHI_CROP_WIN_START(w) ((int32_t)((w) & 0xFFFFu))
+#define RHI_CROP_WIN_WIDTH(w) ((int32_t)((w) >> 16))
+uint32_t rhi_common_crop_window(int crop_overscan, int32_t x1, int32_t x2);
 
 float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,

@@ -33,6 +33,8 @@
 #include <formats/rpng.h>
 
 #include <retro_atomic.h>
+#include <retro_spsc.h>
+#include <rthreads/retro_eventcount.h>
 
 #include "rhi_tt.h"
 #include "tt_io_channel.h"
@@ -115,6 +117,10 @@ static bool tt_backend_set = false;
 static INLINE TTGpuImage *tt_upload_levels(LoadedLevels *levels)
 {
    return tt_backend.upload_levels(tt_backend.ctx, levels);
+}
+static INLINE void tt_staging_release(TTStaging *staging)
+{
+   tt_backend.staging_release(tt_backend.ctx, staging);
 }
 static INLINE void tt_img_addref(TTGpuImage *img)
 {
@@ -495,22 +501,28 @@ static void loaded_image_init(LoadedImage *img)
       return &l->levels[l->count++];
    }
 
-   /* Free all buffers + the array, return to empty state. */
+   /* Free all buffers + the array, return to empty state. Levels in upload
+    * memory give it back to the backend, which is the render thread's to do. */
    static void loaded_levels_reset(LoadedLevels *l)
    {
       int i;
-      for (i = 0; i < l->count; i++)
-         free(l->levels[i].owned_data);
+      if (l->staging)
+         tt_staging_release(l->staging);
+      else
+         for (i = 0; i < l->count; i++)
+            free(l->levels[i].owned_data);
       free(l->levels);
-      l->levels = NULL;
-      l->count  = 0;
+      l->levels  = NULL;
+      l->count   = 0;
+      l->staging = NULL;
    }
 
    /* Zero-initialise (no allocation). */
 static void loaded_levels_init(LoadedLevels *l)
    {
-      l->levels = NULL;
-      l->count  = 0;
+      l->levels  = NULL;
+      l->count   = 0;
+      l->staging = NULL;
    }
 
    /* Move ownership src -> dst (dst's prior contents freed; src left empty). */
@@ -519,10 +531,12 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       if (dst == src)
          return;
       loaded_levels_reset(dst);
-      dst->levels = src->levels;
-      dst->count  = src->count;
-      src->levels = NULL;
-      src->count  = 0;
+      dst->levels  = src->levels;
+      dst->count   = src->count;
+      dst->staging = src->staging;
+      src->levels  = NULL;
+      src->count   = 0;
+      src->staging = NULL;
    }
 
 
@@ -571,19 +585,38 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
    const int ALPHA_FLAG_SEMI_TRANSPARENT = 2;
    const int ALPHA_FLAG_TRANSPARENT = 4;
 
+   enum IOResponseKind {
+      IOResponseKind_Load,
+      /* Not a response: a worker asking for upload memory to decode into
+       * (staging_* below). The render thread answers on the worker's lane. */
+      IOResponseKind_Staging
+   };
+   typedef enum IOResponseKind IOResponseKind;
+
    struct IOResponse {
       tt_io_node node;               /* first: the channel's link (tt_io_channel.h) */
+      IOResponseKind kind;
       uint32_t hash;
       uint32_t palette_hash;
       int alpha_flags;
       bool pages;                    /* page-aligned experiment: routes to the page attach pass */
       LoadedLevels levels;
+      /* Upload memory the worker was given and did not use (the file was not
+       * the size its header said); the render thread gives it back. */
+      TTStaging *spare;
+      /* Staging request: which worker, and the chain it wants room for. */
+      int staging_worker;
+      int staging_width;
+      int staging_height;
+      int staging_levels;
    };
 
    static void io_response_free(IOResponse *r)
    {
       if (r) {
          loaded_levels_reset(&r->levels);
+         if (r->spare)
+            tt_staging_release(r->spare);
          free(r);
       }
    }
@@ -609,8 +642,50 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
     * this thread's reference); now a plain struct driven by io_thread_init /
     * io_thread_deinit. The single member is the refcounted channel pointer.
     * TextureTracker embeds one by value and drives its init/deinit. */
+   /* Upload memory for the workers. A worker that has opened a replacement
+    * asks the render thread for room to decode it into, by pushing an
+    * IOResponseKind_Staging node with its responses, and the render thread
+    * answers on that worker's lane: a retro_spsc of IOStagingReply that only
+    * the render thread writes and only the worker reads, with an eventcount
+    * the worker parks on. Each worker has at most one question open, so a
+    * lane holds at most one answer plus the closing one. */
+   enum { TT_IO_WORKERS_MAX = 4, TT_STAGING_LEVELS_MAX = 16 };
+
+   struct IOStagingReply {
+      TTStaging *staging;   /* NULL: none, decode to malloc'd memory */
+      uint8_t   *level_data[TT_STAGING_LEVELS_MAX];
+      bool       closed;    /* no more answers will come; stop asking */
+   };
+   typedef struct IOStagingReply IOStagingReply;
+
+   struct IOWorker {
+      struct IOPool     *pool;
+      int                index;
+      retro_spsc_t       lane;     /* render thread -> this worker */
+      retro_eventcount_t answered;
+      /* The worker's own: */
+      bool               asked;    /* a question is open */
+      bool               closed;   /* the render thread has stopped answering */
+   };
+   typedef struct IOWorker IOWorker;
+
+   /* What the workers share: the channel and their lanes. Detached workers,
+    * so it is reference counted like the channel: one for the render thread
+    * and one per worker, the last release frees it. */
+   struct IOPool {
+      retro_atomic_int_t refs;
+      tt_io_channel     *channel;
+      bool               staging;  /* the backend has upload memory to give */
+      int                count;
+      IOWorker           workers[TT_IO_WORKERS_MAX];
+   };
+   typedef struct IOPool IOPool;
+
    struct IOThread {
       tt_io_channel *channel; /* refcounted; one ref held here, one per worker */
+      IOPool        *pool;    /* refcounted; one ref held here, one per worker */
+      int            lent;    /* answers holding upload memory not yet back */
+      bool           closed;  /* the workers have been told: no more answers */
    };
 
    static void io_thread_init(IOThread *t);
@@ -2990,8 +3065,8 @@ static char retro_slash = '/';
 #include <sys/stat.h>
 #endif
 
-   /* HD Texture Folder mode: 0 = content dir (default), 1 = system, 2 = save. */
-   static int texture_dir_mode = 0;
+   /* HD Texture Folder mode: see struct tt_dir_mode. */
+   static struct tt_dir_mode texture_dir_mode = { RETRO_ATOMIC_INT_INITIALIZER(0) };
 
    /* Replace Textures on/off for this game session, kept across renderer
     * rebuilds; reset when the game is unloaded. */
@@ -3003,10 +3078,11 @@ static char retro_slash = '/';
     * below append retro_slash uniformly. */
    static char *texture_root(char *out, size_t cap) {
       const char *dir = retro_cd_base_directory;       /* 0 = content (default) */
+      const int   mode = tt_dir_mode_get(&texture_dir_mode);
       size_t len;
-      if (texture_dir_mode == 1 && retro_base_directory[0] != '\0')
+      if (mode == 1 && retro_base_directory[0] != '\0')
          dir = retro_base_directory;                    /* 1 = system */
-      else if (texture_dir_mode == 2 && retro_save_directory[0] != '\0')
+      else if (mode == 2 && retro_save_directory[0] != '\0')
          dir = retro_save_directory;                    /* 2 = save */
       strncpy(out, dir, cap - 1);
       out[cap - 1] = '\0';
@@ -3137,18 +3213,17 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       return &image->owned_data[(y * image->width + x) * 4];
    }
 
-   static LoadedImage generate_mip(LoadedImage *higher) {
+   /* Fills *result (already sized higher/2 and given its buffer) from the
+    * level above it. */
+   static void generate_mip_into(LoadedImage *result, LoadedImage *higher) {
       /* Generate custom mipmaps in order to avoid transparent (0, 0, 0, 0) and
        * semi-transparent (r, g, b, a>=128) mixing to create some dark opaque
        * value (r, g, b, a<128). */
 
-      LoadedImage result;
       int x, y;
       /* Assumes higher.width and higher.height are both divisible by 2 (and also therefore > 1) */
-      loaded_image_init(&result);
-      loaded_image_alloc(&result, higher->width / 2, higher->height / 2);
-      for (y = 0; y < result.height; y++) {
-         for (x = 0; x < result.width; x++) {
+      for (y = 0; y < result->height; y++) {
+         for (x = 0; x < result->width; x++) {
             uint8_t * dst;
             uint8_t *src00 = loaded_pixel(higher, x * 2 + 0, y * 2 + 0);
             uint8_t *src10 = loaded_pixel(higher, x * 2 + 1, y * 2 + 0);
@@ -3161,7 +3236,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             if (src01[0] == 0 && src01[1] == 0 && src01[2] == 0 && src01[3] == 0) numTransparent += 1;
             if (src11[0] == 0 && src11[1] == 0 && src11[2] == 0 && src11[3] == 0) numTransparent += 1;
 
-            dst = loaded_pixel(&result, x, y);
+            dst = loaded_pixel(result, x, y);
             if (numTransparent > 2) {
                dst[0] = 0;
                dst[1] = 0;
@@ -3181,21 +3256,18 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             }
          }
       }
-      return result;
    }
 
-   static LoadedImage convert_tri_to_psx(uint8_t *image,
-         int width,
-         int height,
+   /* Fills *result (already sized and given its buffer) from the decoded
+    * file. */
+   static void convert_tri_to_psx_into(LoadedImage *result, uint8_t *image,
          int *alpha_flags){
-      LoadedImage result;
       size_t i;
-      loaded_image_init(&result);
-      loaded_image_alloc(&result, width, height);
+      size_t bytes = (size_t)result->width * (size_t)result->height * 4u;
       (*alpha_flags) = 0;
-      for (i = 0; i < result.owned_size; i += 4) {
+      for (i = 0; i < bytes; i += 4) {
          uint8_t *src = &image[i];
-         uint8_t *dst = &result.owned_data[i];
+         uint8_t *dst = &result->owned_data[i];
          if (src[3] == 0) {
             /* Transparent */
             (*alpha_flags) |= ALPHA_FLAG_TRANSPARENT;
@@ -3235,7 +3307,19 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             }
          }
       }
-      return result;
+   }
+
+   /* Levels in a width x height chain: halve while both sides are even. */
+   static int tt_mip_count(int width, int height) {
+      int n = 1;
+      if (width <= 0 || height <= 0)
+         return 0;
+      while (width % 2 == 0 && height % 2 == 0) {
+         width /= 2;
+         height /= 2;
+         n++;
+      }
+      return n;
    }
 
    static LoadedLevels prepare_texture(RGBAImage *image, int *alpha_flags) {
@@ -3244,10 +3328,15 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       int height = image->height;
       LoadedImage base;
       loaded_levels_init(&levels);
-      base = convert_tri_to_psx(image->data, width, height, alpha_flags);
+      loaded_image_init(&base);
+      loaded_image_alloc(&base, width, height);
+      convert_tri_to_psx_into(&base, image->data, alpha_flags);
       loaded_levels_push_move(&levels, &base);
       while (width % 2 == 0 && height % 2 == 0) {
-         LoadedImage mip = generate_mip(&levels.levels[levels.count - 1]);
+         LoadedImage mip;
+         loaded_image_init(&mip);
+         loaded_image_alloc(&mip, width / 2, height / 2);
+         generate_mip_into(&mip, &levels.levels[levels.count - 1]);
          loaded_levels_push_move(&levels, &mip);
 
          width /= 2;
@@ -3256,26 +3345,175 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       return levels;
    }
 
+   /* As prepare_texture, but into upload memory the caller was given for
+    * exactly this chain: no level is allocated, nothing is copied. */
+   static LoadedLevels prepare_texture_staged(RGBAImage *image, int *alpha_flags,
+         TTStaging *staging, uint8_t *const *level_data) {
+      LoadedLevels levels;
+      int n = tt_mip_count(image->width, image->height);
+      int i;
+      loaded_levels_init(&levels);
+      levels.staging = staging; /* ours now, even if the array cannot be had */
+      levels.levels  = (LoadedImage *)malloc((size_t)n * sizeof(LoadedImage));
+      if (!levels.levels)
+         return levels;
+      levels.count   = n;
+      for (i = 0; i < n; i++) {
+         LoadedImage *l = &levels.levels[i];
+         l->width      = image->width >> i;
+         l->height     = image->height >> i;
+         l->owned_data = level_data[i];
+         l->owned_size = (size_t)l->width * (size_t)l->height * 4u;
+         if (i == 0)
+            convert_tri_to_psx_into(l, image->data, alpha_flags);
+         else
+            generate_mip_into(l, &levels.levels[i - 1]);
+      }
+      return levels;
+   }
+
+   /* Where a load gets the upload memory it decodes into. On the render
+    * thread (worker == NULL) it is allocated on the spot; a worker asks the
+    * render thread on its lane and collects the answer once the file is
+    * decoded. Asking as soon as the header gives the size lets the answer
+    * come back while the decode runs. */
+   struct TTStagingSource {
+      IOWorker  *worker;
+      bool       asked;
+      int        width, height;           /* the chain asked for */
+      TTStaging *staging;                 /* the answer, once taken */
+      uint8_t   *level_data[TT_STAGING_LEVELS_MAX];
+      TTStaging *spare;                   /* given but not used: the caller gives it back */
+   };
+   typedef struct TTStagingSource TTStagingSource;
+
+   static void tt_staging_source_init(TTStagingSource *src, IOWorker *worker) {
+      memset(src, 0, sizeof(*src));
+      src->worker = worker;
+   }
+
+   static void tt_staging_ask(TTStagingSource *src, int width, int height) {
+      int n = tt_mip_count(width, height);
+      if (n <= 0 || n > TT_STAGING_LEVELS_MAX)
+         return;
+      if (!src->worker) {
+         if (!tt_backend.staging_alloc)
+            return;
+         src->staging = tt_backend.staging_alloc(tt_backend.ctx, width, height, n,
+               src->level_data);
+      } else {
+         IOWorker   *w = src->worker;
+         IOResponse *q;
+         if (w->closed || !w->pool->staging)
+            return;
+         q = (IOResponse *)calloc(1, sizeof(IOResponse));
+         if (!q)
+            return;
+         q->kind           = IOResponseKind_Staging;
+         q->staging_worker = w->index;
+         q->staging_width  = width;
+         q->staging_height = height;
+         q->staging_levels = n;
+         loaded_levels_init(&q->levels);
+         tt_io_channel_push_response(w->pool->channel, &q->node);
+      }
+      src->asked  = true;
+      src->width  = width;
+      src->height = height;
+   }
+
+   /* The answer to the open question; a worker parks until it is there. */
+   static void tt_staging_take(TTStagingSource *src) {
+      IOWorker      *w = src->worker;
+      IOStagingReply r;
+      if (!src->asked || !w)
+         return;
+      src->asked = false;
+      for (;;) {
+         int key;
+         if (retro_spsc_read_avail(&w->lane) >= sizeof(r))
+            break;
+         key = retro_eventcount_prepare_wait(&w->answered);
+         if (retro_spsc_read_avail(&w->lane) >= sizeof(r)) {
+            retro_eventcount_cancel_wait(&w->answered);
+            break;
+         }
+         retro_eventcount_commit_wait(&w->answered, key);
+      }
+      retro_spsc_read(&w->lane, &r, sizeof(r));
+      if (r.closed)
+         w->closed = true;
+      src->staging = r.staging;
+      memcpy(src->level_data, r.level_data, sizeof(src->level_data));
+   }
+
+   /* The size a PNG's header gives, without decoding it. */
+   static bool tt_png_size(const char *path, int *width, int *height) {
+      static const uint8_t sig[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
+      uint8_t b[24];
+      int64_t got;
+      uint32_t w, h;
+      RFILE  *f = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
+      if (!f)
+         return false;
+      got = filestream_read(f, b, sizeof(b));
+      filestream_close(f);
+      if (got != (int64_t)sizeof(b) || memcmp(b, sig, 8) || memcmp(b + 12, "IHDR", 4))
+         return false;
+      w = ((uint32_t)b[16] << 24) | ((uint32_t)b[17] << 16) | ((uint32_t)b[18] << 8) | b[19];
+      h = ((uint32_t)b[20] << 24) | ((uint32_t)b[21] << 16) | ((uint32_t)b[22] << 8) | b[23];
+      if (w == 0 || h == 0 || w > 32768 || h > 32768)
+         return false;
+      *width  = (int)w;
+      *height = (int)h;
+      return true;
+   }
+
    /* Load the decoded mip chain for a combo: resolve the pack file, decode
     * it, and generate mips. Returns false when there is no file or the load
     * fails; path_out always holds the probed source path (for error
     * messages). Shared by the async IO workers and both sync loaders;
     * thread-safe (per-combo dedup via `requested` means no two threads load
-    * the same combo concurrently). */
+    * the same combo concurrently). With a staging source the levels are
+    * generated straight into upload memory when it can be had; upload
+    * memory it was given but did not use is left in src->spare. */
    static bool tt_load_replacement_levels(uint32_t hash, uint32_t palette_hash, bool pages,
          LoadedLevels *out_levels, int *out_alpha_flags,
-         char *path_out, size_t path_cap) {
+         char *path_out, size_t path_cap, TTStagingSource *src) {
       RGBAImage image;
+      int pw, ph;
       if (!find_replacement_file(path_out, path_cap, hash, palette_hash, pages))
          return false;
+      if (src && tt_png_size(path_out, &pw, &ph))
+         tt_staging_ask(src, pw, ph);
       image.data = NULL;
       load_image(path_out, &image);
+      if (src) {
+         if (image.data && !src->asked && !src->staging)
+            tt_staging_ask(src, image.width, image.height);
+         tt_staging_take(src);
+         if (src->staging && (!image.data ||
+               src->width != image.width || src->height != image.height)) {
+            src->spare   = src->staging;
+            src->staging = NULL;
+         }
+      }
       if (image.data == NULL)
          return false;
       *out_alpha_flags = 0;
-      *out_levels = prepare_texture(&image, out_alpha_flags);
+      if (src && src->staging) {
+         *out_levels  = prepare_texture_staged(&image, out_alpha_flags,
+               src->staging, src->level_data);
+         src->staging = NULL;
+      } else
+         *out_levels = prepare_texture(&image, out_alpha_flags);
       rgba_image_free(&image);
       if (out_levels->count == 0) {
+         if (src) {
+            src->spare           = out_levels->staging;
+            out_levels->staging  = NULL;
+         }
          loaded_levels_reset(out_levels);
          return false;
       }
@@ -3337,11 +3575,25 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       return bytes;
    }
 
+   static void io_pool_release(IOPool *pool) {
+      int i;
+      if (retro_atomic_fetch_sub_int(&pool->refs, 1) != 1)
+         return;
+      for (i = 0; i < pool->count; i++) {
+         retro_spsc_free(&pool->workers[i].lane);
+         retro_eventcount_free(&pool->workers[i].answered);
+      }
+      free(pool);
+   }
+
    static void io_thread(void *user_data) {
-      /* Pool worker. Each worker is handed the channel pointer with a reference
-       * already taken on its behalf (at spawn); it releases that reference on
-       * the way out. Whichever holder releases last frees the channel. */
-      tt_io_channel *channel = (tt_io_channel *)user_data;
+      /* Pool worker. Each worker is handed its slot of the pool with a
+       * reference on the pool and on the channel already taken on its behalf
+       * (at spawn); it releases both on the way out. Whichever holder
+       * releases last frees each. */
+      IOWorker *worker = (IOWorker *)user_data;
+      IOPool *pool = worker->pool;
+      tt_io_channel *channel = pool->channel;
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread starting\n");
 
       while (true) {
@@ -3362,10 +3614,14 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             char path[PATH_MAX_TT];
             LoadedLevels levels;
             int alpha_flags_out = 0;
+            TTStagingSource staging;
+            tt_staging_source_init(&staging, worker);
             if (tt_load_replacement_levels(hash, palette_hash, request->pages,
-                  &levels, &alpha_flags_out, path, sizeof(path))) {
-               IOResponse *response = (IOResponse *)malloc(sizeof(IOResponse));
+                  &levels, &alpha_flags_out, path, sizeof(path), &staging)) {
+               IOResponse *response = (IOResponse *)calloc(1, sizeof(IOResponse));
                response->node.next    = NULL;
+               response->kind         = IOResponseKind_Load;
+               response->spare        = staging.spare;
                response->hash         = hash;
                response->palette_hash = palette_hash;
                response->alpha_flags  = alpha_flags_out;
@@ -3381,9 +3637,11 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
                 * violation, handle pressure during a burst) meant permanent
                 * native until a manual reload. The drain erases `requested` on
                 * an empty response so the next draw can retry. */
-               IOResponse *response = (IOResponse *)malloc(sizeof(IOResponse));
+               IOResponse *response = (IOResponse *)calloc(1, sizeof(IOResponse));
                TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path);
                response->node.next    = NULL;
+               response->kind         = IOResponseKind_Load;
+               response->spare        = staging.spare;
                response->hash         = hash;
                response->palette_hash = palette_hash;
                response->alpha_flags  = 0;
@@ -3407,12 +3665,13 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
          io_request_free(request);
       }
       tt_io_channel_release(channel); /* drop this worker's reference */
+      io_pool_release(pool);
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread ending\n");
    }
 
    /* Upper bound on parallel PNG-decode workers. Keeps first-appearance
     * prefetch bursts short without starving the emulation/render threads. */
-   enum { NUM_IO_THREADS = 4 };
+   enum { NUM_IO_THREADS = TT_IO_WORKERS_MAX };
 
    /* Size the pool from the machine: leave two physical cores for the
     * emulation thread and the frontend's video/audio threads, use the rest
@@ -3434,33 +3693,121 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 
    static void io_thread_init(IOThread *t) {
       int count = io_thread_count();
+      IOPool *pool;
+      t->pool   = NULL;
+      t->lent   = 0;
+      t->closed = false;
       t->channel = tt_io_channel_new(io_request_node_free, io_response_node_free); /* this IOThread holds one reference */
-      if (!t->channel) {
+      pool = t->channel ? (IOPool *)calloc(1, sizeof(IOPool)) : NULL;
+      if (!pool) {
          /* No channel: every request is refused (tt_io_channel_push returns
           * false) and replacement textures simply never arrive. */
          TT_LOG(RETRO_LOG_ERROR, "hd texture io pool: could not be set up\n");
+         if (t->channel)
+            tt_io_channel_stop(t->channel);
+         t->channel = NULL;
          return;
       }
-      TT_LOG(RETRO_LOG_INFO, "hd texture io pool: %d worker(s)\n", count);
+      pool->channel = t->channel;
+      pool->staging = tt_backend.staging_alloc && tt_backend.staging_release;
+      retro_atomic_int_init(&pool->refs, 1); /* this IOThread's */
       { int i; for (i = 0; i < count; i++) {
+         IOWorker *w = &pool->workers[pool->count];
+         w->pool  = pool;
+         w->index = pool->count;
+         if (!retro_spsc_init(&w->lane, 4 * sizeof(IOStagingReply)))
+            break;
+         if (!retro_eventcount_init(&w->answered)) {
+            retro_spsc_free(&w->lane);
+            break;
+         }
+         pool->count++;
+      } }
+      t->pool = pool;
+      TT_LOG(RETRO_LOG_INFO, "hd texture io pool: %d worker(s)\n", pool->count);
+      { int i; for (i = 0; i < pool->count; i++) {
          sthread_t * thread;
-         /* Take a reference on the worker's behalf BEFORE it starts, so the
-          * channel can't be freed out from under it; the worker releases on
-          * exit. */
+         /* Take references on the worker's behalf BEFORE it starts, so the
+          * channel and pool can't be freed out from under it; the worker
+          * releases them on exit. */
          tt_io_channel_acquire(t->channel);
-         thread = sthread_create(io_thread, t->channel);
+         retro_atomic_fetch_add_int(&pool->refs, 1);
+         thread = sthread_create(io_thread, &pool->workers[i]);
          if (thread) {
             sthread_detach(thread);
          } else {
-            tt_io_channel_release(t->channel); /* thread failed to start; undo its ref */
+            /* thread failed to start; undo its refs. Its lane stays unused. */
+            tt_io_channel_release(t->channel);
+            retro_atomic_fetch_sub_int(&pool->refs, 1);
          }
       } }
    }
+
+   /* Answer a worker's request for upload memory. */
+   static void io_thread_answer(IOThread *t, const IOResponse *q) {
+      IOWorker      *w = &t->pool->workers[q->staging_worker];
+      IOStagingReply r;
+      if (t->closed)
+         return; /* the closing answer is already on its lane */
+      memset(&r, 0, sizeof(r));
+      r.staging = tt_backend.staging_alloc(tt_backend.ctx, q->staging_width,
+            q->staging_height, q->staging_levels, r.level_data);
+      if (r.staging)
+         t->lent++;
+      /* At most one question per worker is ever open, so there is room. */
+      retro_spsc_write(&w->lane, &r, sizeof(r));
+      retro_eventcount_notify(&w->answered);
+   }
+
+   /* A response coming back: the upload memory it carries is no longer out
+    * with a worker. */
+   static void io_thread_returned(IOThread *t, const IOResponse *r) {
+      if (r->levels.staging)
+         t->lent--;
+      if (r->spare)
+         t->lent--;
+   }
+
+   /* Stop the workers writing to upload memory: tell each its last answer has
+    * been given, then wait for every piece of memory already handed out to
+    * come back, so none is written once the backend lets it go. Takes and
+    * frees whatever responses arrive meanwhile. Render thread. */
+   static void io_thread_close(IOThread *t) {
+      int i;
+      if (!t->pool || t->closed)
+         return;
+      for (i = 0; i < t->pool->count; i++) {
+         IOStagingReply r;
+         memset(&r, 0, sizeof(r));
+         r.closed = true;
+         retro_spsc_write(&t->pool->workers[i].lane, &r, sizeof(r));
+         retro_eventcount_notify(&t->pool->workers[i].answered);
+      }
+      t->closed = true;
+      while (t->lent > 0) {
+         IOResponse *r = (IOResponse *)tt_io_channel_take_responses(t->channel);
+         if (!r) {
+            tt_io_channel_wait_response_unbounded(t->channel);
+            continue;
+         }
+         while (r) {
+            IOResponse *next = (IOResponse *)r->node.next;
+            io_thread_returned(t, r);
+            io_response_free(r);
+            r = next;
+         }
+      }
+   }
+
    static void io_thread_deinit(IOThread *t) {
       /* Tell the workers to leave, wake them all, and drop this IOThread's
-       * reference; the last worker to exit frees the channel. */
+       * references; the last worker to exit frees the channel and pool. */
+      io_thread_close(t);
       tt_io_channel_stop(t->channel);
       t->channel = NULL;
+      if (t->pool)
+         io_pool_release(t->pool);
+      t->pool = NULL;
    }
 
    static void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode, uint32_t palette_hash_override) {
@@ -3953,6 +4300,9 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 
    static void texture_tracker_fini(struct TextureTracker *self)
    {
+      /* No worker may still be writing upload memory once the caches below
+       * let theirs go. */
+      io_thread_close(&self->iothread);
       ih_reset(&self->default_hd_texture); /* drop the default HD texture reference */
       tt_journal_save_file(&self->journal); /* persist any un-saved chain links */
       tt_journal_free(&self->journal);
@@ -4436,6 +4786,13 @@ static TTRect fromSRect(SRect rect) {
          while (response != NULL) {
             IOResponse *rnext = (IOResponse *)response->node.next;
             HdTextureId id;
+            if (response->kind == IOResponseKind_Staging) {
+               io_thread_answer(&self->iothread, response);
+               io_response_free(response);
+               response = rnext;
+               continue;
+            }
+            io_thread_returned(&self->iothread, response);
             id.hash = response->hash;
             id.palette_hash = response->palette_hash;
             id.pages = response->pages;
@@ -5590,6 +5947,8 @@ static bool is_power_of_two(int n) {
          char path[PATH_MAX_TT];
          int alpha_flags = 0;
          LoadedLevels levels;
+         TTStagingSource staging;
+         bool ok;
          int width, height;
          if (hd_key_set_contains(&self->requested, hd_pack_key(id)))
             return;
@@ -5597,8 +5956,12 @@ static bool is_power_of_two(int n) {
             hd_key_set_insert(&self->requested, hd_pack_key(id));
             return;
          }
-         if (!tt_load_replacement_levels(id.hash, id.palette_hash, false,
-               &levels, &alpha_flags, path, sizeof(path))) {
+         tt_staging_source_init(&staging, NULL);
+         ok = tt_load_replacement_levels(id.hash, id.palette_hash, false,
+               &levels, &alpha_flags, path, sizeof(path), &staging);
+         if (staging.spare)
+            tt_staging_release(staging.spare);
+         if (!ok) {
             /* Same bounded retry as the async drain: a transient failure must
              * not cost the combo the rest of the session, and a deterministic
              * one must not be reattempted once per draw. Lazy (synchronous)
@@ -5656,14 +6019,20 @@ static bool is_power_of_two(int n) {
          char path[PATH_MAX_TT];
          int alpha_flags = 0;
          LoadedLevels levels;
+         TTStagingSource staging;
+         bool ok;
          if (hd_key_set_contains(&self->requested, hd_pack_key(id)))
             return;
          if (!hd_key_set_contains(&self->known_files_pages, hd_pack_key(id))) {
             hd_key_set_insert(&self->requested, hd_pack_key(id));
             return;
          }
-         if (!tt_load_replacement_levels(id.hash, id.palette_hash, true,
-               &levels, &alpha_flags, path, sizeof(path))) {
+         tt_staging_source_init(&staging, NULL);
+         ok = tt_load_replacement_levels(id.hash, id.palette_hash, true,
+               &levels, &alpha_flags, path, sizeof(path), &staging);
+         if (staging.spare)
+            tt_staging_release(staging.spare);
+         if (!ok) {
             TT_LOG(RETRO_LOG_ERROR, "sync page load failed: %s\n", path);
             hd_key_set_insert(&self->requested, hd_pack_key(id));
             return;
@@ -5977,6 +6346,11 @@ static bool is_power_of_two(int n) {
 
    void texture_tracker_endFrame(struct TextureTracker *self) {
       self->frame += 1;
+
+      /* Answer the workers' requests for upload memory now rather than at
+       * the next queue reset, so a decode that finished during the frame is
+       * not left waiting through the present. */
+      texture_tracker_drain_responses(self);
 
       /* Re-arm the inline-upload budget for the next frame's draws. */
       self->inline_uploads_this_frame = 0;
@@ -7230,7 +7604,7 @@ void texture_tracker_session_reset(void)
 
 void texture_tracker_set_texture_dir_mode(int mode)
 {
-   texture_dir_mode = mode;
+   tt_dir_mode_set(&texture_dir_mode, mode);
 }
 
 TextureTrackerSaveState *tts_new(void)

@@ -36,6 +36,9 @@ extern uint8_t psx_gpu_upscale_shift_hw;
  * libretro.c when the user picks Deinterlace Method = Off.
  */
 extern bool psx_gpu_rasterize_both_fields;
+/* Bob deinterlacing: an interlaced field's lines are scanned out to
+ * consecutive rows, the half-height picture as it is shown. */
+extern bool psx_gpu_bob_scanout;
 extern int line_render_mode;
 extern int filter_mode;
 extern int crop_overscan;
@@ -55,6 +58,8 @@ extern uint8_t startup_frame_count;
 
 extern int aspect_ratio_setting;
 extern bool aspect_ratio_dirty;
+/* The overscan crop's window changed width with the GP1(06h) range. */
+extern bool crop_window_dirty;
 extern bool gpu_fbwrite_fifo_delay;
 
 /* Internal drawing policy, independent of the output pixel format. Native

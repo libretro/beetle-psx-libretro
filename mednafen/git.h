@@ -50,6 +50,8 @@ typedef struct
    MDFN_Surface *loan;
    int32_t loan_h;
    int32_t loan_dmw;
+   /* The overscan crop window the loan was cut to (rhi_common_crop_window) */
+   uint32_t loan_win;
 
    /* Set by the system emulation code every frame, to denote the
     * horizontal and vertical offsets of the image, and the size of the

@@ -1,0 +1,39 @@
+name: Upscaled UV phase
+
+# The software rasteriser's upscaled texture sampling: 2D polygons keep
+# every sub-pixel on its native texel, 3D keeps native phase when
+# magnified, and the upscaled slope is the native slope divided by the
+# scale. Strict C89, ASan/UBSan, and a mingw-w64 build run under Wine.
+
+on:
+  push:
+    paths:
+      - 'mednafen/psx/gpu_uv_phase.h'
+      - 'mednafen/psx/gpu_polygon.c'
+      - 'tools/uv_phase/**'
+      - '.github/workflows/uv-phase.yml'
+  pull_request:
+    paths:
+      - 'mednafen/psx/gpu_uv_phase.h'
+      - 'mednafen/psx/gpu_polygon.c'
+      - 'tools/uv_phase/**'
+      - '.github/workflows/uv-phase.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  uv-phase:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux, C89 and ASan/UBSan
+        run: tools/uv_phase/run.sh
+      - name: Install mingw-w64 and Wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 wine64 wine
+      - name: Windows (mingw-w64 under Wine)
+        run: CC=x86_64-w64-mingw32-gcc WINEDEBUG=-all RUN=wine tools/uv_phase/run.sh

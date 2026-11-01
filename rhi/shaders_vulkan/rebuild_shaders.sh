@@ -51,6 +51,7 @@ mkdir -p prebuilt
 
 # Quads
 "$GLSLC" -o prebuilt/quad.vert.inc -mfmt=c quad.vert
+
 "$GLSLC" -o prebuilt/unscaled.quad.frag.inc -mfmt=c -DUNSCALED quad.frag
 "$GLSLC" -o prebuilt/scaled.quad.frag.inc -mfmt=c -DSCALED quad.frag
 "$GLSLC" -o prebuilt/bpp24.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 quad.frag
@@ -64,9 +65,14 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/hdr.bpp24.quad.frag.inc -mfmt=c -DHDR -DUNSCALED -DBPP24 quad.frag
 "$GLSLC" -o prebuilt/hdr.bpp24.yuv.quad.frag.inc -mfmt=c -DHDR -DUNSCALED -DBPP24 -DBPP24_YUV quad.frag
 
+# Temporal upscaler motion vector pass
+"$GLSLC" -o prebuilt/upscaler_motion.vert.inc -mfmt=c upscaler_motion.vert
+"$GLSLC" -o prebuilt/upscaler_motion.frag.inc -mfmt=c upscaler_motion.frag
+
 # Copy VRAM shaders
 "$GLSLC" -o prebuilt/copy_vram.comp.inc -mfmt=c copy_vram.comp
 "$GLSLC" -o prebuilt/copy_vram.masked.comp.inc -mfmt=c -DMASKED copy_vram.comp
+"$GLSLC" -o prebuilt/readback_pack.comp.inc -mfmt=c readback_pack.comp
 
 # Blit VRAM shaders
 "$GLSLC" -o prebuilt/blit_vram.scaled.comp.inc -mfmt=c -DSCALED blit_vram.comp
@@ -125,6 +131,15 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/analog.rgb.pal.frag.inc -mfmt=c -DPAL analog_rgb.frag
 "$GLSLC" -o prebuilt/analog.resolve.frag.inc -mfmt=c analog_resolve.frag
 "$GLSLC" -o prebuilt/analog.resolve.hdr.frag.inc -mfmt=c -DHDR analog_resolve.frag
+
+# HDR post effects: the bloom stages and the composite that applies them,
+# the chromatic aberration and the encode. See hdr_bloom.frag / hdr_post.frag.
+"$GLSLC" -o prebuilt/hdr.bloom.bright.frag.inc -mfmt=c -DBRIGHT hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.bloom.blur.frag.inc -mfmt=c -DBLUR hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.bloom.down.frag.inc -mfmt=c -DDOWN hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.bloom.down.karis.frag.inc -mfmt=c -DDOWN -DKARIS hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.bloom.up.frag.inc -mfmt=c -DUP hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.post.frag.inc -mfmt=c -DHDR hdr_post.frag
 
 # analog_yc.frag is the trap's bypass branch as a fragment shader, used by the
 # GL backend below the compute floor. Vulkan does not run it (its compute trap

@@ -116,8 +116,9 @@ STRINGIZE(
 #endif
 STRINGIZE(
 
-   // Let OpenGL interpolate the texel position
-   smooth_texture_coord = vec2(texture_coord) + vec2(0.001, 0.001);
+   // Flagged enhanced polygons use half-texel rounding.
+   smooth_texture_coord = vec2(texture_coord) +
+         vec2((native_flags & 16u) != 0u ? 0.5 : 0.001);
 
    frag_texture_page = texture_page;
    frag_clut = clut;

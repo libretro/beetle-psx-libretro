@@ -33,6 +33,10 @@ retro_input_state_t dbg_input_state_cb = 0;
 #include "pgxp/pgxp_main.h"
 #include "pgxp/pgxp_gte.h"
 #include "rhi/hdr_display.h"
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+#define HAVE_HDR_TRANSFORM
+#include "rhi/hdr_transform.h"
+#endif
 
 #include "deps/openbios/openbios.bin.h"
 
@@ -89,6 +93,7 @@ uint8_t widescreen_hack_aspect_ratio_setting;
 uint8_t psx_gpu_upscale_shift;
 uint8_t psx_gpu_upscale_shift_hw;
 bool psx_gpu_rasterize_both_fields = false;
+bool psx_gpu_bob_scanout = false;
 int line_render_mode;
 int filter_mode;
 int crop_overscan = 0;
@@ -100,6 +105,7 @@ uint8_t startup_frame_count = 0;
 
 int aspect_ratio_setting = 0;
 bool aspect_ratio_dirty = false;
+bool crop_window_dirty = false;
 bool gpu_fbwrite_fifo_delay = false;
 
 /* libretro callback pointers, formerly defined in libretro_cbs.c. Declared in
@@ -222,7 +228,12 @@ float psx_hdr_to_panel[9]      = { 0.0f };
  * primaries and black the derived values above were built from are kept so
  * they are only rebuilt when the frontend reports a change. */
 static unsigned hdr_meta_cmd;
-static uint16_t hdr_panel_xy[8];
+/* The panel's primaries (CIE xy x 10000, zero = unknown) and peak, for the
+ * Display Transform's ACES 2.0 Auto gamut and Display peak. */
+uint16_t psx_hdr_panel_xy[8];
+static float hdr_panel_peak_nits;
+/* HDR Display Peak Luminance: 0 the frontend's, -1 the panel's, else nits. */
+static float hdr_peak_option;
 static float    hdr_black_nits;
 /* HDR highlight roll-off curve applied to the over-paper-white region only:
  * 0 = Reinhard soft-knee (default, matches the validated behaviour),
@@ -251,7 +262,8 @@ static void reset_hdr_output_state(void)
    for (i = 0; i < 9; i++)
       psx_hdr_to_panel[i] = 0.0f;
    for (i = 0; i < 8; i++)
-      hdr_panel_xy[i]     = 0;
+      psx_hdr_panel_xy[i]     = 0;
+   hdr_panel_peak_nits = 0.0f;
 }
 
 /* Reference SDR transfer the 24-bit path is assumed to have been viewed
@@ -420,46 +432,39 @@ static Deinterlacer deint;
 static MDFN_Surface *surf = NULL;
 
 /* Left edge of the picture in a line of *width dots, and *width cut
- * down to the picture, when overscan is cropped. */
+ * down to the picture, when overscan is cropped.  The line starts at GPU
+ * clock 488 and spans 2800 clocks; what is kept is the window the GPU
+ * latched for the frame (rhi_common_crop_window). */
 static unsigned crop_line(unsigned *width)
 {
+   uint32_t win;
+   unsigned clock_div, start, w;
+
    if (!crop_overscan)
       return 0;
 
-   /* Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
-    * 280 width -> 256 width.
-    * 350 width -> 320 width.
-    * 400 width -> 366 width.
-    * 560 width -> 512 width.
-    * 700 width -> 640 width. */
    switch (*width)
    {
-      case 280:
-         *width = 256 - image_crop;
-         return 12 - image_offset + (image_crop / 2);
-
-      case 350:
-         *width = 320 - image_crop;
-         return 15 - image_offset + (image_crop / 2);
-
-      /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
-         Adjust in future if there are issues. */
-      case 400:
-         *width = 366 - image_crop;
-         return 17 - image_offset + (image_crop / 2);
-
-      case 560:
-         *width = 512 - image_crop;
-         return 24 - image_offset + (image_crop / 2);
-
-      case 700:
-         *width = 640 - image_crop;
-         return 30 - image_offset + (image_crop / 2);
-
+      case 280: clock_div = 10; break;
+      case 350: clock_div = 8;  break;
+      case 400: clock_div = 7;  break;
+      case 560: clock_div = 5;  break;
+      case 700: clock_div = 4;  break;
       default:
          /* This shouldn't happen. */
          return 0;
    }
+
+   win   = GPU_get_crop_window();
+   /* Same truncation as the scanout's own dx_start */
+   start = (unsigned)RHI_CROP_WIN_START(win) / clock_div - 488 / clock_div;
+   /* Rounded to the dot: the standard 2560 clocks keep 366 in 368 mode */
+   w     = ((unsigned)RHI_CROP_WIN_WIDTH(win) + clock_div / 2) / clock_div;
+   if (w > *width - start)
+      w = *width - start;
+
+   *width = w - image_crop;
+   return start - image_offset + (image_crop / 2);
 }
 
 /* RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER for the software
@@ -529,6 +534,82 @@ static void acquire_lent_surface(EmulateSpecStruct *spec)
    spec->loan     = &lent_surf;
    spec->loan_h   = lend_h;
    spec->loan_dmw = lend_dmw;
+   spec->loan_win = GPU_get_crop_window();
+}
+
+/* The new Video CD picture, converted straight into a framebuffer of the
+ * frontend's; NULL when the frontend has none to lend. */
+static const void *lend_vcd_picture(unsigned w, unsigned h, size_t *pitch)
+{
+   struct retro_framebuffer fb;
+
+   if (!environ_cb)
+      return NULL;
+
+   memset(&fb, 0, sizeof(fb));
+   fb.width        = w;
+   fb.height       = h;
+   fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
+
+   if (   !environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
+       || !fb.data
+       || fb.format != RETRO_PIXEL_FORMAT_XRGB8888
+       || fb.pitch  <  (size_t)w * sizeof(uint32_t)
+       || fb.pitch  %  sizeof(uint32_t))
+      return NULL;
+
+   VCD_ConvertVideo(fb.data, fb.pitch);
+   *pitch = fb.pitch;
+   return fb.data;
+}
+
+/* The 480i picture the deferred scanout (the "Off" deinterlacer) holds,
+ * scanned out straight into a frontend buffer cut to x0, w, h (upscaled)
+ * when it is the whole picture and the frontend lends one: its pixels,
+ * and *pitch. Otherwise it goes to the core's surface, and NULL. */
+static MDFN_Surface field_surf;
+
+static const uint32_t *flush_deferred_scanout(unsigned x0, unsigned w,
+      unsigned h, unsigned *pitch)
+{
+   struct retro_framebuffer fb;
+   const unsigned us = GPU_get_upscale_shift();
+   int32_t        dmw;
+
+   if (   !environ_cb
+       || FrontIO_ReadsScanout(PSX_FIO)
+       || (VCD_GetMode() != VCD_MODE_OFF && VCD_GetAVSwitch())
+       || !GPU_DeferredScanoutWhole((int32_t)(h >> us), &dmw)
+       || x0 + w > ((unsigned)dmw << us))
+   {
+      GPU_FlushDeferredScanout(NULL);
+      return NULL;
+   }
+
+   memset(&fb, 0, sizeof(fb));
+   fb.width        = w;
+   fb.height       = h;
+   fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
+
+   if (   !environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
+       || !fb.data
+       || fb.format != RETRO_PIXEL_FORMAT_XRGB8888
+       || fb.pitch  <  (size_t)w * sizeof(uint32_t)
+       || fb.pitch  %  sizeof(uint32_t))
+   {
+      GPU_FlushDeferredScanout(NULL);
+      return NULL;
+   }
+
+   field_surf.pixels     = (uint32_t *)fb.data;
+   field_surf.w          = (int32_t)w;
+   field_surf.h          = (int32_t)h;
+   field_surf.pitchinpix = (int32_t)(fb.pitch / sizeof(uint32_t));
+   field_surf.x0         = (int32_t)x0;
+   GPU_FlushDeferredScanout(&field_surf);
+
+   *pitch = (unsigned)fb.pitch;
+   return field_surf.pixels;
 }
 
 enum
@@ -4590,6 +4671,167 @@ uint8_t analog_combo_hold = 0;
 
 extern void PSXDitherApply(bool);
 
+#ifdef HAVE_HDR_TRANSFORM
+/* Value keys of the Display Transform option in enum hdr_dt_curve order.
+ * The two knees are hdr.h's own roll-off ("knee_exp" its filmic shoulder);
+ * every other curve is the transform in rhi/hdr_transform.c. */
+static const char *const display_transform_keys[HDR_DT_COUNT] = {
+   "reinhard", "aces", "hejl", "gt", "hable", "lottes", "drago", "unreal",
+   "filmicalu", "rplain", "rext", "expo", "hable2017", "aces2", "tumblin",
+   "ward", "schlick", "devlin", "filmiclog", "jodie", "acesfit", "neutral",
+   "agx", "aces2full"
+};
+
+static const char *display_transform_value(const char *key)
+{
+   struct retro_variable var;
+   var.key   = key;
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      return var.value;
+   return NULL;
+}
+
+/* Options that tune one Display Transform curve, shown only while that
+ * curve is selected. The ACES 2.0 two belong to the full output transform;
+ * the tone scale alone has no surround or limiting gamut. */
+static const struct
+{
+   const char *key;
+   const char *curve;
+} dt_curve_options[] = {
+   { BEETLE_OPT(hdr_aces2_surround),     "aces2full" },
+   { BEETLE_OPT(hdr_aces2_gamut),        "aces2full" },
+   { BEETLE_OPT(hdr_agx_look),           "agx" },
+   { BEETLE_OPT(hdr_gt_toe),             "gt" },
+   { BEETLE_OPT(hdr_gt_linear),          "gt" },
+   { BEETLE_OPT(hdr_filmiclog_contrast), "filmiclog" },
+   { BEETLE_OPT(hdr_filmiclog_range),    "filmiclog" }
+};
+#define DT_CURVE_OPTIONS (sizeof(dt_curve_options) / sizeof(dt_curve_options[0]))
+
+/* Bit i set: dt_curve_options[i] is shown. Options start out visible. */
+static unsigned dt_curve_options_shown = (1u << DT_CURVE_OPTIONS) - 1;
+
+/* Returns whether any visibility changed, as the frontend's update-display
+ * callback expects. */
+static bool update_display_transform_options(void)
+{
+   const char *v    = display_transform_value(BEETLE_OPT(hdr_display_transform));
+   unsigned    mask = 0;
+   unsigned    i;
+
+   if (!v)
+      v = "reinhard";
+   for (i = 0; i < DT_CURVE_OPTIONS; i++)
+      if (!strcmp(v, dt_curve_options[i].curve))
+         mask |= 1u << i;
+   if (mask == dt_curve_options_shown)
+      return false;
+   for (i = 0; i < DT_CURVE_OPTIONS; i++)
+   {
+      struct retro_core_option_display option_display;
+      if (!((mask ^ dt_curve_options_shown) & (1u << i)))
+         continue;
+      option_display.key     = dt_curve_options[i].key;
+      option_display.visible = (mask >> i) & 1;
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+   }
+   dt_curve_options_shown = mask;
+   return true;
+}
+
+static void check_display_transform_variables(void)
+{
+   static const char *const contrast[7] = {
+      "verylow", "low", "medium", "base", "medhigh", "high", "veryhigh" };
+   struct hdr_dt_settings dt;
+   struct hdr_post_settings post;
+   const char *v;
+   int i;
+
+   memset(&dt, 0, sizeof(dt));
+   dt.curve           = HDR_DT_KNEE;
+   dt.aces2_surround  = 1;
+   dt.aces2_gamut     = 3;
+   dt.gt_toe          = 0.22f;
+   dt.gt_linear       = 0.40f;
+   dt.filmic_contrast = 3;
+   dt.filmic_max_ev   = 4.026068811f;
+   psx_hdr_shoulder   = 0;
+
+   if ((v = display_transform_value(BEETLE_OPT(hdr_display_transform))))
+   {
+      if (!strcmp(v, "knee_exp"))
+         psx_hdr_shoulder = 1;
+      for (i = 1; i < HDR_DT_COUNT; i++)
+         if (!strcmp(v, display_transform_keys[i]))
+            dt.curve = i;
+   }
+   if ((v = display_transform_value(BEETLE_OPT(hdr_aces2_surround))))
+      dt.aces2_surround = !strcmp(v, "dark") ? 0 : !strcmp(v, "average") ? 2 : 1;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_aces2_gamut))))
+      dt.aces2_gamut = !strcmp(v, "rec709") ? 0 : !strcmp(v, "p3") ? 1
+                     : !strcmp(v, "rec2020") ? 2 : 3;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_agx_look))))
+      dt.agx_punchy = !strcmp(v, "punchy");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_gt_toe))))
+      dt.gt_toe = (float)atof(v);
+   if ((v = display_transform_value(BEETLE_OPT(hdr_gt_linear))))
+      dt.gt_linear = (float)atof(v);
+   if (!(dt.gt_toe > 0.0f && dt.gt_toe < 1.0f))
+      dt.gt_toe = 0.22f;
+   if (!(dt.gt_linear > 0.0f && dt.gt_linear < 1.0f))
+      dt.gt_linear = 0.40f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_filmiclog_contrast))))
+      for (i = 0; i < 7; i++)
+         if (!strcmp(v, contrast[i]))
+            dt.filmic_contrast = i;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_filmiclog_range))))
+   {
+      float ev = (float)atof(v);
+      dt.filmic_max_ev = (ev > 4.5f) ? ev : 4.026068811f;
+   }
+   if ((v = display_transform_value(BEETLE_OPT(hdr_highlight_hue))))
+      dt.hue_preserve = !strcmp(v, "enabled");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_expansion))))
+      dt.expansion = !strcmp(v, "inverse") ? 1 : !strcmp(v, "hue") ? 2 : 0;
+   hdr_dt_configure(&dt);
+
+   /* HDR post effects: bloom, halation, chromatic aberration. */
+   memset(&post, 0, sizeof(post));
+   post.firefly_knee = 1.0f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_bloom))))
+      post.bloom = !strcmp(v, "subtle") ? 0.55f : !strcmp(v, "standard") ? 1.0f
+                 : !strcmp(v, "intense") ? 1.7f : 0.0f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_bloom_select))))
+      post.bloom_knee = !strcmp(v, "knee");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_bloom_range))))
+      post.firefly_knee = !strcmp(v, "wide") ? 0.25f : !strcmp(v, "widest") ? 0.0625f : 1.0f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_bloom_convolution))))
+      post.convolution = !strcmp(v, "enabled");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_halation))))
+      post.halation = !strcmp(v, "subtle") ? 1 : !strcmp(v, "strong") ? 2 : 0;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_post_compact))))
+      post.compact = !strcmp(v, "enabled");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_chromatic))))
+      post.chromatic = !strcmp(v, "subtle") ? 1 : !strcmp(v, "strong") ? 2
+                     : !strcmp(v, "heavy") ? 3 : 0;
+   hdr_post_configure(&post);
+   update_display_transform_options();
+
+   /* HDR Display Peak Luminance; the per-frame metadata refresh reapplies
+    * it over whatever the frontend reports. */
+   hdr_peak_option = 0.0f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_peak))) && strcmp(v, "auto"))
+      hdr_peak_option = !strcmp(v, "display") ? -1.0f : (float)atof(v);
+   if (hdr_peak_option > 0.0f)
+      psx_hdr_max_nits = hdr_peak_option;
+   else if (hdr_peak_option < 0.0f && hdr_panel_peak_nits > 0.0f)
+      psx_hdr_max_nits = hdr_panel_peak_nits;
+}
+#endif
+
 static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
@@ -5013,6 +5255,13 @@ static void check_variables(bool startup)
          psx_video_cable = 4;
    }
 
+#ifdef HAVE_HDR_TRANSFORM
+   /* Display Transform, its parameters and the post effects (HDR output
+    * only). Read on every update, not just at startup: all of it is
+    * consumed per frame, so a change applies on the next frame. */
+   check_display_transform_variables();
+#endif
+
    if (startup)
    {
       bool hw_renderer = false;
@@ -5045,16 +5294,6 @@ static void check_variables(bool startup)
             psx_color_format = PSX_COLOR_FORMAT_30BIT_HDR;
          else if (!strcmp(var.value, "64bit_scrgb"))
             psx_color_format = PSX_COLOR_FORMAT_64BIT_SCRGB;
-      }
-
-      /* HDR highlight roll-off curve (Vulkan HDR path only): 0 Reinhard,
-       * 1 ACES. Inert unless the HDR scanout is actually engaged. */
-      var.key = BEETLE_OPT(hdr_shoulder);
-      psx_hdr_shoulder = 0;
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      {
-         if (!strcmp(var.value, "aces"))
-            psx_hdr_shoulder = 1;
       }
 
       /* Reference SDR transfer for the HDR encode (Vulkan HDR path only).
@@ -5684,6 +5923,7 @@ static void check_variables(bool startup)
          Deinterlacer_SetType(&deint, DEINT_WEAVE);
 
       psx_gpu_rasterize_both_fields = (Deinterlacer_GetType(&deint) == DEINT_OFF);
+      psx_gpu_bob_scanout           = (Deinterlacer_GetType(&deint) == DEINT_BOB);
    }
 
    apply_compatibility_settings();
@@ -6109,6 +6349,11 @@ static void apply_hdr_metadata(const struct retro_display_metadata *d)
       psx_hdr_max_nits         = h->max_nits;
    else if (d->caps.peak_nits > 0.0f)
       psx_hdr_max_nits         = d->caps.peak_nits;
+   hdr_panel_peak_nits         = d->caps.peak_nits;
+   if (hdr_peak_option > 0.0f)
+      psx_hdr_max_nits         = hdr_peak_option;
+   else if (hdr_peak_option < 0.0f && hdr_panel_peak_nits > 0.0f)
+      psx_hdr_max_nits         = hdr_panel_peak_nits;
    psx_hdr_expand_gamut        = (int)h->expand_gamut;
    psx_hdr_output_mode         = (int)h->output_mode;
 
@@ -6121,10 +6366,10 @@ static void apply_hdr_metadata(const struct retro_display_metadata *d)
       psx_hdr_black_pq = (black > 0.0f) ? hdr_display_pq(black) : 0.0f;
    }
 
-   if (memcmp(hdr_panel_xy, d->caps.primaries_xy, sizeof(hdr_panel_xy)) != 0)
+   if (memcmp(psx_hdr_panel_xy, d->caps.primaries_xy, sizeof(psx_hdr_panel_xy)) != 0)
    {
-      memcpy(hdr_panel_xy, d->caps.primaries_xy, sizeof(hdr_panel_xy));
-      hdr_display_panel_matrix(hdr_panel_xy, psx_hdr_to_panel);
+      memcpy(psx_hdr_panel_xy, d->caps.primaries_xy, sizeof(psx_hdr_panel_xy));
+      hdr_display_panel_matrix(psx_hdr_panel_xy, psx_hdr_to_panel);
    }
 }
 
@@ -6417,8 +6662,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
          negotiate_hdr_output();
 
-         option_display.key = BEETLE_OPT(scaled_uv_offset);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_sprite);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_2d_polygon);
@@ -6844,12 +7087,10 @@ retry_frame:
 
    ForceEventUpdates(timestamp);
 
-   /* Drain any deferred SW-renderer scanout records collected
-    * during this frame's emulation.  See GPU_FlushDeferredScanout
-    * and psx_gpu_rasterize_both_fields - this is the safe point
-    * to read VRAM since rasterisation for this frame is finished
-    * and the frontend hasn't yet read the surface for display. */
-   GPU_FlushDeferredScanout();
+   /* The deferred SW-renderer scanout records collected during this
+    * frame's emulation (psx_gpu_rasterize_both_fields) are drained in
+    * retro_run below, once the picture's size is known: rasterisation
+    * for this frame is finished, and nothing touches VRAM before. */
 
    espec->SoundBufSize = IntermediateBufferPos;
    IntermediateBufferPos = 0;
@@ -6915,6 +7156,14 @@ retry_frame:
          aspect_ratio_dirty = false;
 
       // If unable to change geometry here, defer to next frame and leave aspect_ratio_dirty flagged
+   }
+
+   /* The cropped picture's aspect follows the crop window, which follows
+    * the game's horizontal display range. */
+   if (MDFN_UNLIKELY(crop_window_dirty))
+   {
+      if (!crop_overscan || retro_set_geometry())
+         crop_window_dirty = false;
    }
 
    // Check if timing needs to be changed due to interlacing change on this frame
@@ -7019,7 +7268,13 @@ retry_frame:
       width  <<= upscale_shift;
       height <<= upscale_shift;
 
-      if (frame_surf != &lent_surf)
+      pix = flush_deferred_scanout(pix_offset << upscale_shift,
+            width, height, &pitch);
+      if (pix)
+      {
+         /* the 480i "Off" picture, straight in a frontend buffer */
+      }
+      else if (frame_surf != &lent_surf)
          pix = frame_surf->pixels + (pix_offset << upscale_shift);
       /* Handed back only exactly as lent; anything else is a dupe. */
       else if (   (int32_t)(pix_offset << upscale_shift) == lent_surf.x0
@@ -7084,10 +7339,20 @@ retry_frame:
    {
       unsigned    vcd_w = 0, vcd_h = 0;
       size_t      vcd_pitch = 0;
-      const void *vcd_fb;
+      const void *vcd_fb    = NULL;
+      bool        fresh;
 
       VCD_RunFrame();
-      vcd_fb = VCD_GetVideo(&vcd_w, &vcd_h, &vcd_pitch);
+      fresh = VCD_PendingVideo(&vcd_w, &vcd_h);
+
+      /* A Video CD runs at half the display rate or less. Where the
+       * frontend dupes, a new picture is converted straight into its own
+       * framebuffer and the frames between are dupes; otherwise each is
+       * shown from the core's copy. */
+      if (fresh && allow_frame_duping && rhi_intf_is_type() == RHI_SOFTWARE)
+         vcd_fb = lend_vcd_picture(vcd_w, vcd_h, &vcd_pitch);
+      if (!vcd_fb && (fresh || !allow_frame_duping))
+         vcd_fb = VCD_GetVideo(&vcd_w, &vcd_h, &vcd_pitch);
 
       if (vcd_fb)
          rhi_intf_finalize_frame(vcd_fb, vcd_w, vcd_h, (unsigned)vcd_pitch);
@@ -7095,13 +7360,18 @@ retry_frame:
          rhi_intf_finalize_frame(NULL, width, height,
                MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
+      /* Handed over where it lies in the ring, in two spans at its wrap */
       if (audio_batch_cb)
       {
-         static int16_t vcd_abuf[4096 * 2];
-         size_t frames = VCD_GetAudio(vcd_abuf,
-               sizeof(vcd_abuf) / (2 * sizeof(int16_t)));
-         if (frames)
-            audio_batch_cb(vcd_abuf, frames);
+         unsigned       spans;
+         size_t         frames;
+         const int16_t *pcm;
+
+         for (spans = 0; spans < 2 && (pcm = VCD_PeekAudio(&frames)); spans++)
+         {
+            audio_batch_cb(pcm, frames);
+            VCD_ConsumeAudio(frames);
+         }
       }
    }
    else
@@ -7255,6 +7525,19 @@ void retro_set_environment(retro_environment_t cb)
    libretro_supports_option_categories = false;
    libretro_set_core_options(environ_cb, &libretro_supports_option_categories);
 
+#ifdef HAVE_HDR_TRANSFORM
+   /* Setting the options made every one visible again; the frontend asks
+    * through the callback whenever its options menu may need refreshing,
+    * so the curve options follow the Display Transform as it is changed. */
+   {
+      struct retro_core_options_update_display_callback update_display;
+      dt_curve_options_shown      = (1u << DT_CURVE_OPTIONS) - 1;
+      update_display.callback     = update_display_transform_options;
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK,
+            &update_display);
+   }
+#endif
+
 #ifndef STATIC_LINKING
    /*
       Hybrid VFS replaces the wholesale adoption: plain paths (disc
@@ -7319,11 +7602,11 @@ size_t retro_serialize_size(void)
       st.malloced       = 0;
       st.initial_malloc = 0;
       st.fixed          = false;
+      st.sizing         = true;
 
       if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
          return 0;
 
-      free(st.data);
       return st.len;
    }
 
@@ -7360,6 +7643,7 @@ bool retro_serialize(void *data, size_t size)
    st.malloced       = size > UINT32_MAX ? UINT32_MAX : (uint32_t)size;
    st.initial_malloc = 0;
    st.fixed          = true;
+   st.sizing         = false;
 
    FastSaveStates = UsingFastSavestates();
    ret            = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
@@ -7394,6 +7678,7 @@ bool retro_unserialize(const void *data, size_t size)
    st.malloced       = 0;
    st.initial_malloc = 0;
    st.fixed          = true;
+   st.sizing         = false;
 
    FastSaveStates = UsingFastSavestates();
    okay           = MDFNSS_LoadSM(&st, 0, 0);

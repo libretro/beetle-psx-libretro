@@ -20,7 +20,8 @@ CHD_SOURCES_C = \
                      $(LIBRETRO_COMM_DIR)/formats/7z/r7z_lzma.c \
                      $(LIBRETRO_COMM_DIR)/formats/flac/rflac.c \
                      $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c \
-                     $(LIBRETRO_COMM_DIR)/features/features_cpu.c
+                     $(LIBRETRO_COMM_DIR)/features/features_cpu.c \
+                     $(LIBRETRO_COMM_DIR)/vfs/vfs_prefetch.c
 
 
 # Image decoders for the shared RHI HD-texture replacement system (rhi/rhi_tt.c).
@@ -250,21 +251,27 @@ endif
       FLAGS       += -DTEXTURE_DUMPING_ENABLED $(IMAGE_FORMAT_FLAGS)
       SOURCES_C   += $(CORE_DIR)/rhi/rhi_tt.c \
                      $(CORE_DIR)/rhi/tt_io_channel.c \
+                     $(CORE_DIR)/rhi/hdr_transform.c \
+                     $(CORE_DIR)/rhi/hdr_aces2.c \
                      $(IMAGE_FORMAT_SOURCES_C)
 
       # Same MSVC-C89 discipline as the Vulkan TU (see below).
       $(CORE_DIR)/rhi/rhi_tt.o: CFLAGS += -Werror=declaration-after-statement
+      $(CORE_DIR)/rhi/hdr_transform.o: CFLAGS += -Werror=declaration-after-statement
+      $(CORE_DIR)/rhi/hdr_aces2.o: CFLAGS += -Werror=declaration-after-statement
    endif
 
    ifeq ($(HAVE_VULKAN), 1)
       SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
                      $(CORE_DIR)/rhi/rhi_spirv_reflect.cpp
-      SOURCES_C   += $(CORE_DIR)/rhi/rhi_lib_vulkan.c
+      SOURCES_C   += $(CORE_DIR)/rhi/rhi_lib_vulkan.c \
+                     $(CORE_DIR)/rhi/rhi_upscaler.c
 
       # The Vulkan RHI TU targets MSVC C89, which rejects declarations after
       # statements. GCC/Clang only diagnose this under an explicit flag, so make
       # it a hard error for this one object (target-specific, no global impact).
       $(CORE_DIR)/rhi/rhi_lib_vulkan.o: CFLAGS += -Werror=declaration-after-statement
+      $(CORE_DIR)/rhi/rhi_upscaler.o: CFLAGS += -Werror=declaration-after-statement
 
       EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/SPIRV-Cross \
                         -I$(CORE_DIR)/parallel-psx/khronos/include

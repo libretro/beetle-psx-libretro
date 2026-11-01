@@ -482,7 +482,7 @@ size_t rchd_read_progress(const rchd_t *chd);
  * rchd_read_hunk_begin:
  * @chd        : opened decoder
  * @hunk       : hunk index, below rchd_info()->hunk_count
- * @dst        : destination, at least hunk_bytes
+ * @dst        : destination, at least hunk_bytes; or NULL
  *
  * Arms a read of one whole hunk, addressed by index rather than by byte
  * offset. Equivalent to arming a byte read of hunk_bytes at
@@ -490,9 +490,21 @@ size_t rchd_read_progress(const rchd_t *chd);
  * format is written against hunk indices; a consumer being ported does
  * not have to convert its call sites to offsets to use this one.
  *
+ * With @dst NULL nothing is copied: once the read completes the hunk is
+ * read where the decoder built it, through rchd_hunk_cache().
+ *
  * Returns: RCHD_OK, or RCHD_ERROR_PARAM if @hunk is out of range.
  */
 int rchd_read_hunk_begin(rchd_t *chd, uint32_t hunk, void *dst);
+
+/**
+ * rchd_hunk_cache:
+ *
+ * Returns: the hunk the decoder built last, hunk_bytes long - after a
+ * completed rchd_read_hunk_begin(chd, hunk, NULL), that hunk. Valid
+ * until the next read armed on @chd. NULL before the first read.
+ */
+const uint8_t *rchd_hunk_cache(const rchd_t *chd);
 
 /* -------- pipelining -------- */
 
@@ -572,8 +584,12 @@ int rchd_feed_at(rchd_t *chd, uint64_t offset, int source,
  * hunk, and at the maximum hunk size that is half a megabyte of
  * memcpy the caller has already paid for once.
  *
- * @data must stay valid and unmoved until the next rchd_read_step()
- * returns something other than RCHD_PENDING. That rules out any buffer
+ * @data must stay valid and unmoved until the decoder is done with
+ * it: until a later rchd_read_step() either finishes the read (returns
+ * something other than RCHD_PENDING) or asks for a different range. A
+ * caller may therefore lend one staging buffer per request and refill
+ * it for the next one. Lent bytes are used once; asking for the same
+ * range again means supplying it again. That rules out any buffer
  * whose pages can be released underneath the decoder while it works,
  * and it rules out a base pointer that can move: a growing arena may
  * reallocate, so re-read the base after growing it and borrow from the

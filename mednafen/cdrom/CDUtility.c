@@ -195,16 +195,6 @@ void subq_generate_checksum(uint8_t *buf)
    buf[0xb] = ~(crc);
 }
 
-void subq_deinterleave(const uint8_t *SubPWBuf, uint8_t *qbuf)
-{
-   unsigned i;
-
-   memset(qbuf, 0, 0xC);
-
-   for(i = 0; i < 96; i++)
-      qbuf[i >> 3] |= ((SubPWBuf[i] >> 6) & 0x1) << (7 - (i & 0x7));
-}
-
 
 // Deinterleaves 96 bytes of subchannel P-W data from 96 bytes of interleaved subchannel PW data.
 void subpw_deinterleave(const uint8_t *in_buf, uint8_t *out_buf)

@@ -19,17 +19,7 @@ typedef struct CD_Audio_Buffer
    uint32_t ReadPos;
 } CD_Audio_Buffer;
 
-/* SimpleFIFO is a fixed-power-of-two-capacity ring buffer of bytes,
- * used by the CDC DMA path; the only place it lives is inside
- * struct PS_CDC. */
-typedef struct SimpleFIFO
-{
-   uint8_t  *data;
-   uint32_t size;
-   uint32_t read_pos;
-   uint32_t write_pos;
-   uint32_t in_count;
-} SimpleFIFO;
+#include "cdc_fifo.h"
 
 /* Number of pipelined sectors held by the disc-read delay buffer.
  * Was a class-scoped enum constant inside PS_CDC */

@@ -16,6 +16,39 @@ struct CDIF;
 int CDIF_ReadSector(struct CDIF *c, uint8_t *b, uint32_t l, uint32_t n)
 { (void)c; (void)b; (void)l; (void)n; return 0; }
 
+/* The core's pixel format is XRGB8888: the X byte of every pixel is zero,
+ * which a picture in any 16-bit format read back this way is not */
+static int check_xrgb(const uint8_t *fb, unsigned w, unsigned h, size_t pitch)
+{
+   unsigned x, y;
+   if (pitch < (size_t)w * 4)
+   {
+      printf("pitch %zu is short of %u XRGB8888 pixels\n", pitch, w);
+      return 0;
+   }
+   for (y = 0; y < h; y++)
+      for (x = 0; x < w; x++)
+         if (((const uint32_t *)(fb + y * pitch))[x] >> 24)
+         {
+            printf("pixel %u,%u is not XRGB8888\n", x, y);
+            return 0;
+         }
+   return 1;
+}
+
+/* Takes the audio where it lies in the ring, as retro_run does */
+static size_t drain_audio(void)
+{
+   size_t total = 0, n;
+   unsigned spans;
+   for (spans = 0; spans < 2 && VCD_PeekAudio(&n); spans++)
+   {
+      total += n;
+      VCD_ConsumeAudio(n);
+   }
+   return total;
+}
+
 int main(int argc, char **argv)
 {
    FILE     *f;
@@ -24,7 +57,8 @@ int main(int argc, char **argv)
    size_t    off = 0;
    unsigned  sectors = 0, frames = 0;
    size_t    audio_frames = 0;
-   int16_t   abuf[8192 * 2];
+   unsigned  lent = 0;
+   uint8_t  *frontend_fb;
 
    if (argc < 2) { fprintf(stderr, "usage: %s file.mpg\n", argv[0]); return 2; }
    f = fopen(argv[1], "rb");
@@ -33,6 +67,8 @@ int main(int argc, char **argv)
    mpg = (uint8_t *)malloc(len);
    if (fread(mpg, 1, len, f) != (size_t)len) return 2;
    fclose(f);
+
+   frontend_fb = (uint8_t *)malloc(720 * 576 * 4);
 
    VCD_Init();
    VCD_SetMode(VCD_MODE_HLE);
@@ -57,14 +93,26 @@ int main(int argc, char **argv)
       off += n;
 
       if (VCD_RunFrame())
+      {
+         unsigned pw, ph;
          frames++;
-      audio_frames += VCD_GetAudio(abuf, 8192);
+         /* Every other picture goes straight into a frontend buffer, the
+          * way retro_run lends one, the rest through the core's copy */
+         if ((frames & 1) && VCD_PendingVideo(&pw, &ph))
+         {
+            VCD_ConvertVideo(frontend_fb, (size_t)pw * 4);
+            if (!check_xrgb(frontend_fb, pw, ph, (size_t)pw * 4))
+               return 1;
+            lent++;
+         }
+      }
+      audio_frames += drain_audio();
    }
 
    /* Drain whatever the decoders still hold. */
    { int guard = 0;
      while (VCD_RunFrame() && guard++ < 4096) frames++;
-     audio_frames += VCD_GetAudio(abuf, 8192); }
+     audio_frames += drain_audio(); }
 
    {
       unsigned    w = 0, h = 0;
@@ -83,20 +131,24 @@ int main(int argc, char **argv)
        * decodes nothing. */
       if (fb && w && h)
       {
-         const uint16_t *px = (const uint16_t *)fb;
-         size_t stride16 = pitch / 2, x, y;
-         uint16_t first = px[0];
+         const uint32_t *px = (const uint32_t *)fb;
+         size_t stride32 = pitch / 4, x, y;
+         uint32_t first = px[0];
          int varied = 0;
+         if (!check_xrgb((const uint8_t *)fb, w, h, pitch))
+            return 1;
          for (y = 0; y < h && !varied; y++)
             for (x = 0; x < w; x++)
-               if (px[y * stride16 + x] != first) { varied = 1; break; }
+               if (px[y * stride32 + x] != first) { varied = 1; break; }
          printf("picture varied: %s\n", varied ? "yes" : "NO (uniform)");
          if (!varied) { VCD_Kill(); free(mpg); return 1; }
       }
 
+      printf("lent pictures : %u\n", lent);
       VCD_Kill();
       free(mpg);
-      if (!fb || frames < 10 || audio_frames < 10000) {
+      free(frontend_fb);
+      if (!fb || frames < 10 || audio_frames < 10000 || !lent) {
          printf("RESULT: FAIL\n"); return 1; }
    }
    printf("RESULT: PASS\n");

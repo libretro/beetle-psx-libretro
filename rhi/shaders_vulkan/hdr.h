@@ -23,6 +23,11 @@
 #ifndef HDR_H
 #define HDR_H
 
+/* The HDR output variants carry the Display Transform (hdr_transform.h). */
+#if defined(HDR) && !defined(HDR_DT)
+#define HDR_DT
+#endif
+
 const highp float PQ_M1     = 2610.0 / 16384.0;
 const highp float PQ_M2     = (2523.0 / 4096.0) * 128.0;
 const highp float PQ_C1     = 3424.0 / 4096.0;
@@ -247,6 +252,10 @@ highp vec3 pq_black_floor(highp vec3 e, highp float black_pq)
 	return e + black_pq * (t * t);
 }
 
+#ifdef HDR_DT
+#include "hdr_transform.h"
+#endif
+
 /* The grade both HDR outputs share: linear light in, absolute nits out, in
  * the Rec.2020 container after the Colour Boost rotation and panel gamut
  * compression. `scene_linear` is normalised with 1.0 at reference white;
@@ -289,6 +298,18 @@ highp vec3 hdr_grade_linear(highp vec3 scene_linear, highp float paper_white_nit
 	 * that way; headroom then clamps to zero and the roll-off degenerates to a
 	 * clamp at paper white, which is the right behaviour rather than a
 	 * negative range. */
+#ifdef HDR_DT
+	/* The Display Transform option replaces the knee below. */
+	if (dt.mode.x > 0.5)
+	{
+		bool absolute;
+		highp vec3 v = dt_apply(src_primaries_to_709(max(scene_linear, vec3(0.0)), src_primaries),
+		                        paper_white_nits, absolute);
+		if (absolute)
+			return v;
+		return panel_gamut_compress(rec709_to_target(v * paper_white_nits, expand_gamut), to_panel);
+	}
+#endif
 	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
 	highp vec3  lin      = src_primaries_to_709(max(scene_linear, vec3(0.0)), src_primaries)
 	                     * paper_white_nits;
@@ -368,6 +389,21 @@ highp vec3 encode_hdr_output(highp vec3 rgb, highp float paper_white_nits, highp
 	                                paper_white_nits, peak_nits, expand_gamut, shoulder,
 	                                src_primaries, black_pq, to_panel, scrgb);
 }
+
+/* HDR post effects (bloom, halation, chromatic aberration). With
+ * HDR_LINEAR_OUT set the display stage writes scene-linear light - 1.0 at
+ * reference white, still in the authoring primaries - to a half-float image
+ * instead of encoding, and hdr_post.frag encodes after the effects. A
+ * specialization constant on Vulkan, so the default pipelines compile to the
+ * code they always had; a uniform on GL. Constant 1 is the primitive
+ * shaders' FILTER_TYPE slot, which no display program shares. */
+#if defined(HDR)
+#ifdef VULKAN
+layout(constant_id = 1) const int HDR_LINEAR_OUT = 0;
+#else
+uniform int HDR_LINEAR_OUT;
+#endif
+#endif
 
 /* ---- Debanding dither -----------------------------------------------------
  * For the genuinely-8-bit paths whose gradients are already quantised and

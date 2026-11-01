@@ -167,11 +167,18 @@ void main()
 #if defined(HDR)
 	/* The SDR rgb is gamma-encoded 0..1; encode_hdr_output handles the
 	 * linearise / paper-white / gamut / PQ chain. */
-	FragColor = vec4(encode_hdr_output(rgb, registers.paper_white_nits, registers.peak_nits,
-	                                   registers.expand_gamut, registers.shoulder,
-	                                   registers.sdr_eotf, registers.src_primaries,
-	                                   registers.black_pq, registers.to_panel,
-	                                   registers.scrgb), 1.0);
+	if (HDR_LINEAR_OUT != 0)
+	{
+		FragColor = vec4(sdr_to_linear(max(rgb, vec3(0.0)), registers.sdr_eotf), 1.0);
+	}
+	else
+	{
+		FragColor = vec4(encode_hdr_output(rgb, registers.paper_white_nits, registers.peak_nits,
+		                                   registers.expand_gamut, registers.shoulder,
+		                                   registers.sdr_eotf, registers.src_primaries,
+		                                   registers.black_pq, registers.to_panel,
+		                                   registers.scrgb), 1.0);
+	}
 #else
 	/* Apply source primaries after color expansion. */
 	FragColor = vec4(sdr_apply_src_primaries(rgb, registers.sdr_eotf,

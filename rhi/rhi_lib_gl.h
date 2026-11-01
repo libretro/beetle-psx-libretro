@@ -59,7 +59,8 @@ void rhi_gl_push_triangle(float p0x, float p0y, float p0w,
                           uint8_t depth_shift,
                           bool dither,
                           int blend_mode, //enum blending_modes
-                          bool mask_test, bool set_mask);
+                          bool mask_test, bool set_mask,
+                          bool may_be_2d);
 
 void rhi_gl_push_quad(float p0x, float p0y, float p0w,
                       float p1x, float p1y, float p1w,
@@ -83,6 +84,7 @@ void rhi_gl_push_quad(float p0x, float p0y, float p0w,
                       bool dither,
                       int blend_mode, //enum blending_modes
                       bool mask_test, bool set_mask,
+                      bool is_sprite, bool may_be_2d,
                       uint32_t uv_offset);
 
 void rhi_gl_push_line(int16_t p0x, int16_t p0y,

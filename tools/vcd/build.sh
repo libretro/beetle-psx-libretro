@@ -3,7 +3,7 @@
 #
 #   sh tools/vcd/build.sh <harness> [extra cc args...]
 #
-# where <harness> is one of: vcd_probe vcd_pipeline vcd_state
+# where <harness> is one of: vcd_probe vcd_pipeline vcd_state vcd_churn
 #                            cdstream_map_test vcd_disc
 #
 # The binary lands in $OUT (default /tmp/<harness>). Pass
@@ -50,7 +50,7 @@ VFS="$LC/streams/file_stream.c $LC/vfs/vfs_implementation.c
      $LC/lists/dir_list.c $LC/formats/data_transfer.c"
 
 case "$HARNESS" in
-vcd_probe|vcd_pipeline|vcd_state)
+vcd_probe|vcd_pipeline|vcd_state|vcd_churn)
    SRC="tools/vcd/$HARNESS.c tools/vcd/state_stub.c
         mednafen/psx/vcd.c mednafen/state.c $MPEG $BASE"
    ;;
@@ -71,7 +71,7 @@ vcd_disc)
         $LC/formats/chd/rchd.c $LC/encodings/encoding_huffman.c
         $LC/formats/7z/r7z_lzma.c
         $LC/encodings/encoding_rzstd.c $LC/streams/trans_stream_rzstd.c
-        $LC/streams/chd_stream.c $LC/streams/memory_stream.c
+        $LC/streams/chd_stream.c $LC/vfs/vfs_prefetch.c $LC/streams/memory_stream.c
         $LC/streams/interface_stream.c $LC/streams/trans_stream.c
         $LC/streams/trans_stream_pipe.c $LC/streams/rzip_stream.c
         $LC/encodings/encoding_crc32.c $LC/encodings/encoding_deflate.c

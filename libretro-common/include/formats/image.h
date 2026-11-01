@@ -215,7 +215,10 @@ enum image_pixfmt
     * is NV12 with 16-bit samples holding 10 bits in the high bits. */
    IMAGE_PIXFMT_I420     = (1 << 7),
    IMAGE_PIXFMT_NV12     = (1 << 8),
-   IMAGE_PIXFMT_P010     = (1 << 9)
+   IMAGE_PIXFMT_P010     = (1 << 9),
+   /* GPU-only Y,Cb,Cr integer samples in an RGBA16F texel. */
+   IMAGE_PIXFMT_YUV8_FP16  = (1 << 10),
+   IMAGE_PIXFMT_YUV10_FP16 = (1 << 11)
 };
 
 #define IMAGE_PIXFMT_PLANAR \
@@ -230,7 +233,8 @@ enum image_pixfmt
  * one */
 #define IMAGE_PIXFMT_BPP(f) \
    (((f) & IMAGE_PIXFMT_FP32) ? 16u \
-   : ((f) & IMAGE_PIXFMT_FP16) ? 8u \
+   : ((f) & (IMAGE_PIXFMT_FP16 | IMAGE_PIXFMT_YUV8_FP16 \
+         | IMAGE_PIXFMT_YUV10_FP16)) ? 8u \
    : ((f) & (IMAGE_PIXFMT_565 | IMAGE_PIXFMT_4444 | IMAGE_PIXFMT_P010)) ? 2u \
    : ((f) & (IMAGE_PIXFMT_I420 | IMAGE_PIXFMT_NV12)) ? 1u : 4u)
 
@@ -560,12 +564,24 @@ void *image_transfer_anim_stream_new_hw_avail(void *buf, size_t len,
       size_t avail, enum image_type_enum type, int *need_more,
       size_t *need_lo, size_t *need_hi);
 
+/* Metadata-first GPU-player open. Software preference is unchanged; native-only
+ * candidates are returned without opening a backend. The decoder owner must
+ * call set_hw(true) before advancing such a candidate. Admission can still
+ * fail, including when no native backend is available. */
+void *image_transfer_anim_stream_new_hw_deferred_avail(void *buf, size_t len,
+      size_t avail, enum image_type_enum type, int *need_more,
+      size_t *need_lo, size_t *need_hi);
+
 void image_transfer_anim_stream_free(void *stream,
       enum image_type_enum type);
 
 void image_transfer_anim_stream_get_info(void *stream,
       enum image_type_enum type,
       unsigned *width, unsigned *height, int *num_frames, int *loop_count);
+
+/* Decoder owner: the last movie advance reached clean EOF. */
+bool image_transfer_anim_stream_completed(const void *stream,
+      enum image_type_enum type);
 
 const uint32_t *image_transfer_anim_stream_next(void *stream,
       enum image_type_enum type, int *duration_ms);
@@ -631,8 +647,12 @@ bool image_transfer_anim_stream_set_output_stride(void *stream,
  * be. A stream under way starts over. The frame of each shown frame is
  * then taken with _hw_frame after _next - whose pointer only says a
  * frame came - and read or abandoned by the caller. */
+/* enable=false only queries an already admitted backend. */
 bool image_transfer_anim_stream_set_hw(void *stream,
       enum image_type_enum type, bool enable);
+/* Exclusive decoder owner, after decode jobs settle: withdraw hardware
+ * preference and restart the software stream where that type supports it. */
+bool image_transfer_anim_stream_stop_hw(void *stream, enum image_type_enum type);
 bool image_transfer_anim_stream_waiting(const void *stream,
       enum image_type_enum type);
 bool image_transfer_anim_stream_hw_frame(void *stream,
@@ -693,8 +713,9 @@ void image_transfer_anim_stream_set_avail(void *stream,
  * feeder can make a frame larger than its lookahead resident before
  * asking for it - without this a lossless 4K frame past the lookahead
  * would never become readable and the stream would sit at the wall
- * forever.  0/0 for the video types (packet-sized reads well inside
- * any lookahead) and for a frame not indexed yet. */
+ * forever. WebM reports a blocked complete element (a BlockGroup can
+ * exceed ordinary lookahead); admit it with bounded I/O over subsequent
+ * polls. Other video types and unindexed frames report 0/0. */
 size_t image_transfer_anim_stream_media_floor(void *stream,
       enum image_type_enum type);
 /* Container duration in nanoseconds for the video types, 0 for the
@@ -705,6 +726,13 @@ int64_t image_transfer_anim_stream_duration_ns(void *stream,
       enum image_type_enum type);
 size_t image_transfer_anim_stream_consumed(void *stream,
       enum image_type_enum type);
+/* Feed-owner read demand and retained coded span. Demand can lead
+ * consumed() during metadata lookahead; window owners retain the span. */
+size_t image_transfer_anim_stream_feed_frontier(void *stream, enum image_type_enum type);
+void image_transfer_anim_stream_pin_span(void *stream, enum image_type_enum type,
+      size_t *lo, size_t *hi);
+int image_transfer_anim_stream_seek_span(void *stream,
+      enum image_type_enum type, size_t *lo, size_t *hi);
 void image_transfer_anim_stream_next_span(void *stream,
       enum image_type_enum type, size_t *lo, size_t *hi);
 
@@ -716,6 +744,24 @@ void image_transfer_anim_stream_next_span(void *stream,
  * without a scan. */
 void image_transfer_anim_stream_complete_scan(void *stream,
       enum image_type_enum type, const void *buf, size_t len);
+
+/* Exclusive decoding-thread bounded seek. MP4, software WebM and AV1
+ * hardware WebM support it;
+ * begin selects the request, step returns -1/0/1 (failed/retry/positioned).
+ * The owner feeds the stream's selected byte frontier between steps. */
+/* Exclusive-owner query; cache before handing the decoder to a worker. */
+int64_t image_transfer_anim_stream_start_ns(void *stream, enum image_type_enum type);
+/* Most recently decoded display frame in movie time. Decoder-owner
+ * query only; -1 before a frame or when the format has no such query.
+ * MP4 and WebM. Still-image decoding and decoder-specific raw seek
+ * coordinates do not change. Generic seeks below use movie time. */
+int64_t image_transfer_anim_stream_frame_time_ns(void *stream, enum image_type_enum type);
+
+bool image_transfer_anim_stream_seekable(void *stream, enum image_type_enum type);
+bool image_transfer_anim_stream_seek_begin(void *stream,
+      enum image_type_enum type, int64_t target_us);
+int image_transfer_anim_stream_seek_step(void *stream,
+      enum image_type_enum type, int64_t *position_us);
 
 void image_transfer_anim_stream_rewind(void *stream,
       enum image_type_enum type);

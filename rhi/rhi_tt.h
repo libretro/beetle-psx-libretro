@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <boolean.h>
 #include <retro_inline.h>
+#include <retro_atomic.h>
 #include "libretro.h"
 
 #ifdef __cplusplus
@@ -386,11 +387,17 @@ struct LoadedImage {
 };
 typedef struct LoadedImage LoadedImage;
 
+typedef struct TTStaging TTStaging; /* opaque; backend-defined */
+
 /* A decoded texture as a set of mip levels. C-style dynamic array: `levels`
- * is a malloc'd array of `count` LoadedImage, owning all buffers. */
+ * is a malloc'd array of `count` LoadedImage. The level buffers are malloc'd
+ * and owned by the levels, unless `staging` is set: then they all point into
+ * that one piece of backend upload memory (TTGpuBackend.staging_alloc),
+ * which the levels own instead and give back through staging_release. */
 struct LoadedLevels {
    LoadedImage *levels;
    int          count;
+   TTStaging   *staging;
 };
 typedef struct LoadedLevels LoadedLevels;
 
@@ -460,6 +467,19 @@ struct TTGpuBackend {
    void (*page_blit)(void *ctx, TTGpuImage *page, TTGpuImage *src,
          const TTPageBlit *blit);
    void (*page_end)(void *ctx, TTGpuImage *page);
+
+   /* Optional; both NULL when the backend has none. Upload memory the GPU
+    * copies from, mapped for the CPU, for a width x height RGBA8 chain of
+    * `levels` levels: level_data[i] receives level i's address (rows
+    * packed). The decoder writes the levels there and upload_levels then
+    * only records the copy, so the bytes are never copied on the CPU.
+    * Returns NULL when there is no such memory. The memory stays valid
+    * until staging_release, which keeps it from being reused until the GPU
+    * has finished every copy recorded from it. Writing it from another
+    * thread is fine; both calls are the render thread's. */
+   TTStaging *(*staging_alloc)(void *ctx, int width, int height, int levels,
+         uint8_t **level_data);
+   void (*staging_release)(void *ctx, TTStaging *staging);
 };
 typedef struct TTGpuBackend TTGpuBackend;
 
@@ -521,6 +541,28 @@ void texture_tracker_set_texture_dir_mode(int mode);
  * toggle), so the next game starts from the menu value. The state outlives
  * renderer rebuilds on purpose; call this when the game is unloaded. */
 void texture_tracker_session_reset(void);
+
+/* HD Texture Folder mode (0 = content, 1 = system, 2 = save). The render
+ * thread sets it every frame from the option; the I/O workers read it to
+ * build replacement paths. A worker reads it once per path, and a change
+ * re-scans the replacements anyway, so one atomic int is all it needs. */
+struct tt_dir_mode
+{
+   retro_atomic_int_t mode;
+};
+
+/* Render thread: stored only when it changes. */
+static INLINE void tt_dir_mode_set(struct tt_dir_mode *d, int mode)
+{
+   if (retro_atomic_load_relaxed_int(&d->mode) != mode)
+      retro_atomic_store_release_int(&d->mode, mode);
+}
+
+/* Any thread. */
+static INLINE int tt_dir_mode_get(struct tt_dir_mode *d)
+{
+   return retro_atomic_load_acquire_int(&d->mode);
+}
 
 /* Replace Textures on/off for one game session. A changed menu value and
  * the in-game toggle both set it; every tracker, a rebuilt one included,

@@ -42,6 +42,19 @@ static const char *disc_name(VCD_DiscType t)
    }
 }
 
+/* Takes the audio where it lies in the ring, as retro_run does */
+static size_t drain_audio(void)
+{
+   size_t total = 0, n;
+   unsigned spans;
+   for (spans = 0; spans < 2 && VCD_PeekAudio(&n); spans++)
+   {
+      total += n;
+      VCD_ConsumeAudio(n);
+   }
+   return total;
+}
+
 int main(int argc, char **argv)
 {
    CDIF        *cdif;
@@ -52,7 +65,6 @@ int main(int argc, char **argv)
    uint32_t     t2_lba, t2_end, lba;
    unsigned     fed = 0, frames = 0;
    size_t       audio = 0;
-   int16_t      abuf[8192 * 2];
 
    if (argc < 2)
    {
@@ -113,14 +125,14 @@ int main(int argc, char **argv)
 
       if (VCD_RunFrame())
          frames++;
-      audio += VCD_GetAudio(abuf, 8192);
+      audio += drain_audio();
    }
 
    {
       int guard = 0;
       while (VCD_RunFrame() && guard++ < 4096)
          frames++;
-      audio += VCD_GetAudio(abuf, 8192);
+      audio += drain_audio();
    }
 
    printf("read %u sectors from track 2: %u pictures, %zu audio frames @ %u Hz\n",
@@ -145,14 +157,14 @@ int main(int argc, char **argv)
        * produced nothing -- the failure that looks like success. */
       if (fb && w && h)
       {
-         const uint16_t *px = (const uint16_t *)fb;
-         size_t   stride16 = pitch / 2, x, y;
-         uint16_t first = px[0];
+         const uint32_t *px = (const uint32_t *)fb;
+         size_t   stride32 = pitch / 4, x, y;
+         uint32_t first = px[0];
          int      varied = 0;
 
          for (y = 0; y < h && !varied; y++)
             for (x = 0; x < w; x++)
-               if (px[y * stride16 + x] != first) { varied = 1; break; }
+               if (px[y * stride32 + x] != first) { varied = 1; break; }
 
          chk("picture is not a flat colour", varied);
       }

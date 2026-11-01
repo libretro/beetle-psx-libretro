@@ -112,49 +112,12 @@ void Deinterlacer_ClearState(Deinterlacer *d)
  * in pixels, up = 1 << s, copy_pix = surface_w << s if you want to
  * copy padding too, but we use the active native width from
  * LineWidths to avoid clobbering the opposite field's pixels past
- * the active area (matters for BOB/BOB_OFFSET when WEAVE is the
+ * the active area (matters for BOB_OFFSET when WEAVE is the
  * "fallback" recovery path users may switch to mid-frame).
  *
- * BOB writes are destructive to opposite-field data anyway (the
- * dest_block IS one of the row-block stripes the next frame's
- * GPU will use), but we still bound to the active width so the
- * far-right padding in the surface stays at whatever the GPU left
- * there.  Cheap insurance against future width-change shenanigans.
+ * BOB has no loop here: the GPU scans each field's lines out to
+ * consecutive rows (psx_gpu_bob_scanout), which is the picture.
  */
-static void deint_bob(uint32_t *pixels, int32_t pitch_pix,
-      const MDFN_Rect *DisplayRect, const int32_t *LineWidths,
-      bool field, unsigned s)
-{
-   const unsigned up      = 1u << s;
-   const int32_t  field_h = DisplayRect->h / 2;
-   const int32_t  dy      = DisplayRect->y;
-   int32_t        k;
-
-   for (k = 0; k < field_h; k++)
-   {
-      const int32_t   src_native = (k * 2) + (int32_t)field + dy;
-      const int32_t   dst_native = k + dy;
-      const size_t    copy_pix   = (size_t)LineWidths[src_native] << s;
-      const uint32_t *src        = pixels
-         + (size_t)(src_native << s) * pitch_pix
-         + DisplayRect->x;
-      uint32_t       *dst        = pixels
-         + (size_t)(dst_native << s) * pitch_pix
-         + DisplayRect->x;
-      unsigned u;
-
-      /* k=0, field=0 case: src and dst are the same row block; the
-       * memcpy would be a no-op but skipping it saves the work. */
-      if (src == dst)
-         continue;
-
-      for (u = 0; u < up; u++)
-         memcpy(dst + (size_t)u * pitch_pix,
-                src + (size_t)u * pitch_pix,
-                copy_pix * sizeof(uint32_t));
-   }
-}
-
 static void deint_bob_offset(uint32_t *pixels, int32_t pitch_pix,
       const MDFN_Rect *DisplayRect, const int32_t *LineWidths,
       bool field, unsigned s)
@@ -828,8 +791,7 @@ void Deinterlacer_Process(Deinterlacer *d, MDFN_Surface *surface,
          break;
 
       case DEINT_BOB:
-         deint_bob(pixels, pitch_pix, DisplayRect,
-               LineWidths, field, s);
+         /* Scanned out compact already */
          break;
 
       case DEINT_FASTMAD:

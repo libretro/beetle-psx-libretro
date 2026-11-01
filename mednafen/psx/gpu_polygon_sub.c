@@ -1,12 +1,4 @@
-/*
- * gpu_polygon_sub.c - polygon-helper free functions used by the
- * software rasteriser's polygon decoder.
- *
- * Switched to a minimal include set: gpu.h gives us PS_GPU and
- * tri_vertex (both now C-includable as of 7d257de), rhi_intf.h
- * gives us RHI_VULKAN and rhi_intf_is_type, and
- * beetle_psx_globals.h gives us psx_gpu_upscale_shift_hw.
- */
+/* GPU polygon UV and line helpers. */
 
 #include "gpu.h"
 #include "../../rhi/rhi_intf.h"
@@ -14,13 +6,54 @@
 
 #include <retro_miscellaneous.h>
 
-/* Determine whether to offset UVs to account for difference in interpolation between PS1 and modern GPUs */
+static bool IsAxisAlignedTriangle(const tri_vertex *vertices)
+{
+	return vertices[0].precise[2] == vertices[1].precise[2] &&
+		vertices[1].precise[2] == vertices[2].precise[2] &&
+		(vertices[0].x == vertices[1].x || vertices[0].x == vertices[2].x ||
+		 vertices[1].x == vertices[2].x) &&
+		(vertices[0].y == vertices[1].y || vertices[0].y == vertices[2].y ||
+		 vertices[1].y == vertices[2].y);
+}
+
+/* Match decoder size culling, including retained vertices. */
+static bool TriangleFits(const tri_vertex *vertices, unsigned shift)
+{
+	int32_t min_x = MIN(vertices[0].x, MIN(vertices[1].x, vertices[2].x));
+	int32_t max_x = MAX(vertices[0].x, MAX(vertices[1].x, vertices[2].x));
+	int32_t min_y = MIN(vertices[0].y, MIN(vertices[1].y, vertices[2].y));
+	int32_t max_y = MAX(vertices[0].y, MAX(vertices[1].y, vertices[2].y));
+	return (int64_t)max_x - min_x < ((int64_t)1024 << shift) &&
+		(int64_t)max_y - min_y < ((int64_t)512 << shift);
+}
+
+/* Classify the complete strip; one aligned triangle does not imply a sprite. */
+static bool IsAxisAlignedQuad(const tri_vertex *first,
+      const tri_vertex *vertices, bool triangle_is_3d)
+{
+	const tri_vertex *b = &vertices[0];
+	const tri_vertex *c = &vertices[1];
+	const tri_vertex *d = &vertices[2];
+	return !triangle_is_3d && first->precise[2] == b->precise[2] &&
+		((first->x == c->x && b->x == d->x &&
+		  first->y == b->y && c->y == d->y &&
+		  first->x != b->x && first->y != c->y) ||
+		 (first->x == b->x && c->x == d->x &&
+		  first->y == c->y && b->y == d->y &&
+		  first->x != c->x && first->y != b->y));
+}
+
+/* Calculate UV offsets and shared one-pixel vertex adjustments. */
 void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
 {
 	/* iCB: Just borrowing this from \parallel-psx\renderer\renderer.cpp */
 	uint16_t off_u = 0;
 	uint16_t off_v = 0;
 	bool may_be_2d = false;
+	enum rhi_renderer_type renderer = rhi_intf_is_type();
+	bool hardware_command = count == 4 && gpu->InCmd == INCMD_QUAD &&
+		(renderer == RHI_OPENGL || renderer == RHI_VULKAN);
+	bool hardware_quad = false;
 	if (gpu->InCmd == INCMD_QUAD)
 	{
 		off_u = gpu->off_u;
@@ -28,31 +61,11 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 		may_be_2d = gpu->may_be_2d;
 	}
 
-	/* For X/Y flipped 2D sprites, PSX games rely on a very specific rasterization behavior.
-	 * If U or V is decreasing in X or Y, and we use the provided U/V as is, we will sample the wrong texel as interpolation
-	 * covers an entire pixel, while PSX samples its interpolation essentially in the top-left corner and splats that interpolant across the entire pixel.
-	 * While we could emulate this reasonably well in native resolution by shifting our vertex coords by 0.5,
-	 * this breaks in upscaling scenarios, because we have several samples per native sample and we need NN rules to hit the same UV every time.
-	 * One approach here is to use interpolate at offset or similar tricks to generalize the PSX interpolation patterns,
-	 * but the problem is that vertices sharing an edge will no longer see the same UV (due to different plane derivatives),
-	 * we end up sampling outside the intended boundary and artifacts are inevitable, so the only case where we can apply this fixup is for "sprites"
-	 * or similar which should not share edges, which leads to this unfortunate code below.
-	 */
+	/* Hardware interpolation can cross a flipped sprite's texel boundary.
+	 * Keep edge corrections for sprite-like mappings, not oblique mesh quads. */
 	{
-		/* It might be faster to do more direct checking here, but the code below handles primitives in any order
-		 * and orientation, and is far more SIMD-friendly if needed.
-		 *
-		 * All inputs (x, y, u, v) are int32_t, so every derivative below is
-		 * integer-valued.  It used to be computed in float: at upscale_shift
-		 * == 0 the coords are small and the float math is exact, but with the
-		 * software renderer upscaling (upscale_shift > 0) the coords are
-		 * shifted up and the mul-add chains overflow 2^24, at which point the
-		 * < 0 / == 0 tests round - and round differently under FMA contraction
-		 * or x87-vs-SSE codegen, so off_u/off_v/may_be_2d (and the Wild Arms 2
-		 * vertex fixup) could diverge between netplay peers.  Compute the
-		 * derivatives exactly in int64 instead; the results feed only sign and
-		 * zero tests, so the old `* inv_area` scaling was a no-op for the
-		 * decisions (it cannot change a sign or a zero) and is dropped. */
+		/* Exact derivatives keep sign/zero tests deterministic when upscaled,
+		 * including the shared one-pixel vertex adjustment. */
 		int64_t abx = (int64_t)vertices[1].x - vertices[0].x;
 		int64_t aby = (int64_t)vertices[1].y - vertices[0].y;
 		int64_t bcx = (int64_t)vertices[2].x - vertices[1].x;
@@ -60,8 +73,7 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 		int64_t cax = (int64_t)vertices[0].x - vertices[2].x;
 		int64_t cay = (int64_t)vertices[0].y - vertices[2].y;
 
-		/* Compute static derivatives, just assume W is uniform across the primitive
-		 * and that the plane equation remains the same across the quad. */
+		/* Derivative numerators for the current triangle. */
 		int64_t dudx = -aby * vertices[2].u - bcy * vertices[0].u - cay * vertices[1].u;
 		int64_t dvdx = -aby * vertices[2].v - bcy * vertices[0].v - cay * vertices[1].v;
 		int64_t dudy = +abx * vertices[2].u + bcx * vertices[0].u + cax * vertices[1].u;
@@ -74,11 +86,34 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 		/* Leverage PGXP to further avoid 3D polygons that just happen to align this way after projection */
 		bool is3D = ((vertices[0].precise[2] != vertices[1].precise[2]) || (vertices[1].precise[2] != vertices[2].precise[2]));
 
+		bool first_valid = false;
+		bool second_valid = false;
+		if (hardware_command)
+		{
+			const tri_vertex *first = gpu->InQuad_F3Vertices;
+			int64_t first_area = 0;
+			first_valid = !(gpu->killQuadPart & 1) &&
+				TriangleFits(first, gpu->upscale_shift);
+			if (first_valid)
+				first_area = ((int64_t)first[1].x - first[0].x) *
+					((int64_t)first[2].y - first[0].y) - ((int64_t)first[2].x - first[0].x) *
+					((int64_t)first[1].y - first[0].y);
+			first_valid = first_valid && first_area != 0;
+			second_valid = !(gpu->killQuadPart & 2) && area != 0 &&
+				TriangleFits(vertices, gpu->upscale_shift);
+			hardware_quad = first_valid && second_valid && texArea != 0;
+			if (hardware_quad)
+			{
+				/* Recompute complete-quad corrections from retained vertices. */
+				off_u = off_v = 0;
+				may_be_2d = false;
+			}
+		}
+
 		/* Shouldn't matter as degenerate primitives will be culled anyways. */
 		if ((area != 0) && (texArea != 0) && !is3D)
 		{
-			/* Sign of (deriv / inv_area) equals (sign of deriv) XOR (sign
-			 * of area); zero-ness is unchanged since inv_area is non-zero. */
+			/* Derivative sign is numerator sign XOR area sign; zero stays zero. */
 			bool neg_area  = area < 0;
 			bool neg_dudx  = (dudx < 0) != neg_area;
 			bool neg_dudy  = (dudy < 0) != neg_area;
@@ -89,22 +124,17 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 			bool zero_dvdx = dvdx == 0;
 			bool zero_dvdy = dvdy == 0;
 
-			/* Dumb heuristic to check if a polygon may be 2D */
-			may_be_2d = may_be_2d || zero_dudy || zero_dudx || zero_dvdy || zero_dvdx;
+			/* Use complete-quad geometry when available, otherwise the legacy heuristic. */
+			if (hardware_quad)
+				may_be_2d = IsAxisAlignedQuad(&gpu->InQuad_F3Vertices[0], vertices, is3D) &&
+					((zero_dudy && zero_dvdx) || (zero_dudx && zero_dvdy));
+			else
+				may_be_2d = may_be_2d || zero_dudy || zero_dudx || zero_dvdy || zero_dvdx;
 
-			/* If we have negative dU or dV in any direction, increment the U or V to work properly with nearest-neighbor in this impl.
-			 * If we don't have 1:1 pixel correspondence, this creates a slight "shift" in the sprite, but we guarantee that we don't sample garbage at least.
-			 * Overall, this is kinda hacky because there can be legitimate, rare cases where 3D meshes hit this scenario, and a single texel offset can pop in, but
-			 * this is way better than having borked 2D overall.
-			 * TODO: Try to figure out if this can be generalized.
-			 *
-			 * TODO: If perf becomes an issue, we can probably SIMD the 8 comparisons above,
-			 * create an 8-bit code, and use a LUT to get the offsets.
-			 * Case 1: U is decreasing in X, but no change in Y.
-			 * Case 2: U is decreasing in Y, but no change in X.
-			 * Case 3: V is decreasing in X, but no change in Y.
-			 * Case 4: V is decreasing in Y, but no change in X. */
-			if (rhi_intf_is_type() != RHI_VULKAN || psx_gpu_upscale_shift_hw)
+			/* Correct flipped sprite-like UVs. Complete hardware quads must pass
+			 * the geometry check; other primitives retain the legacy flip policy. */
+			if ((!hardware_quad || may_be_2d) &&
+				(renderer != RHI_VULKAN || psx_gpu_upscale_shift_hw))
 			{
 				if (neg_dudx && zero_dudy)
 					off_u = 1;
@@ -143,6 +173,19 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 							vertices[0].v = vertices[2].v - 1;
 					}
 				}
+			}
+		}
+		if (hardware_command && !hardware_quad && (first_valid || second_valid))
+		{
+			/* Preserve 2D fallbacks; collapsed UVs need the saved first mapping,
+			 * which may already include one-pixel vertex adjustments. */
+			bool sprite_geometry = first_valid && second_valid ?
+				IsAxisAlignedQuad(&gpu->InQuad_F3Vertices[0], vertices, is3D) :
+				IsAxisAlignedTriangle(first_valid ? gpu->InQuad_F3Vertices : vertices);
+			if (!sprite_geometry)
+			{
+				off_u = off_v = 0;
+				may_be_2d = false;
 			}
 		}
 	}

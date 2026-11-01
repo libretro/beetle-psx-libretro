@@ -1,5 +1,6 @@
 #include <math.h>
 #include "beetle_psx_globals.h"
+#include "gpu_uv_phase.h"
 
 /* PGXP precise colour plumbing to the hardware renderers.
  *
@@ -53,10 +54,7 @@ static INLINE const float *gpu_precise_quad_rgb(const tri_vertex *first,
  * definition in gpu.c provides storage. */
 static const int8_t dither_table[4][4];
 
-#define COORD_FBS 12
 #define PCT_UV_BLOCK 64
-#define COORD_MF_INT(n) ((n) << COORD_FBS)
-#define COORD_POST_PADDING 12
 
 struct i_group
 {
@@ -106,6 +104,8 @@ struct i_deltas
     * fragment shader does via clamp_coord(vUV) against vTexLimits -
     * keeps these edge pixels at the closest valid texel. */
    float min_u, max_u, min_v, max_v;
+   /* Seed bias of the perspective-correct U/V, in texels. */
+   float pct_bias;
 };
 typedef struct i_deltas i_deltas;
 
@@ -162,7 +162,7 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
  */
 #define CALCIS(x,y) (((B->x - A->x) * (C->y - B->y)) - ((C->x - B->x) * (B->y - A->y)))
 #define DEFINE_CalcIDeltas(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
-static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, const tri_vertex *B, const tri_vertex *C) \
+static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, const tri_vertex *B, const tri_vertex *C, unsigned upscale_shift) \
 { \
    int32_t denom = CALCIS(x, y); \
    if (!denom) \
@@ -178,10 +178,10 @@ static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, cons
    } \
    if (TEXTURED_LIT) \
    { \
-      idl->du_dx = (uint32_t)(CALCIS(u, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->du_dy = (uint32_t)(CALCIS(x, u) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dv_dx = (uint32_t)(CALCIS(v, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dv_dy = (uint32_t)(CALCIS(x, v) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->du_dx = gpu_uv_delta(CALCIS(u, y), denom, upscale_shift); \
+      idl->du_dy = gpu_uv_delta(CALCIS(x, u), denom, upscale_shift); \
+      idl->dv_dx = gpu_uv_delta(CALCIS(v, y), denom, upscale_shift); \
+      idl->dv_dy = gpu_uv_delta(CALCIS(x, v), denom, upscale_shift); \
    } \
    return true; \
 }
@@ -955,12 +955,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
           *     correct 0 (clamp(.,0,max) + +0.5 bias = 0..max+0.5, \
           *     int cast = 0..max, AND = same; for negative inputs \
           *     pre-clamp, the clamp brings them to 0 anyway). \
-          * The +bias matches the affine seed's `+(1 << (COORD_FBS \
-          * - 1 - upscale_shift))`: half a native texel added \
-          * before the integer truncation, i.e. round-to-nearest \
-          * sampling.  The HW backends get this implicitly via \
-          * primitive.frag's `int(vUV)` after the GPU's pixel- \
-          * center interpolation. */ \
+          * The bias matches the affine seed (gpu_uv_seed). */ \
          if (pct) \
          { \
             /* Pull the perspective-correct UV from the SIMD-precomputed \
@@ -977,7 +972,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
             { \
                int remain = (int)w; \
                int blk    = (remain < PCT_UV_BLOCK) ? remain : PCT_UV_BLOCK; \
-               float bias = 0.5f / (float)(1 << gpu->upscale_shift); \
+               float bias = idl->pct_bias; \
                PCT_UVBatch(blk, bias, &ig.pct_inv_w, &ig.pct_u_over_w, \
                      &ig.pct_v_over_w, idl->d_inv_w_dx, idl->d_u_over_w_dx, \
                      idl->d_v_over_w_dx, idl->min_u, idl->max_u, \
@@ -1164,7 +1159,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    /* 0-height, abort out. */ \
    if (vertices[0].y == vertices[2].y) \
       return; \
-   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2])) \
+   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2], gpu->upscale_shift)) \
       return; \
    /* Perspective-correct UV deltas - only when the caller said this \
     * primitive is eligible (textured + PGXP-on + texture-correction \
@@ -1180,19 +1175,11 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    /* [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex. */ \
    if (TEXTURED_LIT) \
    { \
-      ig.u = (COORD_MF_INT(vertices[core_vertex].u) + (1 << (COORD_FBS - 1 - gpu->upscale_shift))) << COORD_POST_PADDING; \
-      ig.v = (COORD_MF_INT(vertices[core_vertex].v) + (1 << (COORD_FBS - 1 - gpu->upscale_shift))) << COORD_POST_PADDING; \
-      if (gpu->upscale_shift > 0) \
-      { \
-         /* Bias the texture coordinates so that it rounds to the */ \
-         /* correct value when the game is mapping a 2D sprite using */ \
-         /* triangles.  Otherwise this could cause a small "shift" in */ \
-         /* the texture coordinates when upscaling. */ \
-         if (gpu->off_u) \
-            ig.u += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING; \
-         if (gpu->off_v) \
-            ig.v += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING; \
-      } \
+      ig.u = gpu_uv_seed(vertices[core_vertex].u, gpu->upscale_shift, \
+            gpu->may_be_2d, gpu->off_u != 0); \
+      ig.v = gpu_uv_seed(vertices[core_vertex].v, gpu->upscale_shift, \
+            gpu->may_be_2d, gpu->off_v != 0); \
+      idl.pct_bias = gpu_uv_pct_bias(gpu->upscale_shift, gpu->may_be_2d); \
       if (pct_local) \
       { \
          /* Seed the perspective interpolants at the core vertex (origin \
@@ -1605,12 +1592,31 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          } \
          vertices[v].precise[2] = 1.f; \
       } \
-   /* Copy before Calc_UVOffsets which modifies vertices */ \
-   /* Calc_UVOffsets likes to see unadjusted vertices */ \
+   /* Retain vertices before applying UV adjustments. */ \
    if (NV_LIT == 4 && gpu->InCmd != INCMD_QUAD) \
       memcpy(&gpu->InQuad_F3Vertices[1], &vertices[1], sizeof(tri_vertex) * 2); \
-   /* Calculated UV offsets (needed for hardware renderers and software with scaling) */ \
-   /* Do one time updates for primitive */ \
+   /* Classify the quad using the same fallback coordinates sent to the RHI. */ \
+   if (NV_LIT == 4 && gpu->InCmd == INCMD_QUAD) \
+   { \
+      if (invalidW) \
+      { \
+         if (PGXP_LIT && psx_pgxp_2d_tol >= 0) \
+         { \
+            float tol = (float)((unsigned)psx_pgxp_2d_tol << gpu->upscale_shift); \
+            if ( \
+               fabsf(gpu->InQuad_F3Vertices[0].precise[0] - (float)gpu->InQuad_F3Vertices[0].x) > tol || \
+               fabsf(gpu->InQuad_F3Vertices[0].precise[1] - (float)gpu->InQuad_F3Vertices[0].y) > tol \
+            ) \
+            { \
+               gpu->InQuad_F3Vertices[0].precise[0] = gpu->InQuad_F3Vertices[0].x; \
+               gpu->InQuad_F3Vertices[0].precise[1] = gpu->InQuad_F3Vertices[0].y; \
+            } \
+         } \
+         /* Apply the unit-depth fallback to the retained first vertex too. */ \
+         gpu->InQuad_F3Vertices[0].precise[2] = 1.f; \
+      } \
+   } \
+   /* Calculate UV corrections and one-pixel vertex adjustments. */ \
    if (TEXTURED_LIT) \
       Calc_UVOffsets_Adjust_Verts(gpu, vertices, NV_LIT); \
    if (NV_LIT == 4) \
@@ -1618,23 +1624,6 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       if (gpu->InCmd == INCMD_QUAD) \
       { \
          gpu->InCmd = INCMD_NONE; \
-         if (invalidW) \
-         { \
-            if (PGXP_LIT && psx_pgxp_2d_tol >= 0) \
-            { \
-               float tol = (float)((unsigned)psx_pgxp_2d_tol << gpu->upscale_shift); \
-               if ( \
-                  fabsf(gpu->InQuad_F3Vertices[0].precise[0] - (float)gpu->InQuad_F3Vertices[0].x) > tol || \
-                  fabsf(gpu->InQuad_F3Vertices[0].precise[1] - (float)gpu->InQuad_F3Vertices[0].y) > tol \
-               ) \
-               { \
-                  gpu->InQuad_F3Vertices[0].precise[0] = gpu->InQuad_F3Vertices[0].x; \
-                  gpu->InQuad_F3Vertices[0].precise[1] = gpu->InQuad_F3Vertices[0].y; \
-               } \
-            } \
-            /* default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay) */ \
-            gpu->InQuad_F3Vertices[0].precise[2] = 1.f; \
-         } \
       } \
       else \
       { \
@@ -1775,7 +1764,8 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                POLYGON_DITHER_ENABLED(gpu, TEXTURED_LIT, TM_LIT, GOURAUD_LIT), \
                (BM_VAL), \
                (ME_LIT), \
-               gpu->MaskSetOR != 0); \
+               gpu->MaskSetOR != 0, \
+               gpu->may_be_2d); \
             if (gpu->killQuadPart == 2) \
             { \
                gpu->killQuadPart = 0; \

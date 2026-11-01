@@ -1722,10 +1722,12 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
          if(timestamp < gte_ts_done)
           timestamp = gte_ts_done;
 
-	 WriteMemory_u32(&timestamp, address, GTE_ReadDR(rt), false);
-
+	 /* PGXP's value goes with the word: the GPU reads it from the
+	  * port as the word is written */
 	 if (PGXP_GetModes() & PGXP_MODE_GTE)
             PGXP_GTE_SWC2(instr, GTE_ReadDR(rt), address);
+
+	 WriteMemory_u32(&timestamp, address, GTE_ReadDR(rt), false);
 	}
 	DO_LDS();
     END_OPF;
@@ -2671,10 +2673,14 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 	 new_PC = CPU_Exception(EXCEPTION_ADES, PC, new_PC, instr);
 	}
 	else
-	 WriteMemory_u32(&timestamp, address, GPR[rt], false);
-
-	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
+	{
+	 /* PGXP's value goes with the word: the GPU reads it from the
+	  * port as the word is written */
+	 if (PGXP_GetModes() & PGXP_MODE_MEMORY)
 		PGXP_CPU_SW(instr, GPR[rt], address);
+
+	 WriteMemory_u32(&timestamp, address, GPR[rt], false);
+	}
 
 	DO_LDS();
     END_OPF;
@@ -3243,8 +3249,8 @@ static void pgxp_hw_write_word(struct lightrec_state *state,
 {
 	int32_t timestamp = lightrec_current_cycle_count(state);
 
-	PSX_MemWrite32(timestamp, mem, val);
-
+	/* PGXP's value goes with the word: the GPU reads it from the
+	 * port as the word is written */
 	switch (opcode >> 26){
 		case OP_SWL:
 			PGXP_CPU_SWL(opcode, val, mem + (opcode & 0x3));
@@ -3261,6 +3267,8 @@ static void pgxp_hw_write_word(struct lightrec_state *state,
 		default:
 			break;
 	}
+
+	PSX_MemWrite32(timestamp, mem, val);
 
 	reset_target_cycle_count(state, timestamp);
 }

@@ -198,6 +198,9 @@ struct PS_GPU
 
    uint32_t HorizStart;
    uint32_t HorizEnd;
+   /* The overscan crop window for the frame being scanned out, latched
+    * at its first visible line (rhi_common_crop_window) */
+   uint32_t crop_window;
 
    uint32_t VertStart;
    uint32_t VertEnd;
@@ -330,6 +333,7 @@ uint8_t GPU_get_upscale_shift(void);
 /* Lines spanned by the programmed vertical display range (GP1(07)),
  * before any scanline cropping and before interlace doubling. */
 uint32_t GPU_get_vertical_range_lines(void);
+uint32_t GPU_get_crop_window(void);
 
 bool GPU_get_display_possibly_dirty(void);
 
@@ -357,7 +361,12 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V);
 uint32_t GPU_Read(const int32_t timestamp, uint32_t A);
 
 void GPU_StartFrame(EmulateSpecStruct *espec_arg);
-void GPU_FlushDeferredScanout(void);
+/* Whether the deferred 480i scanout fills rows [0, lines) at one line
+ * width, *dmw: the whole picture. */
+bool GPU_DeferredScanoutWhole(int32_t lines, int32_t *dmw);
+/* Scans the deferred records out into target (a frontend buffer cut to
+ * the picture, by its x0 and w) or, NULL, into the core's surface. */
+void GPU_FlushDeferredScanout(MDFN_Surface *target);
 
 /* Resets the per-dest_line cache that lets the SW renderer skip
  * re-zeroing margin pixels each frame when geometry is unchanged.
