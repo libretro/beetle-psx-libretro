@@ -996,20 +996,12 @@ struct gl_output_vertex {
 typedef struct gl_output_vertex gl_output_vertex;
 
 
-struct gl_image_load_vertex {
-   /* Vertex position in VRAM */
-   uint16_t position[2];
-};
-typedef struct gl_image_load_vertex gl_image_load_vertex;
-
-
 /* Forward declarations for vertex-attribute accessor functions.
  * The arrays and bodies live further down (after push_primitive)
  * but gl_renderer_new calls them when constructing each
  * gl_draw_buffer, well before that point. */
 static const struct gl_attribute *gl_command_vertex_attributes(size_t *count);
 static const struct gl_attribute *gl_output_vertex_attributes(size_t *count);
-static const struct gl_attribute *gl_image_load_vertex_attributes(size_t *count);
 
 struct gl_display_rect
 {
@@ -1156,7 +1148,7 @@ struct gl_draw_buffer
    gl_program *program;
    /* Currently mapped buffer range (write-only).  void* because
     * the actual element type is one of gl_command_vertex /
-    * gl_output_vertex / gl_image_load_vertex; element_size below tells
+    * gl_output_vertex; element_size below tells
     * us the stride. */
    void *map;
    /* sizeof(vertex_type), stored at construction */
@@ -1205,8 +1197,16 @@ struct gl_renderer {
    gl_draw_buffer *command_buffer;
    /* Buffer used to draw to the frontend's framebuffer */
    gl_draw_buffer *output_buffer;
-   /* Buffer used to copy textures from 'fb_texture' to 'fb_out' */
-   gl_draw_buffer *image_load_buffer;
+   /* Draws a VRAM rect from a texture into the bound framebuffer: CPU
+    * uploads into fb_out, resolves back into fb_texture. */
+   gl_program *image_load_program;
+   GLint image_load_loc[5];
+   /* The command program's per-flush and per-batch uniforms (GL_CMD_LOC_*),
+    * resolved when the program is built. */
+   GLint cmd_loc[12];
+   /* Unit quad that rect programs place with their "rect" uniform. */
+   GLuint quad_vao;
+   GLuint quad_vbo;
 
    GLushort vertex_indices[INDEX_BUFFER_LEN];
    /* GPU buffer for vertex_indices (required for core profile), a ring
@@ -1237,8 +1237,6 @@ struct gl_renderer {
     * source, the program drawing it back and its unit quad. */
    gl_texture copy_snapshot;
    gl_program *copy_program;
-   GLuint copy_vao;
-   GLuint copy_vbo;
    GLint copy_loc[6];
    bool copy_failed;
    /* gl_framebuffer used as an output when running draw commands */
@@ -3415,14 +3413,38 @@ static gl_draw_buffer *gl_draw_buffer_build(const char *vertex_shader_src,
    return db;
 }
 
+enum
+{
+   GL_LOAD_LOC_RECT = 0,
+   GL_LOAD_LOC_FB_TEXTURE,
+   GL_LOAD_LOC_UPSCALING,
+   GL_LOAD_LOC_CONVERSION,
+   GL_LOAD_LOC_MASK_PASS
+};
+
+enum
+{
+   GL_CMD_LOC_OFFSET = 0,
+   GL_CMD_LOC_FEEDBACK_UPSCALING,
+   GL_CMD_LOC_SEMI,
+   GL_CMD_LOC_MASK,
+   GL_CMD_LOC_NATIVE,
+   GL_CMD_LOC_COLOR,
+   GL_CMD_LOC_HOT,
+   GL_CMD_LOC_HD_ENABLED,
+   GL_CMD_LOC_HD_VRAM_RECT,
+   GL_CMD_LOC_HD_TEXEL_RECT,
+   GL_CMD_LOC_FORCE_ZERO,
+   GL_CMD_LOC_FORCE_CEILING
+};
+
 /* Clamp through the same primitive coverage without reading a destination
  * texture. Keep alpha/mask and stencil unchanged, and restore blend state. */
 static void gl_renderer_ceiling_batch(gl_renderer *renderer,
       const struct gl_primitive_batch *batch, float ceiling,
       GLenum blend_src, GLenum blend_dst, GLenum blend_func)
 {
-   GLint uniform = gl_uniform_map_get(
-         &renderer->command_buffer->program->uniforms, "force_ceiling");
+   GLint uniform = renderer->cmd_loc[GL_CMD_LOC_FORCE_CEILING];
    glUniform1f(uniform, ceiling);
    glBlendEquationSeparate(GL_MIN, GL_FUNC_ADD);
    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
@@ -3504,23 +3526,19 @@ static void gl_renderer_draw(gl_renderer *renderer)
 
    if (renderer->command_buffer->program)
    {
-      const struct gl_uniform_map *uniforms =
-            &renderer->command_buffer->program->uniforms;
-      /* The linked command program is fixed for the whole submission.
-       * Resolve batch uniform locations once; every batch still writes its
-       * values, including after auxiliary ceiling/zero passes. */
-      semi_uniform = gl_uniform_map_get(uniforms, "draw_semi_transparent");
-      mask_uniform = gl_uniform_map_get(uniforms, "force_mask_bit");
-      native_uniform = gl_uniform_map_get(uniforms, "native_blend");
-      color_uniform = gl_uniform_map_get(uniforms, "color_blend");
-      hot_uniform = gl_uniform_map_get(uniforms, "hdr_hot");
+      /* Every batch still writes its values, including after auxiliary
+       * ceiling/zero passes. */
+      semi_uniform = renderer->cmd_loc[GL_CMD_LOC_SEMI];
+      mask_uniform = renderer->cmd_loc[GL_CMD_LOC_MASK];
+      native_uniform = renderer->cmd_loc[GL_CMD_LOC_NATIVE];
+      color_uniform = renderer->cmd_loc[GL_CMD_LOC_COLOR];
+      hot_uniform = renderer->cmd_loc[GL_CMD_LOC_HOT];
       glUseProgram(renderer->command_buffer->program->id);
-      glUniform2i(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "offset"), (GLint)x, (GLint)y);
+      glUniform2i(renderer->cmd_loc[GL_CMD_LOC_OFFSET], (GLint)x, (GLint)y);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, renderer->palette_texture.id);
-      glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
-               "feedback_upscaling"), renderer->fb_feedback_texture.id ?
-               renderer->internal_upscaling : 0);
+      glUniform1ui(renderer->cmd_loc[GL_CMD_LOC_FEEDBACK_UPSCALING],
+            renderer->fb_feedback_texture.id ? renderer->internal_upscaling : 0);
       glActiveTexture(GL_TEXTURE0);
    }
 
@@ -3672,8 +3690,7 @@ static void gl_renderer_draw(gl_renderer *renderer)
        * done with them). */
       {
          TTGpuImage *hd_owned = NULL;
-         const struct gl_uniform_map *um = renderer->command_buffer->program
-            ? &renderer->command_buffer->program->uniforms : NULL;
+         const bool um = renderer->command_buffer->program != NULL;
          bool have_hd = renderer->tracker && !hd_handle_is_none(&it->hd);
          if (have_hd)
          {
@@ -3685,17 +3702,17 @@ static void gl_renderer_draw(gl_renderer *renderer)
             glActiveTexture(GL_TEXTURE0);
             if (um)
             {
-               glUniform1ui(gl_uniform_map_get(um, "hd_enabled"), img ? 1u : 0u);
-               glUniform4i(gl_uniform_map_get(um, "hd_vram_rect"),
+               glUniform1ui(renderer->cmd_loc[GL_CMD_LOC_HD_ENABLED], img ? 1u : 0u);
+               glUniform4i(renderer->cmd_loc[GL_CMD_LOC_HD_VRAM_RECT],
                      hd.vram_rect.x, hd.vram_rect.y,
                      hd.vram_rect.width, hd.vram_rect.height);
-               glUniform4i(gl_uniform_map_get(um, "hd_texel_rect"),
+               glUniform4i(renderer->cmd_loc[GL_CMD_LOC_HD_TEXEL_RECT],
                      hd.texel_rect.x, hd.texel_rect.y,
                      hd.texel_rect.width, hd.texel_rect.height);
             }
          }
          else if (um)
-            glUniform1ui(gl_uniform_map_get(um, "hd_enabled"), 0u);
+            glUniform1ui(renderer->cmd_loc[GL_CMD_LOC_HD_ENABLED], 0u);
 
       /* Drawing */
       if (!gl_draw_buffer_is_empty(renderer->command_buffer))
@@ -3773,14 +3790,14 @@ static void gl_renderer_draw(gl_renderer *renderer)
              it->transparency_mode == SEMI_TRANSPARENCY_MODE_SUBTRACT_SOURCE &&
              renderer->command_buffer->program)
          {
-            glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_zero"), 1u);
+            glUniform1ui(renderer->cmd_loc[GL_CMD_LOC_FORCE_ZERO], 1u);
             glBlendEquationSeparate(GL_MAX, GL_FUNC_ADD);
             glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
             glStencilMask(0);
             glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
                            GL_INDEX_OFFSET(renderer, it->first));
             glStencilMask(1);
-            glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_zero"), 0u);
+            glUniform1ui(renderer->cmd_loc[GL_CMD_LOC_FORCE_ZERO], 0u);
          }
       }
 
@@ -3807,38 +3824,108 @@ static void gl_renderer_draw(gl_renderer *renderer)
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 }
 
+
+static void gl_command_locate(gl_renderer *renderer)
+{
+   static const char *const names[12] = {
+      "offset", "feedback_upscaling", "draw_semi_transparent",
+      "force_mask_bit", "native_blend", "color_blend", "hdr_hot",
+      "hd_enabled", "hd_vram_rect", "hd_texel_rect", "force_zero",
+      "force_ceiling"
+   };
+   unsigned i;
+   for (i = 0; i < 12; i++)
+      renderer->cmd_loc[i] = renderer->command_buffer->program
+         ? gl_uniform_map_get(&renderer->command_buffer->program->uniforms, names[i])
+         : -1;
+}
+
+/* Compiles and links a program; NULL on failure. */
+static gl_program *gl_program_build(const char *vs_src, const char *fs_src)
+{
+   gl_shader vs, fs;
+   gl_program *program = (gl_program *)calloc(1, sizeof(*program));
+   bool vs_ok, fs_ok, ok = false;
+
+   memset(&vs, 0, sizeof(vs));
+   memset(&fs, 0, sizeof(fs));
+   vs_ok = program && gl_shader_init(&vs, vs_src, GL_VERTEX_SHADER);
+   fs_ok = vs_ok && gl_shader_init(&fs, fs_src, GL_FRAGMENT_SHADER);
+   if (fs_ok)
+      ok = gl_program_init(program, &vs, &fs);
+   if (vs_ok)
+      glDeleteShader(vs.id);
+   if (fs_ok)
+      glDeleteShader(fs.id);
+   free(vs.info_log);
+   free(fs.info_log);
+   if (!ok)
+   {
+      free(program);
+      return NULL;
+   }
+   return program;
+}
+
+static void gl_image_load_locate(gl_renderer *renderer)
+{
+   const struct gl_uniform_map *u = &renderer->image_load_program->uniforms;
+   renderer->image_load_loc[GL_LOAD_LOC_RECT]       = gl_uniform_map_get(u, "rect");
+   renderer->image_load_loc[GL_LOAD_LOC_FB_TEXTURE] = gl_uniform_map_get(u, "fb_texture");
+   renderer->image_load_loc[GL_LOAD_LOC_UPSCALING]  = gl_uniform_map_get(u, "internal_upscaling");
+   renderer->image_load_loc[GL_LOAD_LOC_CONVERSION] = gl_uniform_map_get(u, "color_conversion");
+   renderer->image_load_loc[GL_LOAD_LOC_MASK_PASS]  = gl_uniform_map_get(u, "mask_pass");
+}
+
+/* The unit quad, at attribute 0 of every rect program. */
+static void gl_quad_init(gl_renderer *renderer)
+{
+   static const GLfloat corners[8] = { 0, 0, 1, 0, 0, 1, 1, 1 };
+   glGenVertexArrays(1, &renderer->quad_vao);
+   glGenBuffers(1, &renderer->quad_vbo);
+   glBindVertexArray(renderer->quad_vao);
+   glBindBuffer(GL_ARRAY_BUFFER, renderer->quad_vbo);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STATIC_DRAW);
+   glEnableVertexAttribArray(0);
+   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+   glBindVertexArray(0);
+}
+
+/* Draws the VRAM rect (x0,y0)-(x1,y1) with the bound rect program. */
+static void gl_draw_rect(gl_renderer *renderer, GLint rect,
+      unsigned x0, unsigned y0, unsigned x1, unsigned y1)
+{
+   glBindVertexArray(renderer->quad_vao);
+   glUniform4f(rect, (GLfloat)x0, (GLfloat)y0, (GLfloat)x1, (GLfloat)y1);
+   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
 /* Color alpha is the VRAM mask bit; stencil is only its draw-test mirror.
  * Upload both together, including reset/restore and format changes. The
  * color-copy pass clears stencil only over the uploaded rectangle. A second,
  * stencil-only pass sets protected pixels from alpha, without discarding
  * pixels during color conversion or scanning the upload on the CPU. */
 static void gl_renderer_upload_color_and_stencil(gl_renderer *renderer,
-      const gl_image_load_vertex *slice)
+      unsigned x0, unsigned y0, unsigned x1, unsigned y1)
 {
-   gl_draw_buffer *buffer = renderer->image_load_buffer;
-   const struct gl_uniform_map *uniforms;
+   const GLint *loc = renderer->image_load_loc;
    GLboolean depth;
 
-   if (!buffer || !buffer->program)
-      return;
-   uniforms = &buffer->program->uniforms;
    depth = glIsEnabled(GL_DEPTH_TEST);
    glDisable(GL_DEPTH_TEST);
    glEnable(GL_STENCIL_TEST);
    glStencilMask(1);
    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
    glStencilFunc(GL_ALWAYS, 0, 1);
-   glUseProgram(buffer->program->id);
-   glUniform1ui(gl_uniform_map_get(uniforms, "mask_pass"), 0);
-   if (!gl_draw_buffer_is_empty(buffer))
-      gl_draw_buffer_draw(buffer, GL_TRIANGLE_STRIP);
+   glUseProgram(renderer->image_load_program->id);
+   glUniform1ui(loc[GL_LOAD_LOC_MASK_PASS], 0);
+   gl_draw_rect(renderer, loc[GL_LOAD_LOC_RECT], x0, y0, x1, y1);
 
    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
    glStencilFunc(GL_ALWAYS, 1, 1);
-   glUniform1ui(gl_uniform_map_get(uniforms, "mask_pass"), 1);
-   gl_draw_buffer_push_slice(buffer, slice, 4, sizeof(gl_image_load_vertex));
-   gl_draw_buffer_draw(buffer, GL_TRIANGLE_STRIP);
-   glUniform1ui(gl_uniform_map_get(uniforms, "mask_pass"), 0);
+   glUniform1ui(loc[GL_LOAD_LOC_MASK_PASS], 1);
+   gl_draw_rect(renderer, loc[GL_LOAD_LOC_RECT], x0, y0, x1, y1);
+   glUniform1ui(loc[GL_LOAD_LOC_MASK_PASS], 0);
    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
    glDisable(GL_STENCIL_TEST);
    if (depth)
@@ -3864,7 +3951,6 @@ static void gl_renderer_upload_textures(
    uint16_t x_end;
    uint16_t y_start;
    uint16_t y_end;
-   gl_image_load_vertex slice[4];
 
    if (!renderer)
       return;
@@ -3897,36 +3983,12 @@ static void gl_renderer_upload_textures(
     * A readback used for conversion is derived from the same GPU writes;
     * preserve their origin so later texture feedback keeps its word rules.
     * New renderer flags start clear. GP0 uploads mark CPU origin separately
-    * in rhi_gl_load_image. */
-
-   {
-      gl_image_load_vertex init[4] =
-      {
-         {   {x_start,   y_start }   },
-         {   {x_end,     y_start }   },
-         {   {x_start,   y_end   }   },
-         {   {x_end,     y_end   }   }
-      };
-      memcpy(slice, init, sizeof(slice));
-   }
-
-   if (renderer->image_load_buffer)
-   {
-      gl_draw_buffer_push_slice(renderer->image_load_buffer, &slice, 4,
-            sizeof(gl_image_load_vertex));
-
-      if (renderer->image_load_buffer->program)
-      {
-         /* fb_texture is always at 1x */
-         glUseProgram(renderer->image_load_buffer->program->id);
-         glUniform1i(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "fb_texture"), 0);
-         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), 1);
-         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms,
-                  "color_conversion"), gl_upload_color_conversion(renderer));
-
-         glUseProgram(renderer->command_buffer->program->id);
-      }
-   }
+    * in rhi_gl_load_image. fb_texture is always at 1x. */
+   glUseProgram(renderer->image_load_program->id);
+   glUniform1i(renderer->image_load_loc[GL_LOAD_LOC_FB_TEXTURE], 0);
+   glUniform1ui(renderer->image_load_loc[GL_LOAD_LOC_UPSCALING], 1);
+   glUniform1ui(renderer->image_load_loc[GL_LOAD_LOC_CONVERSION],
+         gl_upload_color_conversion(renderer));
 
    glDisable(GL_SCISSOR_TEST);
    glDisable(GL_BLEND);
@@ -3934,7 +3996,7 @@ static void gl_renderer_upload_textures(
    /* Bind the output framebuffer */
    gl_framebuffer_bind(renderer->fb_out_fbo, &renderer->fb_out);
 
-   gl_renderer_upload_color_and_stencil(renderer, slice);
+   gl_renderer_upload_color_and_stencil(renderer, x_start, y_start, x_end, y_end);
 
    glEnable(GL_SCISSOR_TEST);
 
@@ -4143,12 +4205,10 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    {
       size_t cmd_n_attrs;
       size_t out_n_attrs;
-      size_t img_n_attrs;
       const gl_attribute *cmd_attrs = gl_command_vertex_attributes(&cmd_n_attrs);
       const gl_attribute *out_attrs = gl_output_vertex_attributes(&out_n_attrs);
-      const gl_attribute *img_attrs = gl_image_load_vertex_attributes(&img_n_attrs);
       gl_draw_buffer *output_buffer;
-      gl_draw_buffer *image_load_buffer;
+      gl_program *image_load_program;
 
       switch(renderer->filter_type)
       {
@@ -4207,21 +4267,17 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
          free(out_src);
       }
 
-      image_load_buffer =
-         gl_draw_buffer_build(
-               image_load_vertex,
-               image_load_fragment,
-               4,
-               sizeof(gl_image_load_vertex), img_attrs, img_n_attrs);
+      image_load_program = gl_program_build(image_load_vertex,
+            image_load_fragment);
 
       /* If any of the three failed, free the others to avoid
        * leaking GL/heap resources, and refuse the renderer. */
-      if (!command_buffer || !output_buffer || !image_load_buffer)
+      if (!command_buffer || !output_buffer || !image_load_program)
       {
          log_cb(RETRO_LOG_ERROR,
                "[gl_renderer_new] gl_draw_buffer_build failed: cmd=%p out=%p img=%p\n",
                (void *)command_buffer, (void *)output_buffer,
-               (void *)image_load_buffer);
+               (void *)image_load_program);
          if (command_buffer)
          {
             gl_draw_buffer_free(command_buffer);
@@ -4232,10 +4288,10 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
             gl_draw_buffer_free(output_buffer);
             free(output_buffer);
          }
-         if (image_load_buffer)
+         if (image_load_program)
          {
-            gl_draw_buffer_free(image_load_buffer);
-            free(image_load_buffer);
+            gl_program_free(image_load_program);
+            free(image_load_program);
          }
          return false;
       }
@@ -4243,8 +4299,11 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
       /* Transfer ownership before texture allocation can fail. The context
        * reset caller releases all acquired resources on a failed creation. */
       renderer->command_buffer    = command_buffer;
+      gl_command_locate(renderer);
       renderer->output_buffer     = output_buffer;
-      renderer->image_load_buffer = image_load_buffer;
+      renderer->image_load_program = image_load_program;
+      gl_image_load_locate(renderer);
+      gl_quad_init(renderer);
    }
 
    native_width  = (uint32_t) VRAM_WIDTH_PIXELS;
@@ -4343,7 +4402,7 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
    renderer->command_draw_mode = GL_TRIANGLES;
    renderer->semi_transparency_mode =  SEMI_TRANSPARENCY_MODE_AVERAGE;
-   /* output_buffer and image_load_buffer were assigned to
+   /* output_buffer and image_load_program were assigned to
     * renderer above inside the gl_draw_buffer_build block. */
    renderer->config = config;
    renderer->frontend_resolution[0] = 0;
@@ -5707,12 +5766,17 @@ static void gl_renderer_free(gl_renderer *renderer)
    }
    renderer->output_buffer = NULL;
 
-   if (renderer->image_load_buffer)
+   if (renderer->image_load_program)
    {
-      gl_draw_buffer_free(renderer->image_load_buffer);
-      free(renderer->image_load_buffer);
+      gl_program_free(renderer->image_load_program);
+      free(renderer->image_load_program);
    }
-   renderer->image_load_buffer = NULL;
+   renderer->image_load_program = NULL;
+   if (renderer->quad_vao)
+      glDeleteVertexArrays(1, &renderer->quad_vao);
+   if (renderer->quad_vbo)
+      glDeleteBuffers(1, &renderer->quad_vbo);
+   renderer->quad_vao = renderer->quad_vbo = 0;
 
    /* Release the dynamic batch list backing storage.  C++ used
     * to do this implicitly via std::vector's destructor; in C we
@@ -6808,9 +6872,6 @@ static const struct gl_attribute gl_output_vertex_attribs[] = {
    { "fb_coord", offsetof(gl_output_vertex, fb_coord), GL_UNSIGNED_SHORT, 2 }
 };
 
-static const struct gl_attribute gl_image_load_vertex_attribs[] = {
-   { "position", offsetof(gl_image_load_vertex, position), GL_UNSIGNED_SHORT, 2 }
-};
 
 static const struct gl_attribute *gl_command_vertex_attributes(size_t *count)
 {
@@ -6824,11 +6885,6 @@ static const struct gl_attribute *gl_output_vertex_attributes(size_t *count)
    return gl_output_vertex_attribs;
 }
 
-static const struct gl_attribute *gl_image_load_vertex_attributes(size_t *count)
-{
-   *count = sizeof(gl_image_load_vertex_attribs) / sizeof(gl_image_load_vertex_attribs[0]);
-   return gl_image_load_vertex_attribs;
-}
 
 static void cleanup_gl_state(void)
 {
@@ -7963,26 +8019,9 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    if (renderer->vram_sync.frame_rect[2] && renderer->vram_sync.frame_rect[3])
    {
       uint16_t *rect = renderer->vram_sync.frame_rect;
-      GLfloat x0 = rect[0], y0 = rect[1];
-      GLfloat x1 = rect[0] + rect[2], y1 = rect[1] + rect[3];
-      gl_image_load_vertex slice[4] =
-      {
-         { {x0, y0} }, { {x1, y0} }, { {x0, y1} }, { {x1, y1} },
-      };
+      const GLint *loc = renderer->image_load_loc;
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
-
-      if (renderer->image_load_buffer)
-      {
-         gl_draw_buffer_push_slice(renderer->image_load_buffer, &slice, 4,
-               sizeof(gl_image_load_vertex));
-
-         if (renderer->image_load_buffer->program)
-         {
-            glUseProgram(renderer->image_load_buffer->program->id);
-            glUniform1i(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "fb_texture"), 1);
-         }
-      }
 
       /* GL_SCISSOR_TEST and GL_BLEND were disabled at the top of
        * the finalize block (a few hundred lines up) for the
@@ -7992,19 +8031,14 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
 
       gl_framebuffer_bind(renderer->fb_texture_fbo, &renderer->fb_texture);
 
-      if (renderer->image_load_buffer->program)
-      {
-         glUseProgram(renderer->image_load_buffer->program->id);
-         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), renderer->internal_upscaling);
-         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms,
-                  "color_conversion"), gl_native_mirror_conversion(renderer));
-      }
-
-      if (!gl_draw_buffer_is_empty(renderer->image_load_buffer))
-      {
-         gl_draw_buffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
-         gl_vram_sync_clear(renderer);
-      }
+      glUseProgram(renderer->image_load_program->id);
+      glUniform1i(loc[GL_LOAD_LOC_FB_TEXTURE], 1);
+      glUniform1ui(loc[GL_LOAD_LOC_UPSCALING], renderer->internal_upscaling);
+      glUniform1ui(loc[GL_LOAD_LOC_CONVERSION],
+            gl_native_mirror_conversion(renderer));
+      gl_draw_rect(renderer, loc[GL_LOAD_LOC_RECT], rect[0], rect[1],
+            rect[0] + rect[2], rect[1] + rect[3]);
+      gl_vram_sync_clear(renderer);
 
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
@@ -8119,6 +8153,14 @@ void rhi_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
       rhi_defer_push_set_draw_area(&gl_defer_queue, x0, y0, x1, y1);
       return;
    }
+
+   /* GP0(E3h) and (E4h) each send the whole area, and games resend it
+    * unchanged: only a change ends the batch. */
+   if (renderer->config.draw_area_top_left[0] == x0 &&
+       renderer->config.draw_area_top_left[1] == y0 &&
+       renderer->config.draw_area_bot_right[0] == x1 + 1 &&
+       renderer->config.draw_area_bot_right[1] == y1 + 1)
+      return;
 
    /* Finish drawing anything in the current area */
    if (!gl_draw_buffer_is_empty(renderer->command_buffer))
@@ -8781,7 +8823,6 @@ void rhi_gl_load_image(
    uint16_t x_end;
    uint16_t y_start;
    uint16_t y_end;
-   gl_image_load_vertex slice[4];
    GLboolean scissor_was_enabled;
 
    if (static_renderer.state == GL_STATE_INVALID)
@@ -8884,32 +8925,12 @@ void rhi_gl_load_image(
    y_start    = top_left[1];
    y_end      = y_start + dimensions[1];
 
-   {
-      gl_image_load_vertex init[4] =
-      {
-         {   {x_start,   y_start }   },
-         {   {x_end,     y_start }   },
-         {   {x_start,   y_end   }   },
-         {   {x_end,     y_end   }   }
-      };
-      memcpy(slice, init, sizeof(slice));
-   }
-
-   if (renderer->image_load_buffer)
-   {
-      gl_draw_buffer_push_slice(renderer->image_load_buffer, slice, 4,
-            sizeof(gl_image_load_vertex));
-
-      if (renderer->image_load_buffer->program)
-      {
-         glUseProgram(renderer->image_load_buffer->program->id);
-         glUniform1i(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "fb_texture"), 0);
-         /* fb_texture is always at 1x */
-         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), 1);
-         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms,
-                  "color_conversion"), gl_upload_color_conversion(renderer));
-      }
-   }
+   /* fb_texture is always at 1x */
+   glUseProgram(renderer->image_load_program->id);
+   glUniform1i(renderer->image_load_loc[GL_LOAD_LOC_FB_TEXTURE], 0);
+   glUniform1ui(renderer->image_load_loc[GL_LOAD_LOC_UPSCALING], 1);
+   glUniform1ui(renderer->image_load_loc[GL_LOAD_LOC_CONVERSION],
+         gl_upload_color_conversion(renderer));
 
    /* Save and restore rather than unconditionally re-enabling: this
     * entry point is also reachable outside a prepare_frame /
@@ -8929,7 +8950,7 @@ void rhi_gl_load_image(
    /* Bind the output framebuffer */
    gl_framebuffer_bind(renderer->fb_out_fbo, &renderer->fb_out);
 
-   gl_renderer_upload_color_and_stencil(renderer, slice);
+   gl_renderer_upload_color_and_stencil(renderer, x_start, y_start, x_end, y_end);
 
    if (scissor_was_enabled)
       glEnable(GL_SCISSOR_TEST);
@@ -9472,13 +9493,9 @@ static bool gl_resolve_color_rect(gl_renderer *renderer, gl_texture *dst,
    GLint program, vao, array_buffer, active_texture, texture;
    GLint viewport[4];
    GLboolean scissor, blend, depth, stencil;
-   gl_image_load_vertex slice[4];
-   gl_draw_buffer *buffer = renderer->image_load_buffer;
-   const struct gl_uniform_map *uniforms;
-   if (!buffer || !buffer->program || !buffer->map)
+   const GLint *loc = renderer->image_load_loc;
+   if (!renderer->image_load_program)
       return false;
-   assert(gl_draw_buffer_is_empty(buffer));
-   uniforms = &buffer->program->uniforms;
    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &array_buffer);
@@ -9499,18 +9516,12 @@ static bool gl_resolve_color_rect(gl_renderer *renderer, gl_texture *dst,
          GL_TEXTURE_2D, dst->id, 0);
    glViewport(0, 0, dst->width, dst->height);
    glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
-   glUseProgram(buffer->program->id);
-   glUniform1i(gl_uniform_map_get(uniforms, "fb_texture"), 0);
-   glUniform1ui(gl_uniform_map_get(uniforms, "internal_upscaling"),
-         renderer->internal_upscaling);
-   glUniform1ui(gl_uniform_map_get(uniforms, "color_conversion"),
+   glUseProgram(renderer->image_load_program->id);
+   glUniform1i(loc[GL_LOAD_LOC_FB_TEXTURE], 0);
+   glUniform1ui(loc[GL_LOAD_LOC_UPSCALING], renderer->internal_upscaling);
+   glUniform1ui(loc[GL_LOAD_LOC_CONVERSION],
          gl_native_mirror_conversion(renderer));
-   slice[0].position[0] = x;     slice[0].position[1] = y;
-   slice[1].position[0] = x + w; slice[1].position[1] = y;
-   slice[2].position[0] = x;     slice[2].position[1] = y + h;
-   slice[3].position[0] = x + w; slice[3].position[1] = y + h;
-   gl_draw_buffer_push_slice(buffer, slice, 4, sizeof(gl_image_load_vertex));
-   gl_draw_buffer_draw(buffer, GL_TRIANGLE_STRIP);
+   gl_draw_rect(renderer, loc[GL_LOAD_LOC_RECT], x, y, x + w, y + h);
    glBindTexture(GL_TEXTURE_2D, (GLuint)texture);
    glActiveTexture((GLenum)active_texture);
    /* Same framebuffer exit state as the blit path in gl_blit_fb_out. */
@@ -9972,52 +9983,25 @@ static void gl_copy_free(gl_renderer *renderer)
       free(renderer->copy_program);
       renderer->copy_program = NULL;
    }
-   if (renderer->copy_vao)
-      glDeleteVertexArrays(1, &renderer->copy_vao);
-   if (renderer->copy_vbo)
-      glDeleteBuffers(1, &renderer->copy_vbo);
    if (renderer->copy_snapshot.id)
       glDeleteTextures(1, &renderer->copy_snapshot.id);
-   renderer->copy_vao = renderer->copy_vbo = 0;
    memset(&renderer->copy_snapshot, 0, sizeof(renderer->copy_snapshot));
    renderer->copy_failed = false;
 }
 
 static bool gl_copy_init(gl_renderer *renderer)
 {
-   static const GLfloat corners[8] = { 0, 0, 1, 0, 0, 1, 1, 1 };
-   gl_shader vs, fs;
    gl_program *program;
    const struct gl_uniform_map *u;
-   bool vs_ok, fs_ok, ok = false;
-   GLint corner = -1;
 
    if (renderer->copy_program)
       return true;
    if (renderer->copy_failed)
       return false;
 
-   memset(&vs, 0, sizeof(vs));
-   memset(&fs, 0, sizeof(fs));
-   program = (gl_program *)calloc(1, sizeof(*program));
-   vs_ok   = program && gl_shader_init(&vs, vram_copy_vertex, GL_VERTEX_SHADER);
-   fs_ok   = vs_ok && gl_shader_init(&fs, vram_copy_fragment, GL_FRAGMENT_SHADER);
-   if (fs_ok && gl_program_init(program, &vs, &fs))
+   program = gl_program_build(vram_copy_vertex, vram_copy_fragment);
+   if (!program)
    {
-      corner = glGetAttribLocation(program->id, "corner");
-      ok     = corner >= 0;
-      if (!ok)
-         gl_program_free(program);
-   }
-   if (vs_ok)
-      glDeleteShader(vs.id);
-   if (fs_ok)
-      glDeleteShader(fs.id);
-   free(vs.info_log);
-   free(fs.info_log);
-   if (!ok)
-   {
-      free(program);
       renderer->copy_failed = true;
       log_cb(RETRO_LOG_WARN, "[GL] VRAM copy program unavailable; "
             "overlapping, wrapping and masked copies are approximate\n");
@@ -10032,15 +10016,6 @@ static bool gl_copy_init(gl_renderer *renderer)
    renderer->copy_loc[GL_COPY_LOC_SET_MASK]  = gl_uniform_map_get(u, "set_mask");
    renderer->copy_loc[GL_COPY_LOC_SNAPSHOT]  = gl_uniform_map_get(u, "snapshot");
    renderer->copy_program = program;
-
-   glGenVertexArrays(1, &renderer->copy_vao);
-   glGenBuffers(1, &renderer->copy_vbo);
-   glBindVertexArray(renderer->copy_vao);
-   glBindBuffer(GL_ARRAY_BUFFER, renderer->copy_vbo);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STATIC_DRAW);
-   glEnableVertexAttribArray((GLuint)corner);
-   glVertexAttribPointer((GLuint)corner, 2, GL_FLOAT, GL_FALSE, 0, NULL);
-   glBindVertexArray(0);
    return true;
 }
 
@@ -10080,12 +10055,8 @@ static void gl_copy_draw(gl_renderer *renderer,
 {
    unsigned i;
    for (i = 0; i < n; i++)
-   {
-      glUniform4f(renderer->copy_loc[GL_COPY_LOC_RECT],
-            (GLfloat)p[i].x, (GLfloat)p[i].y,
-            (GLfloat)(p[i].x + p[i].w), (GLfloat)(p[i].y + p[i].h));
-      glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-   }
+      gl_draw_rect(renderer, renderer->copy_loc[GL_COPY_LOC_RECT],
+            p[i].x, p[i].y, p[i].x + p[i].w, p[i].y + p[i].h);
 }
 
 /* One step: every pixel of the step reads VRAM as it was before the step,
@@ -10194,7 +10165,6 @@ static bool gl_copy_ordered(gl_renderer *renderer,
    glActiveTexture(GL_TEXTURE0 + GL_COPY_UNIT);
    glBindTexture(GL_TEXTURE_2D, renderer->copy_snapshot.id);
    glUseProgram(renderer->copy_program->id);
-   glBindVertexArray(renderer->copy_vao);
    glUniform1i(renderer->copy_loc[GL_COPY_LOC_SNAPSHOT], GL_COPY_UNIT);
    glUniform2i(renderer->copy_loc[GL_COPY_LOC_PERIOD],
          (GLint)(VRAM_WIDTH_PIXELS * s), (GLint)(VRAM_HEIGHT * s));

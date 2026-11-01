@@ -116,6 +116,17 @@ void glTexSubImage2D(GLenum target, GLint level, GLint x, GLint y,
  * GL 1.1 entry points come in through the PLT and are defined here; the
  * rest through get_proc_address, which hands out these wrappers. */
 static unsigned long gl_respec, gl_respec_half, gl_creates, gl_creates_half;
+/* Buffer maps without GL_MAP_UNSYNCHRONIZED_BIT: each may wait for the
+ * GPU, or make the driver rename the buffer. */
+static unsigned long gl_sync_maps, gl_sync_maps_half;
+typedef void *(*mapbufrange_t)(GLenum, GLintptr, GLsizeiptr, GLbitfield);
+static mapbufrange_t real_map_buffer_range;
+static void *count_map_buffer_range(GLenum t, GLintptr o, GLsizeiptr n, GLbitfield f)
+{
+   if (!(f & GL_MAP_UNSYNCHRONIZED_BIT))
+      gl_sync_maps++;
+   return real_map_buffer_range(t, o, n, f);
+}
 typedef void (*bufdata_t)(GLenum, GLsizeiptr, const void *, GLenum);
 typedef void (*gen_t)(GLsizei, GLuint *);
 static bufdata_t real_buffer_data;
@@ -157,6 +168,8 @@ static retro_proc_address_t get_proc_address(const char *sym)
          return f;
       if (!strcmp(sym, "glBufferData"))
       { real_buffer_data = (bufdata_t)f; return (retro_proc_address_t)count_buffer_data; }
+      if (!strcmp(sym, "glMapBufferRange"))
+      { real_map_buffer_range = (mapbufrange_t)f; return (retro_proc_address_t)count_map_buffer_range; }
       if (!strcmp(sym, "glGenBuffers"))
       { real_gen_buffers = (gen_t)f; return (retro_proc_address_t)count_gen_buffers; }
       if (!strcmp(sym, "glGenFramebuffers"))
@@ -688,6 +701,7 @@ int main(int argc, char **argv)
         {
            upload_texels_half = upload_texels;
            gl_respec_half     = gl_respec;
+           gl_sync_maps_half  = gl_sync_maps;
            gl_creates_half    = gl_creates;
         }
         if (preempt && (i < 5 || (i % 50) == 0))
@@ -786,6 +800,8 @@ int main(int argc, char **argv)
    fprintf(stderr, "[glhost] steady state: %lu buffer re-specifications, %lu GL objects created"
            " in the second half of the run\n",
            gl_respec - gl_respec_half, gl_creates - gl_creates_half);
+   fprintf(stderr, "[glhost] steady state: %lu synchronized buffer maps in the second half of the run\n",
+           gl_sync_maps - gl_sync_maps_half);
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
 

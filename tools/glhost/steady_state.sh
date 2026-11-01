@@ -5,7 +5,10 @@
 # run. Indices go through a ring that only re-specifies when it wraps, and
 # the Display Transform's uniform buffer only when its contents change, so
 # every display path must stay at (nearly) zero: per-flush or per-draw
-# re-specification shows up as hundreds.
+# re-specification shows up as hundreds. Buffer maps that may wait for the
+# GPU (no GL_MAP_UNSYNCHRONIZED_BIT) are held to one per frame: only the
+# command vertex ring's wrap takes one, and a per-draw map shows up as
+# thousands.
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/glhost/steady_state.sh [core.so]
@@ -36,6 +39,12 @@ while IFS='|' read -r name preempt vars; do
    printf '%-10s %s buffer re-specifications, %s objects created in the last %d frames\n' \
       "$name" "${r:-?}" "${o:-?}" $((FRAMES / 2))
    if [ -z "$r" ] || [ -z "$o" ] || [ "$r" -gt "$LIMIT" ] || [ "$o" -gt "$LIMIT" ]; then
+      fail=1
+   fi
+   m=$(sed -n 's/.*steady state: \([0-9]*\) synchronized buffer maps.*/\1/p' "$OUT/$name.log")
+   printf '%-10s %s synchronized buffer maps in the last %d frames\n' \
+      "$name" "${m:-?}" $((FRAMES / 2))
+   if [ -z "$m" ] || [ "$m" -gt $((FRAMES / 2)) ]; then
       fail=1
    fi
 done <<LANES

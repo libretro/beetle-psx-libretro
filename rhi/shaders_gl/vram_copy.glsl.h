@@ -1,10 +1,10 @@
 #include "shaders_common.h"
 
 /* GP0(80h) VRAM-to-VRAM copy: draws one destination piece of a copy step
- * from the step's snapshot. The quad is the unit square placed on the
+ * from the step's snapshot. The renderer's unit quad is placed on the
  * piece's VRAM rect. */
 static const char *vram_copy_vertex = GLSL_VERTEX(
-      in vec2 corner;
+      layout(location = 0) in vec2 corner;
       uniform vec4 rect;
 
       void main() {
