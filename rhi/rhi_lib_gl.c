@@ -233,6 +233,7 @@ static void gl_diag_errors(const char *site)
 #include "shaders_gl/hdr_splice.h"
 #include "shaders_gl/image_load_vertex.glsl.h"
 #include "shaders_gl/image_load_fragment.glsl.h"
+#include "shaders_gl/vram_copy.glsl.h"
 #include "shaders_gl/hdr_transform.glsl.h"
 #include "hdr_transform.h"
 
@@ -1232,6 +1233,14 @@ struct gl_renderer {
    /* Resolution-matched copy for scaled framebuffer feedback. */
    gl_texture fb_feedback_texture;
    bool fb_feedback_texture_failed;
+   /* GP0(80h) copies drawn in the hardware's order: one copy step's
+    * source, the program drawing it back and its unit quad. */
+   gl_texture copy_snapshot;
+   gl_program *copy_program;
+   GLuint copy_vao;
+   GLuint copy_vbo;
+   GLint copy_loc[6];
+   bool copy_failed;
    /* gl_framebuffer used as an output when running draw commands */
    gl_texture fb_out;
    /* Exact internal format selected when fb_out was allocated. */
@@ -1405,6 +1414,9 @@ static bool gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
       uint16_t x, uint16_t y, uint16_t w, uint16_t h,
       bool allow_with_software_fb);
 static bool gl_ensure_fb_feedback_texture(gl_renderer *renderer);
+#ifdef GL_READ_FRAMEBUFFER
+static void gl_copy_free(gl_renderer *renderer);
+#endif
 static bool gl_snapshot_fb_out(gl_renderer *renderer,
       unsigned x, unsigned y, unsigned w, unsigned h);
 #endif
@@ -5750,6 +5762,10 @@ static void gl_renderer_free(gl_renderer *renderer)
    renderer->fb_feedback_texture.height = 0;
    renderer->fb_feedback_texture_failed = false;
 
+#ifdef GL_READ_FRAMEBUFFER
+   gl_copy_free(renderer);
+#endif
+
    glDeleteTextures(1, &renderer->blend_texture.id);
    memset(&renderer->blend_texture, 0, sizeof(renderer->blend_texture));
    glDeleteTextures(1, &renderer->fb_out.id);
@@ -9899,23 +9915,328 @@ void rhi_gl_fill_rect(
    gl_vram_sync_update_gpu_written_rect(renderer, x, y, w, h, true);
 }
 
+#ifdef GL_READ_FRAMEBUFFER
+enum
+{
+   GL_COPY_LOC_RECT = 0,
+   GL_COPY_LOC_ORIGIN,
+   GL_COPY_LOC_PERIOD,
+   GL_COPY_LOC_MASK_PASS,
+   GL_COPY_LOC_SET_MASK,
+   GL_COPY_LOC_SNAPSHOT
+};
+
+/* Unit the copy snapshot is sampled from; no other program uses it. */
+#define GL_COPY_UNIT 5
+
+struct gl_copy_piece
+{
+   unsigned x, y, w, h;
+   /* Offset of the piece within its rect. */
+   unsigned ox, oy;
+};
+
+/* Splits a rect at the VRAM edges into up to four pieces inside VRAM. */
+static unsigned gl_copy_split(unsigned x, unsigned y, unsigned w, unsigned h,
+      struct gl_copy_piece *out)
+{
+   unsigned ws[2], hs[2];
+   unsigned n = 0, xi, yi;
+
+   x %= VRAM_WIDTH_PIXELS;
+   y %= VRAM_HEIGHT;
+   ws[0] = w < VRAM_WIDTH_PIXELS - x ? w : VRAM_WIDTH_PIXELS - x;
+   ws[1] = w - ws[0];
+   hs[0] = h < VRAM_HEIGHT - y ? h : VRAM_HEIGHT - y;
+   hs[1] = h - hs[0];
+   for (yi = 0; yi < 2; yi++)
+      for (xi = 0; xi < 2; xi++)
+         if (ws[xi] && hs[yi])
+         {
+            out[n].x  = xi ? 0 : x;
+            out[n].y  = yi ? 0 : y;
+            out[n].w  = ws[xi];
+            out[n].h  = hs[yi];
+            out[n].ox = xi ? ws[0] : 0;
+            out[n].oy = yi ? hs[0] : 0;
+            n++;
+         }
+   return n;
+}
+
+static void gl_copy_free(gl_renderer *renderer)
+{
+   if (renderer->copy_program)
+   {
+      gl_program_free(renderer->copy_program);
+      free(renderer->copy_program);
+      renderer->copy_program = NULL;
+   }
+   if (renderer->copy_vao)
+      glDeleteVertexArrays(1, &renderer->copy_vao);
+   if (renderer->copy_vbo)
+      glDeleteBuffers(1, &renderer->copy_vbo);
+   if (renderer->copy_snapshot.id)
+      glDeleteTextures(1, &renderer->copy_snapshot.id);
+   renderer->copy_vao = renderer->copy_vbo = 0;
+   memset(&renderer->copy_snapshot, 0, sizeof(renderer->copy_snapshot));
+   renderer->copy_failed = false;
+}
+
+static bool gl_copy_init(gl_renderer *renderer)
+{
+   static const GLfloat corners[8] = { 0, 0, 1, 0, 0, 1, 1, 1 };
+   gl_shader vs, fs;
+   gl_program *program;
+   const struct gl_uniform_map *u;
+   bool vs_ok, fs_ok, ok = false;
+   GLint corner = -1;
+
+   if (renderer->copy_program)
+      return true;
+   if (renderer->copy_failed)
+      return false;
+
+   memset(&vs, 0, sizeof(vs));
+   memset(&fs, 0, sizeof(fs));
+   program = (gl_program *)calloc(1, sizeof(*program));
+   vs_ok   = program && gl_shader_init(&vs, vram_copy_vertex, GL_VERTEX_SHADER);
+   fs_ok   = vs_ok && gl_shader_init(&fs, vram_copy_fragment, GL_FRAGMENT_SHADER);
+   if (fs_ok && gl_program_init(program, &vs, &fs))
+   {
+      corner = glGetAttribLocation(program->id, "corner");
+      ok     = corner >= 0;
+      if (!ok)
+         gl_program_free(program);
+   }
+   if (vs_ok)
+      glDeleteShader(vs.id);
+   if (fs_ok)
+      glDeleteShader(fs.id);
+   free(vs.info_log);
+   free(fs.info_log);
+   if (!ok)
+   {
+      free(program);
+      renderer->copy_failed = true;
+      log_cb(RETRO_LOG_WARN, "[GL] VRAM copy program unavailable; "
+            "overlapping, wrapping and masked copies are approximate\n");
+      return false;
+   }
+
+   u = &program->uniforms;
+   renderer->copy_loc[GL_COPY_LOC_RECT]      = gl_uniform_map_get(u, "rect");
+   renderer->copy_loc[GL_COPY_LOC_ORIGIN]    = gl_uniform_map_get(u, "origin");
+   renderer->copy_loc[GL_COPY_LOC_PERIOD]    = gl_uniform_map_get(u, "period");
+   renderer->copy_loc[GL_COPY_LOC_MASK_PASS] = gl_uniform_map_get(u, "mask_pass");
+   renderer->copy_loc[GL_COPY_LOC_SET_MASK]  = gl_uniform_map_get(u, "set_mask");
+   renderer->copy_loc[GL_COPY_LOC_SNAPSHOT]  = gl_uniform_map_get(u, "snapshot");
+   renderer->copy_program = program;
+
+   glGenVertexArrays(1, &renderer->copy_vao);
+   glGenBuffers(1, &renderer->copy_vbo);
+   glBindVertexArray(renderer->copy_vao);
+   glBindBuffer(GL_ARRAY_BUFFER, renderer->copy_vbo);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STATIC_DRAW);
+   glEnableVertexAttribArray((GLuint)corner);
+   glVertexAttribPointer((GLuint)corner, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+   glBindVertexArray(0);
+   return true;
+}
+
+/* The snapshot follows fb_out's format and grows to the largest step. */
+static bool gl_copy_snapshot_ensure(gl_renderer *renderer,
+      unsigned w, unsigned h)
+{
+   gl_texture *t = &renderer->copy_snapshot;
+   bool ok;
+
+   if (t->id && t->internal_format == renderer->fb_out_internal_format &&
+       t->width >= w && t->height >= h)
+      return true;
+   if (t->id && t->internal_format == renderer->fb_out_internal_format)
+   {
+      if (t->width > w)
+         w = t->width;
+      if (t->height > h)
+         h = t->height;
+   }
+   if (t->id)
+      glDeleteTextures(1, &t->id);
+   memset(t, 0, sizeof(*t));
+   glActiveTexture(GL_TEXTURE0 + GL_COPY_UNIT);
+   ok = gl_texture_init(t, w, h, renderer->fb_out_internal_format);
+   glActiveTexture(GL_TEXTURE0);
+   if (!ok && t->id)
+   {
+      glDeleteTextures(1, &t->id);
+      memset(t, 0, sizeof(*t));
+   }
+   return ok;
+}
+
+static void gl_copy_draw(gl_renderer *renderer,
+      const struct gl_copy_piece *p, unsigned n)
+{
+   unsigned i;
+   for (i = 0; i < n; i++)
+   {
+      glUniform4f(renderer->copy_loc[GL_COPY_LOC_RECT],
+            (GLfloat)p[i].x, (GLfloat)p[i].y,
+            (GLfloat)(p[i].x + p[i].w), (GLfloat)(p[i].y + p[i].h));
+      glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+   }
+}
+
+/* One step: every pixel of the step reads VRAM as it was before the step,
+ * so the source is snapshotted first. Color alpha is the mask bit; the
+ * stencil mirrors it for the mask test. */
+static void gl_copy_step(gl_renderer *renderer,
+      unsigned sx, unsigned sy, unsigned dx, unsigned dy,
+      unsigned w, unsigned h, bool mask_test)
+{
+   struct gl_copy_piece src[4];
+   struct gl_copy_piece dst[4];
+   unsigned s  = renderer->internal_upscaling;
+   unsigned ns = gl_copy_split(sx, sy, w, h, src);
+   unsigned nd = gl_copy_split(dx, dy, w, h, dst);
+   unsigned i;
+
+   if (!gl_caps.fp_glCopyImageSubData)
+   {
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, renderer->vram_sync_read_fbo);
+#ifdef HAVE_OPENGLES3
+      glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D, renderer->fb_out.id, 0);
+#else
+      glFramebufferTexture(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            renderer->fb_out.id, 0);
+#endif
+      glReadBuffer(GL_COLOR_ATTACHMENT0);
+   }
+   for (i = 0; i < ns; i++)
+   {
+      if (gl_caps.fp_glCopyImageSubData)
+         gl_caps.fp_glCopyImageSubData(
+               renderer->fb_out.id, GL_TEXTURE_2D, 0,
+               src[i].x * s, src[i].y * s, 0,
+               renderer->copy_snapshot.id, GL_TEXTURE_2D, 0,
+               src[i].ox * s, src[i].oy * s, 0,
+               src[i].w * s, src[i].h * s, 1);
+      else
+         glCopyTexSubImage2D(GL_TEXTURE_2D, 0,
+               src[i].ox * s, src[i].oy * s,
+               src[i].x * s, src[i].y * s,
+               src[i].w * s, src[i].h * s);
+   }
+   if (!gl_caps.fp_glCopyImageSubData)
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+   glUniform2i(renderer->copy_loc[GL_COPY_LOC_ORIGIN],
+         (GLint)((dx % VRAM_WIDTH_PIXELS) * s), (GLint)((dy % VRAM_HEIGHT) * s));
+
+   /* Color, where the mask test passes. */
+   glStencilMask(0);
+   glStencilFunc(mask_test ? GL_EQUAL : GL_ALWAYS, 0, 1);
+   glUniform1i(renderer->copy_loc[GL_COPY_LOC_MASK_PASS], 0);
+   gl_copy_draw(renderer, dst, nd);
+
+   /* Stencil from the written mask bit. Under the mask test a protected
+    * pixel already holds 1, and writing 1 again leaves it as it was. */
+   glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+   glStencilMask(1);
+   glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+   if (!mask_test)
+   {
+      glStencilFunc(GL_ALWAYS, 0, 1);
+      gl_copy_draw(renderer, dst, nd);
+   }
+   glStencilFunc(GL_ALWAYS, 1, 1);
+   glUniform1i(renderer->copy_loc[GL_COPY_LOC_MASK_PASS], 1);
+   gl_copy_draw(renderer, dst, nd);
+   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+}
+
+/* GP0(80h) in the hardware's order: rows top to bottom, each row in
+ * 128-pixel chunks read before written. Rows D = dy - sy apart (mod 512)
+ * depend on each other, so bands of D rows run in order; with D = 0 a row
+ * reads only itself and its chunks run in order. Returns false when the
+ * program or its snapshot is unavailable. */
+static bool gl_copy_ordered(gl_renderer *renderer,
+      unsigned sx, unsigned sy, unsigned dx, unsigned dy,
+      unsigned w, unsigned h, bool mask_test, bool set_mask)
+{
+   unsigned s     = renderer->internal_upscaling;
+   unsigned d     = (dy + VRAM_HEIGHT - sy) % VRAM_HEIGHT;
+   bool cols      = ((dx + VRAM_WIDTH_PIXELS - sx) % VRAM_WIDTH_PIXELS) < w ||
+                    ((sx + VRAM_WIDTH_PIXELS - dx) % VRAM_WIDTH_PIXELS) < w;
+   unsigned band  = h;
+   unsigned chunk = w;
+   unsigned i;
+   GLboolean scissor, depth;
+
+   if (cols && d != 0 && d < h)
+      band = d;
+   else if (cols && d == 0 && w > 128)
+      chunk = 128;
+
+   if (!gl_copy_init(renderer) ||
+       !gl_copy_snapshot_ensure(renderer, chunk * s, band * s))
+      return false;
+
+   scissor = glIsEnabled(GL_SCISSOR_TEST);
+   depth   = glIsEnabled(GL_DEPTH_TEST);
+   glDisable(GL_SCISSOR_TEST);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_BLEND);
+   glEnable(GL_STENCIL_TEST);
+   gl_framebuffer_bind(renderer->fb_out_fbo, &renderer->fb_out);
+   glActiveTexture(GL_TEXTURE0 + GL_COPY_UNIT);
+   glBindTexture(GL_TEXTURE_2D, renderer->copy_snapshot.id);
+   glUseProgram(renderer->copy_program->id);
+   glBindVertexArray(renderer->copy_vao);
+   glUniform1i(renderer->copy_loc[GL_COPY_LOC_SNAPSHOT], GL_COPY_UNIT);
+   glUniform2i(renderer->copy_loc[GL_COPY_LOC_PERIOD],
+         (GLint)(VRAM_WIDTH_PIXELS * s), (GLint)(VRAM_HEIGHT * s));
+   glUniform1i(renderer->copy_loc[GL_COPY_LOC_SET_MASK], set_mask ? 1 : 0);
+
+   if (band < h)
+      for (i = 0; i < h; i += band)
+         gl_copy_step(renderer, sx, sy + i, dx, dy + i, w,
+               h - i < band ? h - i : band, mask_test);
+   else
+      for (i = 0; i < w; i += chunk)
+         gl_copy_step(renderer, sx + i, sy, dx + i, dy,
+               w - i < chunk ? w - i : chunk, h, mask_test);
+
+   glBindTexture(GL_TEXTURE_2D, 0);
+   glActiveTexture(GL_TEXTURE0);
+   glBindVertexArray(0);
+   glDisable(GL_STENCIL_TEST);
+   if (depth)
+      glEnable(GL_DEPTH_TEST);
+   if (scissor)
+      glEnable(GL_SCISSOR_TEST);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   return true;
+}
+#endif /* GL_READ_FRAMEBUFFER */
+
 void rhi_gl_copy_rect(
       uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
       uint16_t w, uint16_t h,
-      bool mask_test, bool set_mask) /* TODO use mask for copy. See software renderer */
+      bool mask_test, bool set_mask)
 {
    gl_renderer *renderer;
-   uint16_t source_top_left[2];
-   uint16_t target_top_left[2];
-   uint16_t dimensions[2];
    uint32_t upscale;
-   GLint new_src_x;
-   GLint new_src_y;
-   GLint new_dst_x;
-   GLint new_dst_y;
-   GLsizei new_w;
-   GLsizei new_h;
+   bool inside;
+   bool apart;
+#ifdef GL_READ_FRAMEBUFFER
+   struct gl_copy_piece dst[4];
+   unsigned nd;
+   unsigned i;
+#endif
 
    if (static_renderer.state == GL_STATE_INVALID)
       return;
@@ -9924,7 +10245,11 @@ void rhi_gl_copy_rect(
    if (!renderer)
       return;
 
-   if (src_x == dst_x && src_y == dst_y)
+   src_x &= VRAM_WIDTH_PIXELS - 1;
+   src_y &= VRAM_HEIGHT - 1;
+   dst_x &= VRAM_WIDTH_PIXELS - 1;
+   dst_y &= VRAM_HEIGHT - 1;
+   if (!w || !h || (src_x == dst_x && src_y == dst_y))
      return;
 
    renderer->set_mask          = set_mask;
@@ -9938,13 +10263,6 @@ void rhi_gl_copy_rect(
       texture_tracker_blit(renderer->tracker, _dst, _src);
    }
 
-   source_top_left[0] = src_x;
-   source_top_left[1] = src_y;
-   target_top_left[0] = dst_x;
-   target_top_left[1] = dst_y;
-   dimensions[0]      = w;
-   dimensions[1]      = h;
-
    /* Draw pending commands */
    if (!gl_draw_buffer_is_empty(renderer->command_buffer))
       gl_renderer_draw(renderer);
@@ -9952,96 +10270,67 @@ void rhi_gl_copy_rect(
    gl_palette_cache_preserve(renderer, dst_x, dst_y, w, h);
 
    upscale = renderer->internal_upscaling;
+   inside  = (unsigned)src_x + w <= VRAM_WIDTH_PIXELS &&
+             (unsigned)dst_x + w <= VRAM_WIDTH_PIXELS &&
+             (unsigned)src_y + h <= VRAM_HEIGHT &&
+             (unsigned)dst_y + h <= VRAM_HEIGHT;
+   apart   = (unsigned)src_x + w <= dst_x || (unsigned)dst_x + w <= src_x ||
+             (unsigned)src_y + h <= dst_y || (unsigned)dst_y + h <= src_y;
 
-   new_src_x = (GLint) source_top_left[0] * (GLint) upscale;
-   new_src_y = (GLint) source_top_left[1] * (GLint) upscale;
-   new_dst_x = (GLint) target_top_left[0] * (GLint) upscale;
-   new_dst_y = (GLint) target_top_left[1] * (GLint) upscale;
-
-   new_w = (GLsizei) dimensions[0] * (GLsizei) upscale;
-   new_h = (GLsizei) dimensions[1] * (GLsizei) upscale;
-
-   /* === Choose the copy mechanism at runtime ===
-    *
-    * Preference order:
-    *
-    *   1. glCopyImageSubData (GL 4.3 / GLES 3.2 / GL_ARB_copy_image
-    *      / GL_OES_copy_image / GL_EXT_copy_image / GL_NV_copy_image).
-    *      Direct texture-to-texture, no framebuffer dance.  XXX it
-    *      gives undefined results if the source and target areas
-    *      overlap; this is not handled explicitly.
-    *
-    *   2. Portable fallback: bind fb_out to a transient FBO, use
-    *      glCopyTexSubImage2D from the read-bound FBO into the
-    *      same texture.  Works on every profile that has FBO
-    *      support (GL 3.0+, GLES 2.0+).  This is the path used
-    *      historically by the NEW_COPY_RECT codepath, kept here
-    *      as the universal fallback.  Known to cause screen
-    *      flickering on Dead or Alive / Tekken 3 (high-res
-    *      interlaced); investigate before relying on it for
-    *      serious work. */
-   if (gl_caps.fp_glCopyImageSubData)
+   /* A plain copy between disjoint rects inside VRAM is one direct copy of
+    * color and of the stencil mirroring its mask bit. Everything else is
+    * drawn in the hardware's order (glCopyImageSubData is undefined on
+    * overlap and cannot apply the mask bits). */
+   if (inside && apart && !mask_test && !set_mask &&
+       gl_caps.fp_glCopyImageSubData)
    {
       gl_caps.fp_glCopyImageSubData(
-            renderer->fb_out.id, GL_TEXTURE_2D, 0, new_src_x, new_src_y, 0,
-            renderer->fb_out.id, GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 0,
-            new_w, new_h, 1);
+            renderer->fb_out.id, GL_TEXTURE_2D, 0,
+            src_x * upscale, src_y * upscale, 0,
+            renderer->fb_out.id, GL_TEXTURE_2D, 0,
+            dst_x * upscale, dst_y * upscale, 0,
+            w * upscale, h * upscale, 1);
       gl_caps.fp_glCopyImageSubData(
-            renderer->fb_out_depth.id, GL_TEXTURE_2D, 0, new_src_x, new_src_y, 0,
-            renderer->fb_out_depth.id, GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 0,
-            new_w, new_h, 1);
+            renderer->fb_out_depth.id, GL_TEXTURE_2D, 0,
+            src_x * upscale, src_y * upscale, 0,
+            renderer->fb_out_depth.id, GL_TEXTURE_2D, 0,
+            dst_x * upscale, dst_y * upscale, 0,
+            w * upscale, h * upscale, 1);
    }
 #ifdef GL_READ_FRAMEBUFFER
-   else
+   else if (!gl_copy_ordered(renderer, src_x, src_y, dst_x, dst_y,
+            w, h, mask_test, set_mask) &&
+         inside && gl_caps.fp_glCopyImageSubData)
    {
-      GLuint fb;
-      glGenFramebuffers(1, &fb);
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
-
-      /* glFramebufferTexture (layered, GL 3.2+) is not present on
-       * GLES; use the 2D variant on GLES profiles. */
-#ifdef HAVE_OPENGLES3
-      glFramebufferTexture2D(GL_READ_FRAMEBUFFER,
-            GL_COLOR_ATTACHMENT0,
-            GL_TEXTURE_2D,
-            renderer->fb_out.id,
-            0);
-#else
-      glFramebufferTexture(GL_READ_FRAMEBUFFER,
-            GL_COLOR_ATTACHMENT0,
-            renderer->fb_out.id,
-            0);
-#endif
-
-      glReadBuffer(GL_COLOR_ATTACHMENT0);
-
-      /* TODO - binding the same texture to the framebuffer and
-       * GL_TEXTURE_2D may be undefined; consider using
-       * glReadPixels / glTexSubImage2D via a scratch buffer
-       * instead. */
-      glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
-      glCopyTexSubImage2D(GL_TEXTURE_2D, 0, new_dst_x, new_dst_y,
-            new_src_x, new_src_y, new_w, new_h);
-
-      glDeleteFramebuffers(1, &fb);
+      /* No program: the direct copy is the closest left. */
+      gl_caps.fp_glCopyImageSubData(
+            renderer->fb_out.id, GL_TEXTURE_2D, 0,
+            src_x * upscale, src_y * upscale, 0,
+            renderer->fb_out.id, GL_TEXTURE_2D, 0,
+            dst_x * upscale, dst_y * upscale, 0,
+            w * upscale, h * upscale, 1);
+      gl_caps.fp_glCopyImageSubData(
+            renderer->fb_out_depth.id, GL_TEXTURE_2D, 0,
+            src_x * upscale, src_y * upscale, 0,
+            renderer->fb_out_depth.id, GL_TEXTURE_2D, 0,
+            dst_x * upscale, dst_y * upscale, 0,
+            w * upscale, h * upscale, 1);
    }
-#endif /* GL_READ_FRAMEBUFFER */
 
-   /* Mirror the FBCopy result into fb_texture for same-frame
-    * sampling. See gl_mirror_fb_out_to_fb_texture for the full
-    * rationale - this used to be ~60 lines of inline FBO dance
-    * here, extracted so rhi_gl_fill_rect can share it. */
-#ifdef GL_READ_FRAMEBUFFER
-   (void)gl_mirror_fb_out_to_fb_texture(renderer, dst_x, dst_y, w, h, false);
-#endif
-
-#ifdef GL_READ_FRAMEBUFFER
-   if (gl_caps.fp_glBlitFramebuffer)
+   /* Mirror the result into fb_texture for same-frame sampling, piece by
+    * piece since the mirror does not wrap. */
+   nd = gl_copy_split(dst_x, dst_y, w, h, dst);
+   for (i = 0; i < nd; i++)
    {
-      if (has_software_fb)
-         gl_vram_sync_mark_rect(renderer, dst_x, dst_y, w, h);
-      else
-         gl_vram_sync_clean_rect(renderer, dst_x, dst_y, w, h);
+      (void)gl_mirror_fb_out_to_fb_texture(renderer,
+            dst[i].x, dst[i].y, dst[i].w, dst[i].h, false);
+      if (gl_caps.fp_glBlitFramebuffer)
+      {
+         if (has_software_fb)
+            gl_vram_sync_mark_rect(renderer, dst[i].x, dst[i].y, dst[i].w, dst[i].h);
+         else
+            gl_vram_sync_clean_rect(renderer, dst[i].x, dst[i].y, dst[i].w, dst[i].h);
+      }
    }
 #endif
    gl_vram_sync_update_gpu_written_rect(renderer, dst_x, dst_y, w, h, true);

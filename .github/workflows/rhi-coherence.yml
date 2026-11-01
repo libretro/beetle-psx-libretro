@@ -15,6 +15,9 @@ name: VRAM readback coherence
 # (tools/rhi_coherence/state_load_lanes.sh).
 # gl steady state: once warm, an OpenGL frame re-specifies no buffers and
 # creates no objects (tools/glhost/steady_state.sh).
+# vram copies: overlapping, wrapping and masked GP0(80h) copies over native
+# and rendered pixels, read back whole on both hardware renderers, must
+# equal a model of the hardware copy order (tools/glhost/copy_lanes.sh).
 
 on:
   push:
@@ -79,3 +82,5 @@ jobs:
         run: sh tools/rhi_coherence/state_load_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"
       - name: OpenGL steady state
         run: sh tools/glhost/steady_state.sh "$PWD/mednafen_psx_hw_libretro.so"
+      - name: VRAM copy lanes
+        run: sh tools/glhost/copy_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"

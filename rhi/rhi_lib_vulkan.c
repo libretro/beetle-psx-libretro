@@ -11519,7 +11519,12 @@ static void renderer_blit_vram(Renderer *self,
       texture_tracker_blit(self->tracker, *dst, *src);
    }
 
-   if (rect_intersects(dst, src))
+   /* Overlap modulo the VRAM size: a copy that wraps can read pixels it
+    * writes even when the unwrapped rects are apart. */
+   if ((((dst->x - src->x) & (FB_WIDTH - 1)) < dst->width ||
+        ((src->x - dst->x) & (FB_WIDTH - 1)) < dst->width) &&
+       (((dst->y - src->y) & (FB_HEIGHT - 1)) < dst->height ||
+        ((src->y - dst->y) & (FB_HEIGHT - 1)) < dst->height))
    {
       unsigned factor;
       /* The software implementation takes texture cache into account by copying
@@ -11535,10 +11540,12 @@ static void renderer_blit_vram(Renderer *self,
          uint32_t dst_offset[2];
          uint32_t extent[2];
          int32_t scaling;
+         uint32_t mask_or;
       };
       struct Push push = {
          { src->x, src->y }, { dst->x, dst->y }, { dst->width, dst->height }, (int)(factor),
       };
+      push.mask_or = self->render_state.force_mask_bit ? 0x8000u : 0u;
       commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 
       if (domain == Domain_Scaled)

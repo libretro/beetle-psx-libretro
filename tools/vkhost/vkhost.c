@@ -53,6 +53,8 @@
  *   "none".
  *   VKHOST_UPSCALER_STATS: read the transparency mask back every frame and
  *   append to the log line how much of it is set, in thousandths.
+ *   VKHOST_RAM_OUT: path:offset:length - after the last frame, write that
+ *   window of system RAM to path (content can copy VRAM there via GP0).
  *
  * Exits non-zero on any validation error, on any use the core makes of
  * the frontend's queue without holding lock_queue, and on any wait it
@@ -1522,6 +1524,29 @@ run_frames_sw:
            " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
            frames, frame_valid, validation_errors, validation_warnings,
            queue_violations, queue_waits_locked);
+   { const char *ro = getenv("VKHOST_RAM_OUT");
+     if (ro)
+     {
+        typedef void *(*mem_data_t)(unsigned);
+        typedef size_t (*mem_size_t)(unsigned);
+        char path[1024]; unsigned long off = 0, len = 0;
+        const char *c1 = strchr(ro, ':');
+        unsigned char *ram = (unsigned char *)((mem_data_t)dlsym(core,
+              "retro_get_memory_data"))(RETRO_MEMORY_SYSTEM_RAM);
+        size_t ram_size = ((mem_size_t)dlsym(core,
+              "retro_get_memory_size"))(RETRO_MEMORY_SYSTEM_RAM);
+        FILE *f;
+        if (!c1 || (size_t)(c1 - ro) >= sizeof(path) ||
+            sscanf(c1 + 1, "%lx:%lx", &off, &len) != 2 || !ram ||
+            off + len > ram_size)
+        { fprintf(stderr, "[vkhost] VKHOST_RAM_OUT invalid\n"); return 5; }
+        memcpy(path, ro, c1 - ro); path[c1 - ro] = 0;
+        f = fopen(path, "wb");
+        if (!f || fwrite(ram + off, 1, len, f) != len)
+        { fprintf(stderr, "[vkhost] VKHOST_RAM_OUT write failed\n"); return 5; }
+        fclose(f);
+     }
+   }
    { void (*f)(void) = dlsym(core, "retro_unload_game"); if (f) f(); }
    { void (*f)(void) = dlsym(core, "retro_deinit"); if (f) f(); }
    if (next_content && !(validation_errors || queue_violations || queue_waits_locked))

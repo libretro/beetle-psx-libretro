@@ -51,6 +51,8 @@ void main()
 		int sample_id = rects[gl_WorkGroupID.z].sample_id;
 		#if defined(MSAA)
 			vec4 value = texelFetch(uImageMS, ivec2(src_coord), sample_id);
+			if (rects[gl_WorkGroupID.z].mask_or != 0u)
+				value.a = 1.0;
 			#ifdef MASKED
 				float fbalpha = texelFetch(uImageMS, ivec2(dst_coord), sample_id).a;
 				if (fbalpha < 0.5)
@@ -60,6 +62,8 @@ void main()
 			#endif
 		#else
 			vec4 value = texelFetch(uImage, ivec2(src_coord), 0);
+			if (rects[gl_WorkGroupID.z].mask_or != 0u)
+				value.a = 1.0;
 			#ifdef MASKED
 				float fbalpha = texelFetch(uImage, ivec2(dst_coord), 0).a;
 				if (fbalpha < 0.5)
