@@ -342,6 +342,46 @@ static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateComputePipelines(VkDevice d,
       const VkAllocationCallbacks *a, VkPipeline *o)
 { count_pipelines(n); return real_create_compute_pipelines(d, c, n, i, a, o); }
 
+/* VKHOST_NONCOHERENT: report every host-visible memory type as
+ * non-coherent, so the core flushes and invalidates as on a GPU without
+ * coherent host memory, and count the bytes those calls cover. */
+static PFN_vkGetPhysicalDeviceMemoryProperties real_get_memory_properties;
+static PFN_vkInvalidateMappedMemoryRanges real_invalidate_ranges;
+static PFN_vkFlushMappedMemoryRanges real_flush_ranges;
+static unsigned long long invalidated_bytes, flushed_bytes;
+static unsigned long invalidate_calls, flush_calls;
+static VKAPI_ATTR void VKAPI_CALL core_vkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice gpu,
+      VkPhysicalDeviceMemoryProperties *props)
+{
+   uint32_t i;
+   real_get_memory_properties(gpu, props);
+   for (i = 0; i < props->memoryTypeCount; i++)
+      props->memoryTypes[i].propertyFlags &= ~VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+}
+static unsigned long long range_bytes(VkDevice device, uint32_t count, const VkMappedMemoryRange *r)
+{
+   unsigned long long n = 0;
+   uint32_t           i;
+   (void)device;
+   for (i = 0; i < count; i++)
+      n += (r[i].size == VK_WHOLE_SIZE) ? (1ull << 40) : r[i].size;
+   return n;
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkInvalidateMappedMemoryRanges(VkDevice device,
+      uint32_t count, const VkMappedMemoryRange *r)
+{
+   __atomic_add_fetch(&invalidated_bytes, range_bytes(device, count, r), __ATOMIC_SEQ_CST);
+   __atomic_add_fetch(&invalidate_calls, 1, __ATOMIC_SEQ_CST);
+   return real_invalidate_ranges(device, count, r);
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkFlushMappedMemoryRanges(VkDevice device,
+      uint32_t count, const VkMappedMemoryRange *r)
+{
+   __atomic_add_fetch(&flushed_bytes, range_bytes(device, count, r), __ATOMIC_SEQ_CST);
+   __atomic_add_fetch(&flush_calls, 1, __ATOMIC_SEQ_CST);
+   return real_flush_ranges(device, count, r);
+}
+
 static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction real)
 {
    if (!real)
@@ -370,6 +410,12 @@ static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction 
    { real_queue_wait_idle = (PFN_vkQueueWaitIdle)real; return (PFN_vkVoidFunction)core_vkQueueWaitIdle; }
    if (!strcmp(name, "vkDeviceWaitIdle"))
    { real_device_wait_idle = (PFN_vkDeviceWaitIdle)real; return (PFN_vkVoidFunction)core_vkDeviceWaitIdle; }
+   if (!strcmp(name, "vkGetPhysicalDeviceMemoryProperties") && getenv("VKHOST_NONCOHERENT"))
+   { real_get_memory_properties = (PFN_vkGetPhysicalDeviceMemoryProperties)real; return (PFN_vkVoidFunction)core_vkGetPhysicalDeviceMemoryProperties; }
+   if (!strcmp(name, "vkInvalidateMappedMemoryRanges"))
+   { real_invalidate_ranges = (PFN_vkInvalidateMappedMemoryRanges)real; return (PFN_vkVoidFunction)core_vkInvalidateMappedMemoryRanges; }
+   if (!strcmp(name, "vkFlushMappedMemoryRanges"))
+   { real_flush_ranges = (PFN_vkFlushMappedMemoryRanges)real; return (PFN_vkVoidFunction)core_vkFlushMappedMemoryRanges; }
    if (!strcmp(name, "vkWaitForFences"))
    { real_wait_for_fences = (PFN_vkWaitForFences)real; return (PFN_vkVoidFunction)core_vkWaitForFences; }
    return real;
@@ -1536,6 +1582,11 @@ run_frames_sw:
          __atomic_load_n(&pipelines_host, __ATOMIC_SEQ_CST),
          __atomic_load_n(&pipelines_host_running, __ATOMIC_SEQ_CST),
          __atomic_load_n(&pipelines_other, __ATOMIC_SEQ_CST));
+   fprintf(stderr, "[vkhost] host caches: %llu bytes invalidated in %lu calls, %llu bytes flushed in %lu calls\n",
+         __atomic_load_n(&invalidated_bytes, __ATOMIC_SEQ_CST),
+         __atomic_load_n(&invalidate_calls, __ATOMIC_SEQ_CST),
+         __atomic_load_n(&flushed_bytes, __ATOMIC_SEQ_CST),
+         __atomic_load_n(&flush_calls, __ATOMIC_SEQ_CST));
    fprintf(stderr, "[vkhost] longest frame after the first: %.2f ms (frame %d)\n",
          longest_frame_ms, longest_frame);
    if (up_on)

@@ -12,9 +12,14 @@ chunks, source and destination wrapping in x and in y, the mask test, the
 forced mask bit, both together, and an overlapping masked copy. Then it
 loops copying all of VRAM to RAM at 0x100000 through GP0(C0h), so the
 host's RAM dump shows VRAM as the content reads it.
-usage: gen_copy_exe.py out.exe [gp1loop]
-  gp1loop  the loop also sends the display start and mode again, unchanged,
-           as many games do every frame: the screen stays static"""
+usage: gen_copy_exe.py out.exe [gp1loop] [smallread]
+  gp1loop    the loop also sends the display start and mode again, unchanged,
+             as many games do every frame: the screen stays static
+  smallread  each pass of the loop draws a 16x16 quad at (100,100) and
+             uploads an 8x8 block at (140,104), both stepping with the
+             pass, then reads back only the 63x32 rect at (97,96) around
+             them to RAM at 0x100000; after pass 250 it stops, so the dump
+             holds pass 250 exactly. No quads or copies before the loop."""
 import struct, sys
 BASE = 0xA0010000
 DEST = 0xA0100000
@@ -86,6 +91,9 @@ QUADS = [
     (0, 0xC76737, 0, 256, 184, 288),    # the x wrap
     (0, 0x878787, 0, 0, 48, 24),        # copy 0 source
 ]
+small = 'smallread' in sys.argv[2:]
+if small:
+    QUADS = []      # the read rect holds the fill pattern and the passes
 for e6, rgb, x0, y0, x1, y1 in QUADS:
     # Vertex x is 11-bit signed: reach x 1024 through the draw offset.
     o = 512 if x1 > 1023 else 0
@@ -115,6 +123,8 @@ COPIES = [
     (0, 1010, 440, 20, 440, 40, 60),  # source wraps in x, rows below 512
     (1, 900, 260, 880, 262, 300, 20), # overlap, wraps in x, set mask
 ]
+if small:
+    COPIES = []
 for e6, sx, sy, dx, dy, w, h in COPIES:
     wait_ready()
     gp0(0xE6000000 | e6)
@@ -122,24 +132,48 @@ for e6, sx, sy, dx, dy, w, h in COPIES:
 wait_ready()
 gp0(0xE6000000)
 
+if 'smallread' in sys.argv[2:]:
+    emit(addiu(S0, ZERO, 0))                             # pass
 loop = here()
 if 'gp1loop' in sys.argv[2:]:
     gp1(0x05000000)                    # display start (0,0), unchanged
     gp1(0x08000001)                    # 320x240 NTSC, unchanged
+RX, RY, RW, RH = (97, 96, 63, 32) if small else (0, 0, 1024, 512)
+PASSES = 250
+if small:
+    # A quad whose colour (8q+7 channels, q the pass & 31) steps every
+    # pass keeps the rect rendered by the GPU since the last read, and an
+    # upload of the word pass | 0x4000 lands in it from the CPU.
+    emit(addiu(S0, S0, 1))
+    emit(andi(T4, S0, 31)); emit(sll(T4, T4, 3)); emit(ori(T4, T4, 7))
+    emit(sll(T5, T4, 8)); emit(or_(T4, T4, T5))
+    wait_ready()
+    li32(T0, 0x28000000); emit(or_(T0, T0, T4)); emit(sw(T0, S1, 0))
+    gp0(xy(100, 100)); gp0(xy(116, 100)); gp0(xy(100, 116)); gp0(xy(116, 116))
+    wait_ready()
+    gp0(0xA0000000); gp0(xy(140, 104)); gp0(xy(8, 8))
+    emit(ori(T4, S0, 0x4000)); emit(sll(T5, T4, 16)); emit(or_(T4, T4, T5))
+    for _ in range(32):
+        emit(sw(T4, S1, 0))
 wait_ready()
-gp0(0xC0000000); gp0(xy(0, 0)); gp0(xy(1024, 512))      # VRAM to CPU
+gp0(0xC0000000); gp0(xy(RX, RY)); gp0(xy(RW, RH))       # VRAM to CPU
 li32(T3, 0x08000000)                                     # GPUSTAT ready
 wait = here()
 emit(lw(T1, S1, 4)); emit(NOP)
 emit(and_(T1, T1, T3))
 emit(beq(T1, ZERO, (wait - here() - 4) >> 2)); emit(NOP)
 li32(S2, DEST)
-li32(T2, DEST + 1024 * 512 * 2)
+li32(T2, DEST + RW * RH * 2)
 copy = here()
 emit(lw(T1, S1, 0)); emit(NOP)
 emit(sw(T1, S2, 0))
 emit(addiu(S2, S2, 4))
 emit(bne(S2, T2, (copy - here() - 4) >> 2)); emit(NOP)
+if small:
+    li32(T1, PASSES)
+    emit(bne(S0, T1, (loop - here() - 4) >> 2)); emit(NOP)
+    halt = here()
+    emit(j(halt)); emit(NOP)
 emit(j(loop)); emit(NOP)
 
 text = b''.join(struct.pack('<I', w) for w in code)

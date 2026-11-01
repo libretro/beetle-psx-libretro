@@ -13,12 +13,20 @@ name: Vulkan queue contract
 # (native, 2x, smoothing, composite cable, HDR post, rollback) must stay
 # within a handful over the last 300 of 600 frames, where per-frame
 # creation shows up as thousands.
+#
+# And its host cache maintenance: with every host-visible memory type
+# reported non-coherent (as on GPUs whose host memory needs explicit
+# flushes and invalidates), a VRAM readback invalidates only the rect it
+# read and uploads and vertex data flush only the bytes written, with the
+# read rect matching a model of VRAM exactly
+# (tools/vkhost/host_caches.sh).
 
 on:
   push:
     paths:
       - 'rhi/**'
       - 'tools/vkhost/**'
+      - 'tools/glhost/gen_copy_exe.py'
       - 'libretro.c'
       - 'Makefile*'
       - '.github/workflows/vulkan-queue-contract.yml'
@@ -26,6 +34,7 @@ on:
     paths:
       - 'rhi/**'
       - 'tools/vkhost/**'
+      - 'tools/glhost/gen_copy_exe.py'
       - 'libretro.c'
       - 'Makefile*'
       - '.github/workflows/vulkan-queue-contract.yml'
@@ -54,3 +63,5 @@ jobs:
         run: tools/vkhost/queue_contract.sh "$PWD/mednafen_psx_hw_libretro.so" 120
       - name: Steady state resources
         run: sh tools/vkhost/steady_state.sh "$PWD/mednafen_psx_hw_libretro.so"
+      - name: Host cache maintenance
+        run: sh tools/vkhost/host_caches.sh "$PWD/mednafen_psx_hw_libretro.so"

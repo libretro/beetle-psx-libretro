@@ -2342,6 +2342,12 @@ static void *deviceallocator_map_memory(struct DeviceAllocator *self,
 static void deviceallocator_unmap_memory(struct DeviceAllocator *self,
       const struct DeviceAllocation *alloc,
       MemoryAccessFlags flags);
+static void deviceallocator_invalidate(struct DeviceAllocator *self,
+      const struct DeviceAllocation *alloc,
+      VkDeviceSize start, VkDeviceSize bytes);
+static void deviceallocator_flush(struct DeviceAllocator *self,
+      const struct DeviceAllocation *alloc,
+      VkDeviceSize start, VkDeviceSize bytes);
 static bool deviceallocator_allocate(struct DeviceAllocator *self,
       uint32_t size,
       uint32_t memory_type,
@@ -5043,6 +5049,8 @@ static void cbh_move(struct CommandBufferHandle *dst,
     * class for private-member access. */
 static void *device_map_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { return deviceallocator_map_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
 static void device_unmap_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { deviceallocator_unmap_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
+static void device_invalidate_host_buffer(Device *self, const Buffer *buffer, VkDeviceSize start, VkDeviceSize bytes) { deviceallocator_invalidate(&self->managers.memory, buffer_get_allocation(buffer), start, bytes); }
+static void device_flush_host_buffer(Device *self, const Buffer *buffer, VkDeviceSize start, VkDeviceSize bytes) { deviceallocator_flush(&self->managers.memory, buffer_get_allocation(buffer), start, bytes); }
 static ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers) { return attachment_allocator_request_attachment(&self->transient_allocator, width, height, format, index, samples, layers); }
 static VkDevice device_get_device(Device *self) { return self->device; }
 static VkPipelineCache device_get_pipeline_cache(Device *self) { return self->pipeline_cache; }
@@ -7500,6 +7508,10 @@ static TTRect renderer_compute_window_rect(Renderer *self,
  * framebuffer. The rects must not overlap: their tiles share the staging
  * buffer, which holds one whole framebuffer. */
 #define RENDERER_READBACK_TILES 32
+/* The packed words of every tile: two pixels to a uint over at most the
+ * whole framebuffer, plus an odd row's last half for each row of each tile. */
+#define RENDERER_READBACK_BYTES \
+   ((VkDeviceSize)FB_WIDTH * FB_HEIGHT * 2 + RENDERER_READBACK_TILES * FB_HEIGHT * 4)
 static void renderer_copy_vram_to_cpu_rects(Renderer *self,
       const TTRect *rects, unsigned count, uint16_t *vram)
 {
@@ -7508,6 +7520,7 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
    uint32_t      tx[RENDERER_READBACK_TILES], ty[RENDERER_READBACK_TILES];
    uint32_t      tw[RENDERER_READBACK_TILES], th[RENDERER_READBACK_TILES];
    unsigned      tiles = 0, r, t;
+   VkDeviceSize  bytes = 0;
 
    for (r = 0; r < count; r++)
    {
@@ -7520,6 +7533,7 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
 
       if (!rect->width || !rect->height)
          continue;
+      hw[1] = vh[1] = 0;
 
       if (rect->width >= FB_WIDTH)
       {
@@ -7554,8 +7568,13 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
       for (j = 0; j < nv; j++)
          for (i = 0; i < nh; i++)
          {
-            if (tiles == RENDERER_READBACK_TILES)
+            VkDeviceSize tile_bytes = (VkDeviceSize)((hw[i] + 1) >> 1) * vh[j] * 4;
+            /* Overlapping rects could ask for more than the staging buffer
+             * holds; the shader must never write past it. */
+            if (tiles == RENDERER_READBACK_TILES ||
+                bytes + tile_bytes > RENDERER_READBACK_BYTES)
                break;
+            bytes    += tile_bytes;
             tx[tiles] = hx[i]; tw[tiles] = hw[i];
             ty[tiles] = vy[j]; th[tiles] = vh[j];
             tiles++;
@@ -7580,7 +7599,7 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
    {
       BufferCreateInfo info;
       info.domain = BufferDomain_CachedHost;
-      info.size   = (VkDeviceSize)FB_WIDTH * FB_HEIGHT * 4;
+      info.size   = RENDERER_READBACK_BYTES;
       info.usage  = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
       bh_move(buffer, device_create_buffer(self->device, &info, NULL));
       if (!bh_get(buffer))
@@ -7623,8 +7642,11 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
    fenceholder_wait(fence_get(&fence));
 
    {
-      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(buffer), MEMORY_ACCESS_READ_BIT));
+      /* Only the bytes the tiles were packed into come back through the
+       * host's caches. */
+      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(buffer), 0));
       uint32_t        wordoff = 0;
+      device_invalidate_host_buffer(self->device, bh_get(buffer), 0, bytes);
       for (t = 0; t < tiles; t++)
       {
          const uint32_t row_words = (tw[t] + 1) >> 1;
@@ -13843,20 +13865,35 @@ static void *deviceallocator_map_memory(struct DeviceAllocator *self,
    if (!alloc->host_base)
       return NULL;
 
-   if ((flags & MEMORY_ACCESS_READ_BIT) &&
-       !(self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
-   {
-      VkDeviceSize offset = alloc->offset & ~(self->atom_alignment - 1);
-      VkDeviceSize size = (alloc->offset + deviceallocation_get_size(alloc) - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
-
-      /* Have to invalidate cache here. */
-      const VkMappedMemoryRange range = {
-         VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc->base, offset, size,
-      };
-      vkInvalidateMappedMemoryRanges(self->device, 1, &range);
-   }
+   if (flags & MEMORY_ACCESS_READ_BIT)
+      deviceallocator_invalidate(self, alloc, 0, deviceallocation_get_size(alloc));
 
    return alloc->host_base;
+}
+
+/* Make the GPU's writes to bytes [start, start + bytes) of a mapped
+ * allocation visible to the host; a no-op on coherent memory. The range
+ * widens to whole non-coherent atoms. */
+static void deviceallocator_invalidate(struct DeviceAllocator *self,
+      const struct DeviceAllocation *alloc,
+      VkDeviceSize start, VkDeviceSize bytes)
+{
+   VkDeviceSize        offset, size;
+   VkMappedMemoryRange range;
+
+   if (!alloc->host_base || !bytes ||
+       (self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return;
+
+   offset = (alloc->offset + start) & ~(self->atom_alignment - 1);
+   size   = (alloc->offset + start + bytes - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
+
+   range.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+   range.pNext  = NULL;
+   range.memory = alloc->base;
+   range.offset = offset;
+   range.size   = size;
+   vkInvalidateMappedMemoryRanges(self->device, 1, &range);
 }
 
 static void deviceallocator_unmap_memory(struct DeviceAllocator *self,
@@ -13867,18 +13904,33 @@ static void deviceallocator_unmap_memory(struct DeviceAllocator *self,
    if (!alloc->host_base)
       return;
 
-   if ((flags & MEMORY_ACCESS_WRITE_BIT) &&
-       !(self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
-   {
-      VkDeviceSize offset = alloc->offset & ~(self->atom_alignment - 1);
-      VkDeviceSize size = (alloc->offset + deviceallocation_get_size(alloc) - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
+   if (flags & MEMORY_ACCESS_WRITE_BIT)
+      deviceallocator_flush(self, alloc, 0, deviceallocation_get_size(alloc));
+}
 
-      /* Have to flush caches here. */
-      const VkMappedMemoryRange range = {
-         VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc->base, offset, size,
-      };
-      vkFlushMappedMemoryRanges(self->device, 1, &range);
-   }
+/* Make the host's writes to bytes [start, start + bytes) of a mapped
+ * allocation visible to the GPU; a no-op on coherent memory. The range
+ * widens to whole non-coherent atoms. */
+static void deviceallocator_flush(struct DeviceAllocator *self,
+      const struct DeviceAllocation *alloc,
+      VkDeviceSize start, VkDeviceSize bytes)
+{
+   VkDeviceSize        offset, size;
+   VkMappedMemoryRange range;
+
+   if (!alloc->host_base || !bytes ||
+       (self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return;
+
+   offset = (alloc->offset + start) & ~(self->atom_alignment - 1);
+   size   = (alloc->offset + start + bytes - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
+
+   range.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+   range.pNext  = NULL;
+   range.memory = alloc->base;
+   range.offset = offset;
+   range.size   = size;
+   vkFlushMappedMemoryRanges(self->device, 1, &range);
 }
 
 static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory,
@@ -19385,8 +19437,12 @@ fail_jobs:
    static void request_block(Device *device, struct BufferBlock *block, VkDeviceSize size,
          struct BufferPool *pool, struct BufferBlockVec *dma, struct BufferBlockVec *recycle)
    {
+      /* The block is filled from its start: only the used bytes go out. */
       if (block->mapped)
-         device_unmap_host_buffer(device, bh_get(&block->cpu), MEMORY_ACCESS_WRITE_BIT);
+      {
+         device_flush_host_buffer(device, bh_get(&block->cpu), 0, block->offset);
+         device_unmap_host_buffer(device, bh_get(&block->cpu), 0);
+      }
 
       if (block->offset == 0)
       {
@@ -24258,7 +24314,11 @@ void rhi_vulkan_load_image(
                      w * sizeof(uint16_t));
          }
       }
-      device_unmap_host_buffer(renderer->device, mapped, MEMORY_ACCESS_WRITE_BIT);
+      /* Only this rect's bytes of the ring go out. */
+      device_flush_host_buffer(renderer->device, mapped,
+            (VkDeviceSize)((const uint8_t *)tmp - (const uint8_t *)buffer_get_allocation(mapped)->host_base),
+            (VkDeviceSize)w * h * sizeof(uint16_t));
+      device_unmap_host_buffer(renderer->device, mapped, 0);
 
       /* The staging buffer of its own, when the ring could not hold the
        * rect; the recorded copy keeps its own reference. */
