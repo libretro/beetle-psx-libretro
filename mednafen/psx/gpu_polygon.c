@@ -354,7 +354,7 @@ DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
  * inlined here so the inner loop is fully fused.
  */
 
-#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+#if defined(GPU_HAVE_SSE2) || defined(GPU_HAVE_NEON)
 /*
  * Vectorised inner loop for the *non-textured* span at native
  * resolution.  Processes pixels in SIMD chunks and returns the count
@@ -370,10 +370,9 @@ DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
  *     clamp((chan + dither_table[y&3][x&3]) >> 3, 0, 0x1F);
  *     non-dithered -> chan >> 3.  We reproduce the LUT arithmetic
  *     directly (add period-4 offset, arithmetic >>3, clamp).
- *   - blend: the same SWAR math as PlotPixelBlend_*, widened.  AVG/
- *     ADD/ADD_FOURTH stay in 16-bit lanes (8 px/iter).  SUBTRACT's
- *     borrow mask 0x108420 has a bit above lane 15, so it runs in
- *     32-bit lanes (4 px/iter); still ahead of scalar.
+ *   - blend: eight 16-bit lanes for every mode, with four-pixel tails.
+ *     Subtraction saturates
+ *     each channel separately to avoid packed carry/borrow dependencies.
  *   - mask-eval (ME_LIT): keep the destination word where its 0x8000
  *     bit is set, else take the new pixel.  Native-res second fetch
  *     equals the blend's bg fetch (no write between), so one load
@@ -412,12 +411,11 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
    const uint32_t dr   = GOURAUD_LIT ? idl->dr_dx : 0;
    const uint32_t dg   = GOURAUD_LIT ? idl->dg_dx : 0;
    const uint32_t db   = GOURAUD_LIT ? idl->db_dx : 0;
-   const int      step = (BM_VAL == BLEND_MODE_SUBTRACT) ? 4 : 8;
+   int            step;
    int32_t        done = 0;
    const int      use_dither = (GOURAUD_LIT && DITHER_ON);
-#define CHAN(base, d, l) (((base) + (d) * (uint32_t)(l)) >> (COORD_FBS + COORD_POST_PADDING))
 
-#if defined(__SSE2__)
+#if defined(GPU_HAVE_SSE2)
    const __m128i  v7FFF = _mm_set1_epi16(0x7FFF);
    const __m128i  v8000 = _mm_set1_epi16((short)0x8000);
    const __m128i  vmso  = _mm_set1_epi16((short)mso);
@@ -427,25 +425,13 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
    const uint16x8_t vmso  = vdupq_n_u16(mso);
 #endif
 
-   for (; done + step <= w; done += step)
+   for (; done + 4 <= w; done += step)
    {
       const int32_t bx = x + done;
-      uint16_t      R8[8], G8[8], B8[8];
       int           l;
+      step = w - done >= 8 ? 8 : 4;
 
-#if !defined(__SSE2__)
-      /* NEON / scalar path keeps the scalar lane fill -- vld1q + vget_lane
-       * extracts to GPR without a stack roundtrip, so the spill multiplier
-       * the SSE2 path saw doesn't apply. */
-      for (l = 0; l < step; l++)
-      {
-         R8[l] = (uint16_t)CHAN(cr, dr, l);
-         G8[l] = (uint16_t)CHAN(cg, dg, l);
-         B8[l] = (uint16_t)CHAN(cb, db, l);
-      }
-#endif
-
-#if defined(__SSE2__)
+#if defined(GPU_HAVE_SSE2)
       {
          __m128i R, G, B, pr, pg, pb, pix, bg, out;
          /* Direct SSE2 Gouraud lane build: lane l holds (base + d*l) >> 24.
@@ -461,12 +447,10 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
           * intermediates xmm-resident through the blend body and removes
           * the spill multiplier.
           *
-          * Maximum cr/dr is bounded by Gouraud delta range; lane sum
-          * (cr + dr*7) cannot overflow u32 (dr is ~22 bits worst-case so
-          * dr*7 fits in ~25, and cr + dr*7 fits in u32 with the same
-          * margin the scalar version has).  After >> 24 each lane is
-          * <= 255, well within int16 positive range, so packs_epi32 is
-          * non-saturating.
+          * Lane sums wrap modulo 2^32, matching scalar interpolation
+          * even for negative deltas and overflowing colours. After >> 24
+          * each lane is <= 255, well within int16 positive range, so
+          * packs_epi32 is non-saturating.
           *
           * d2..d7 derived by paired adds (cheaper than the imuls gcc would
           * pick for `dr * l`); rodata-folded when dr is constant. */
@@ -495,21 +479,11 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
             R = _mm_packs_epi32(Rlo, Rhi);
             G = _mm_packs_epi32(Glo, Ghi);
             B = _mm_packs_epi32(Blo, Bhi);
-            if (step == 4) {
-               /* Match the original `R8[4..7]=0` zeroing for the SUBTRACT
-                * 4-pixel chunk so downstream lane reads stay quiet. */
-               const __m128i lo4 = _mm_setr_epi16(-1, -1, -1, -1, 0, 0, 0, 0);
-               R = _mm_and_si128(R, lo4);
-               G = _mm_and_si128(G, lo4);
-               B = _mm_and_si128(B, lo4);
-            }
          }
-         (void)R8; (void)G8; (void)B8; (void)l;
          if (use_dither)
          {
             int16_t doff[8];
-            for (l = 0; l < step; l++) doff[l] = dither_table[(y >> dus) & 3][((bx + l) >> dus) & 3];
-            if (step == 4) doff[4]=doff[5]=doff[6]=doff[7]=0;
+            for (l = 0; l < 8; l++) doff[l] = dither_table[(y >> dus) & 3][((bx + l) >> dus) & 3];
             {
                __m128i d = _mm_loadu_si128((const __m128i*)doff);
                __m128i z = _mm_setzero_si128(), m1F = _mm_set1_epi16(0x1F);
@@ -526,7 +500,8 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
          }
          pix = _mm_or_si128(v8000,
                _mm_or_si128(pr, _mm_or_si128(_mm_slli_epi16(pg, 5), _mm_slli_epi16(pb, 10))));
-         bg  = _mm_loadu_si128((const __m128i*)&row[bx]);
+         bg = step == 8 ? _mm_loadu_si128((const __m128i*)&row[bx])
+                       : _mm_loadl_epi64((const __m128i*)&row[bx]);
 
          if (BM_VAL == BLEND_MODE_AVERAGE)
          {
@@ -550,29 +525,7 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
             pix = _mm_or_si128(_mm_sub_epi16(sum, car), _mm_sub_epi16(car, _mm_srli_epi16(car, 5)));
          }
          else if (BM_VAL == BLEND_MODE_SUBTRACT)
-         {
-            /* 32-bit lanes: widen pix/bg low 4 lanes, do the 0x108420 SWAR, repack. */
-            __m128i z   = _mm_setzero_si128();
-            __m128i m84 = _mm_set1_epi32(0x108420), m80 = _mm_set1_epi32(0x8000);
-            __m128i fp32 = _mm_unpacklo_epi16(pix, z);
-            __m128i bg32 = _mm_unpacklo_epi16(bg, z);
-            __m128i bgo  = _mm_or_si128(bg32, m80);
-            __m128i fpc  = _mm_andnot_si128(m80, fp32);
-            __m128i diff = _mm_add_epi32(_mm_sub_epi32(bgo, fpc), m84);
-            __m128i xr   = _mm_and_si128(_mm_xor_si128(bgo, fpc), m84);
-            __m128i bor  = _mm_and_si128(_mm_sub_epi32(diff, xr), m84);
-            __m128i res  = _mm_and_si128(_mm_sub_epi32(diff, bor), _mm_sub_epi32(bor, _mm_srli_epi32(bor, 5)));
-            /* Truncate each 32-bit lane to 16 bits into lanes 0..3.
-             * SSE2 has no unsigned 32->16 pack (packus_epi32 is
-             * SSE4.1) and packs_epi32 signed-saturates (the subtract
-             * result can have bit 15 set, e.g. 0x900e), so emulate
-             * packus via the bias trick: subtract 0x8000 to bring the
-             * value into signed-16 range, signed-pack, then add 0x8000
-             * back in 16-bit lanes.  Only the low 4 lanes are stored. */
-            res = _mm_and_si128(res, _mm_set1_epi32(0xFFFF));
-            pix = _mm_add_epi16(_mm_packs_epi32(_mm_sub_epi32(res, _mm_set1_epi32(0x8000)), z),
-                                _mm_set1_epi16((short)0x8000));
-         }
+            pix = GPU_SW_Subtract16(bg, pix);
 
          out = _mm_or_si128(_mm_and_si128(pix, v7FFF), vmso);
          if (ME_LIT)
@@ -580,21 +533,32 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
             __m128i keep = _mm_srai_epi16(bg, 15);
             out = _mm_or_si128(_mm_and_si128(keep, bg), _mm_andnot_si128(keep, out));
          }
-         if (step == 8)
-            _mm_storeu_si128((__m128i*)&row[bx], out);
-         else
-            _mm_storel_epi64((__m128i*)&row[bx], out); /* 4 px */
+         if (step == 8) _mm_storeu_si128((__m128i*)&row[bx], out);
+         else _mm_storel_epi64((__m128i*)&row[bx], out);
       }
 #else /* GPU_HAVE_NEON */
       {
          uint16x8_t R, G, B, pr, pg, pb, pix, bg, out;
-         if (step == 4) { R8[4]=R8[5]=R8[6]=R8[7]=0; G8[4]=G8[5]=G8[6]=G8[7]=0; B8[4]=B8[5]=B8[6]=B8[7]=0; }
-         R = vld1q_u16(R8); G = vld1q_u16(G8); B = vld1q_u16(B8);
+         /* Build affine colours in vector registers with unsigned wrap,
+          * including negative deltas represented modulo 2^32. */
+         {
+            static const uint32_t lanes[4] = { 0, 1, 2, 3 };
+            uint32x4_t lane = vld1q_u32(lanes);
+#define GPU_SW_COLOR_NEON(out, base, delta) \
+            { \
+               uint32x4_t lo = vaddq_u32(vdupq_n_u32(base), vmulq_u32(lane, vdupq_n_u32(delta))); \
+               uint32x4_t hi = vaddq_u32(lo, vdupq_n_u32((delta) * 4u)); \
+               out = vcombine_u16(vmovn_u32(vshrq_n_u32(lo, 24)), vmovn_u32(vshrq_n_u32(hi, 24))); \
+            }
+            GPU_SW_COLOR_NEON(R, cr, dr);
+            GPU_SW_COLOR_NEON(G, cg, dg);
+            GPU_SW_COLOR_NEON(B, cb, db);
+#undef GPU_SW_COLOR_NEON
+         }
          if (use_dither)
          {
             int16_t doff[8];
-            for (l = 0; l < step; l++) doff[l] = dither_table[(y >> dus) & 3][((bx + l) >> dus) & 3];
-            if (step == 4) doff[4]=doff[5]=doff[6]=doff[7]=0;
+            for (l = 0; l < 8; l++) doff[l] = dither_table[(y >> dus) & 3][((bx + l) >> dus) & 3];
             {
                int16x8_t d  = vld1q_s16(doff);
                int16x8_t m1F = vdupq_n_s16(0x1F), z = vdupq_n_s16(0);
@@ -611,7 +575,8 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
             pr = vshrq_n_u16(R, 3); pg = vshrq_n_u16(G, 3); pb = vshrq_n_u16(B, 3);
          }
          pix = vorrq_u16(v8000, vorrq_u16(pr, vorrq_u16(vshlq_n_u16(pg, 5), vshlq_n_u16(pb, 10))));
-         bg  = vld1q_u16(&row[bx]);
+         bg = step == 8 ? vld1q_u16(&row[bx])
+                       : vcombine_u16(vld1_u16(&row[bx]), vdup_n_u16(0));
 
          if (BM_VAL == BLEND_MODE_AVERAGE)
          {
@@ -635,18 +600,7 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
             pix = vorrq_u16(vsubq_u16(sum, car), vsubq_u16(car, vshrq_n_u16(car, 5)));
          }
          else if (BM_VAL == BLEND_MODE_SUBTRACT)
-         {
-            uint32x4_t m84 = vdupq_n_u32(0x108420), m80 = vdupq_n_u32(0x8000);
-            uint32x4_t fp32 = vmovl_u16(vget_low_u16(pix));
-            uint32x4_t bg32 = vmovl_u16(vget_low_u16(bg));
-            uint32x4_t bgo  = vorrq_u32(bg32, m80);
-            uint32x4_t fpc  = vbicq_u32(fp32, m80);
-            uint32x4_t diff = vaddq_u32(vsubq_u32(bgo, fpc), m84);
-            uint32x4_t xr   = vandq_u32(veorq_u32(bgo, fpc), m84);
-            uint32x4_t bor  = vandq_u32(vsubq_u32(diff, xr), m84);
-            uint32x4_t res  = vandq_u32(vsubq_u32(diff, bor), vsubq_u32(bor, vshrq_n_u32(bor, 5)));
-            pix = vcombine_u16(vmovn_u32(res), vdup_n_u16(0));
-         }
+            pix = GPU_SW_Subtract16(bg, pix);
 
          out = vorrq_u16(vandq_u16(pix, v7FFF), vmso);
          if (ME_LIT)
@@ -654,17 +608,14 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
             uint16x8_t keep = vcgeq_u16(bg, v8000); /* 0xFFFF where high bit set (bg >= 0x8000) */
             out = vbslq_u16(keep, bg, out);
          }
-         if (step == 8)
-            vst1q_u16(&row[bx], out);
-         else
-            vst1_u16(&row[bx], vget_low_u16(out)); /* 4 px */
+         if (step == 8) vst1q_u16(&row[bx], out);
+         else vst1_u16(&row[bx], vget_low_u16(out));
       }
 #endif
       cr += dr * (uint32_t)step;
       cg += dg * (uint32_t)step;
       cb += db * (uint32_t)step;
    }
-#undef CHAN
    return done;
 }
 #else /* SSE2 || NEON */
@@ -686,7 +637,7 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
  * _mm_div_ps and AArch64 NEON has vdivq_f32; 32-bit ARMv7 NEON has no vector
  * float divide (only the vrecpe_f32 estimate + Newton-Raphson, which is not
  * bit-exact), so ARMv7 falls through to the bit-exact scalar tail below. */
-#if defined(__SSE2__) || ((defined(GPU_HAVE_NEON)) && (defined(__aarch64__) || defined(_M_ARM64)))
+#if defined(GPU_HAVE_SSE2) || ((defined(GPU_HAVE_NEON)) && (defined(__aarch64__) || defined(_M_ARM64)))
 #define PCT_UV_SIMD 1
 #endif
 
@@ -728,7 +679,7 @@ static INLINE void PCT_UVBatch(int n, float bias,
    int   i         = 0;
 #if defined(PCT_UV_SIMD)
    int   batch     = n & ~3;
-#if defined(__SSE2__)
+#if defined(GPU_HAVE_SSE2)
    const __m128  vbias = _mm_set1_ps(bias);
    const __m128  veps  = _mm_set1_ps(1e-6f);
    const __m128  vmnu  = _mm_set1_ps(min_u);
@@ -827,6 +778,308 @@ static INLINE void PCT_UVBatch(int n, float bias,
 #undef PCT_UV_SIMD
 #endif
 
+/* Integer interpolation is modulo 2^32, just like AddIDeltas_DX. Recover
+ * eight colours per batch without changing any rounding points. */
+static INLINE void GPU_SW_Colors(uint16_t *out, uint32_t base, uint32_t delta, unsigned count)
+{
+   unsigned i = 0;
+#if defined(GPU_HAVE_SSE2)
+   if (!delta)
+   {
+      __m128i color = _mm_set1_epi16((short)(base >> (COORD_FBS + COORD_POST_PADDING)));
+      for (; i + 8 <= count; i += 8) _mm_storeu_si128((__m128i *)(out + i), color);
+   }
+   else
+   {
+      __m128i value = _mm_setr_epi32((int)base, (int)(base + delta),
+            (int)(base + delta * 2u), (int)(base + delta * 3u));
+      __m128i step = _mm_set1_epi32((int)(delta * 4u));
+      for (; i + 8 <= count; i += 8)
+      {
+         __m128i hi = _mm_add_epi32(value, step);
+         __m128i color = _mm_packs_epi32(_mm_srli_epi32(value, COORD_FBS + COORD_POST_PADDING),
+               _mm_srli_epi32(hi, COORD_FBS + COORD_POST_PADDING));
+         _mm_storeu_si128((__m128i *)(out + i), color);
+         value = _mm_add_epi32(hi, step);
+      }
+      for (; i + 4 <= count; i += 4)
+      {
+         __m128i color = _mm_srli_epi32(value, COORD_FBS + COORD_POST_PADDING);
+         _mm_storel_epi64((__m128i *)(out + i), _mm_packs_epi32(color, color));
+         value = _mm_add_epi32(value, step);
+      }
+   }
+#elif defined(GPU_HAVE_NEON)
+   if (!delta)
+   {
+      uint16x8_t color = vdupq_n_u16(base >> (COORD_FBS + COORD_POST_PADDING));
+      for (; i + 8 <= count; i += 8) vst1q_u16(out + i, color);
+   }
+   else
+   {
+      const uint32_t initial[4] = { base, base + delta, base + delta * 2u, base + delta * 3u };
+      uint32x4_t value = vld1q_u32(initial), step = vdupq_n_u32(delta * 4u);
+      for (; i + 8 <= count; i += 8)
+      {
+         uint32x4_t hi = vaddq_u32(value, step);
+         vst1q_u16(out + i, vcombine_u16(
+                  vmovn_u32(vshrq_n_u32(value, COORD_FBS + COORD_POST_PADDING)),
+                  vmovn_u32(vshrq_n_u32(hi, COORD_FBS + COORD_POST_PADDING))));
+         value = vaddq_u32(hi, step);
+      }
+      for (; i + 4 <= count; i += 4)
+      {
+         vst1_u16(out + i, vmovn_u32(vshrq_n_u32(value, COORD_FBS + COORD_POST_PADDING)));
+         value = vaddq_u32(value, step);
+      }
+   }
+#endif
+   for (; i < count; i++) out[i] = (base + delta * i) >> (COORD_FBS + COORD_POST_PADDING);
+}
+
+/* Affine UV stepping wraps modulo 2^32. Perspective recovery writes -1 for
+ * rejected lanes; only those lanes need the affine fallback. */
+static INLINE void GPU_SW_AffineUV(int32_t *u, int32_t *v, uint32_t base_u,
+      uint32_t base_v, uint32_t du, uint32_t dv, unsigned count, bool fallback)
+{
+   unsigned i = 0;
+#if defined(GPU_HAVE_SSE2)
+   __m128i uv = _mm_setr_epi32((int)base_u, (int)(base_u + du),
+         (int)(base_u + du * 2u), (int)(base_u + du * 3u));
+   __m128i vv = _mm_setr_epi32((int)base_v, (int)(base_v + dv),
+         (int)(base_v + dv * 2u), (int)(base_v + dv * 3u));
+   const __m128i step_u = _mm_set1_epi32((int)(du * 4u));
+   const __m128i step_v = _mm_set1_epi32((int)(dv * 4u));
+   for (; i + 4 <= count; i += 4)
+   {
+      __m128i out_u = _mm_srli_epi32(uv, COORD_FBS + COORD_POST_PADDING);
+      __m128i out_v = _mm_srli_epi32(vv, COORD_FBS + COORD_POST_PADDING);
+      if (fallback)
+      {
+         __m128i pu = _mm_loadu_si128((const __m128i *)(u + i));
+         __m128i pv = _mm_loadu_si128((const __m128i *)(v + i));
+         __m128i mask = _mm_srai_epi32(pu, 31);
+         out_u = _mm_or_si128(_mm_and_si128(mask, out_u), _mm_andnot_si128(mask, pu));
+         out_v = _mm_or_si128(_mm_and_si128(mask, out_v), _mm_andnot_si128(mask, pv));
+      }
+      _mm_storeu_si128((__m128i *)(u + i), out_u);
+      _mm_storeu_si128((__m128i *)(v + i), out_v);
+      uv = _mm_add_epi32(uv, step_u); vv = _mm_add_epi32(vv, step_v);
+   }
+#elif defined(GPU_HAVE_NEON)
+   static const uint32_t lanes[4] = { 0, 1, 2, 3 };
+   uint32x4_t lane = vld1q_u32(lanes);
+   uint32x4_t uv = vaddq_u32(vdupq_n_u32(base_u), vmulq_u32(lane, vdupq_n_u32(du)));
+   uint32x4_t vv = vaddq_u32(vdupq_n_u32(base_v), vmulq_u32(lane, vdupq_n_u32(dv)));
+   for (; i + 4 <= count; i += 4)
+   {
+      int32x4_t out_u = vreinterpretq_s32_u32(vshrq_n_u32(uv, COORD_FBS + COORD_POST_PADDING));
+      int32x4_t out_v = vreinterpretq_s32_u32(vshrq_n_u32(vv, COORD_FBS + COORD_POST_PADDING));
+      if (fallback)
+      {
+         int32x4_t pu = vld1q_s32(u + i), pv = vld1q_s32(v + i);
+         uint32x4_t mask = vcltq_s32(pu, vdupq_n_s32(0));
+         out_u = vbslq_s32(mask, out_u, pu); out_v = vbslq_s32(mask, out_v, pv);
+      }
+      vst1q_s32(u + i, out_u); vst1q_s32(v + i, out_v);
+      uv = vaddq_u32(uv, vdupq_n_u32(du * 4u));
+      vv = vaddq_u32(vv, vdupq_n_u32(dv * 4u));
+   }
+#endif
+   for (; i < count; i++)
+      if (!fallback || u[i] < 0)
+      {
+         u[i] = (base_u + du * i) >> (COORD_FBS + COORD_POST_PADDING);
+         v[i] = (base_v + dv * i) >> (COORD_FBS + COORD_POST_PADDING);
+      }
+}
+
+/* Fuse affine UV recovery with address generation in four-pixel groups.
+ * The fixed-size temporaries can stay in registers instead of materialising
+ * two complete UV arrays for the common non-perspective path. */
+#define DEFINE_GPU_SW_FetchAffine(TAG) \
+static INLINE void GPU_SW_FetchAffine_##TAG(PS_GPU *g, uint16_t *out, \
+      uint32_t u, uint32_t v, uint32_t du, uint32_t dv, unsigned count) \
+{ \
+   unsigned i = 0; \
+   for (; i + 4 <= count; i += 4) \
+   { \
+      int32_t pu[4], pv[4]; \
+      GPU_SW_AffineUV(pu, pv, u + du * i, v + dv * i, du, dv, 4, false); \
+      GPU_SW_FetchTexels_##TAG(g, out + i, pu, pv, 4); \
+   } \
+   for (; i < count; i++) \
+      out[i] = GetTexel_##TAG(g, (u + du * i) >> 24, (v + dv * i) >> 24); \
+}
+DEFINE_GPU_SW_FetchAffine(TM0)
+DEFINE_GPU_SW_FetchAffine(TM1)
+DEFINE_GPU_SW_FetchAffine(TM2)
+#undef DEFINE_GPU_SW_FetchAffine
+
+static INLINE void GPU_SW_DitherOffsets(int16_t *out, unsigned count,
+      unsigned x, unsigned y, unsigned shift, bool enabled)
+{
+   unsigned i, period = 4u << shift;
+   unsigned seed = count < period ? count : period;
+   if (!enabled) { memset(out, 0, count * sizeof(*out)); return; }
+   for (i = 0; i < seed; i++)
+      out[i] = dither_table[(y >> shift) & 3][((x + i) >> shift) & 3];
+   i = seed;
+#if defined(GPU_HAVE_SSE2)
+   for (; i + 8 <= count; i += 8)
+   {
+      __m128i d;
+      if (period == 4)
+      {
+         d = _mm_loadl_epi64((const __m128i *)out);
+         d = _mm_unpacklo_epi64(d, d);
+      }
+      else d = _mm_loadu_si128((const __m128i *)(out + i - period));
+      _mm_storeu_si128((__m128i *)(out + i), d);
+   }
+#elif defined(GPU_HAVE_NEON)
+   for (; i + 8 <= count; i += 8)
+   {
+      int16x8_t d;
+      if (period == 4)
+      {
+         int16x4_t lo = vld1_s16(out);
+         d = vcombine_s16(lo, lo);
+      }
+      else d = vld1q_s16(out + i - period);
+      vst1q_s16(out + i, d);
+   }
+#endif
+   for (; i < count; i++) out[i] = out[i - period];
+}
+
+/* Gather in the original texture-cache order, then shade a whole block. The
+ * overlap test in GPU_SW_Begin guarantees that deferred writes cannot change
+ * any of these fetches, including the four-word cache-fill footprint. */
+#define DEFINE_GPU_SW_TexturedSpan(TAG) \
+static unsigned GPU_SW_TexturedSpan_##TAG(PS_GPU *g, GPU_SW_Packet *p, int x, int y, \
+      unsigned width, i_group *igp, const i_deltas *idl, bool gouraud, bool modulate, bool pct) \
+{ \
+   i_group ig = *igp; \
+   unsigned initial_width = width; \
+   int32_t pu[GPU_SW_BLOCK], pv[GPU_SW_BLOCK]; \
+   const unsigned dus = g->dither_upscale_shift; \
+   const bool dither = DitherEnabled(g); \
+   p->modulate = modulate; \
+   while (width) \
+   { \
+      unsigned count = width < GPU_SW_BLOCK ? width : GPU_SW_BLOCK; \
+      if (!GPU_SW_Threaded()) count &= ~3u; \
+      if (!count) break; \
+      p->count = count; \
+      if (pct) \
+      { \
+         PCT_UVBatch(count, idl->pct_bias, &ig.pct_inv_w, &ig.pct_u_over_w, \
+               &ig.pct_v_over_w, idl->d_inv_w_dx, idl->d_u_over_w_dx, idl->d_v_over_w_dx, \
+               idl->min_u, idl->max_u, idl->min_v, idl->max_v, pu, pv); \
+         GPU_SW_AffineUV(pu, pv, ig.u, ig.v, idl->du_dx, idl->dv_dx, count, true); \
+         GPU_SW_FetchTexels_##TAG(g, p->source, pu, pv, count); \
+      } \
+      else \
+      { \
+         GPU_SW_AffineUV(pu, pv, ig.u, ig.v, idl->du_dx, idl->dv_dx, count, false); \
+         GPU_SW_FetchTexels_##TAG(g, p->source, pu, pv, count); \
+      } \
+      GPU_SW_Coverage(p); \
+      ig.u += idl->du_dx * count; ig.v += idl->dv_dx * count; \
+      if (modulate) \
+      { \
+         GPU_SW_Colors(p->red, ig.r, gouraud ? idl->dr_dx : 0, count); \
+         GPU_SW_Colors(p->green, ig.g, gouraud ? idl->dg_dx : 0, count); \
+         GPU_SW_Colors(p->blue, ig.b, gouraud ? idl->db_dx : 0, count); \
+         GPU_SW_DitherOffsets(p->dither, count, x, y, dus, dither); \
+      } \
+      if (gouraud) \
+      { \
+         ig.r += idl->dr_dx * count; ig.g += idl->dg_dx * count; ig.b += idl->db_dx * count; \
+      } \
+      GPU_SW_Submit(p); \
+      p->dest += count; x += count; width -= count; \
+   } \
+   p->count = 0; \
+   *igp = ig; \
+   return initial_width - width; \
+}
+DEFINE_GPU_SW_TexturedSpan(TM0)
+DEFINE_GPU_SW_TexturedSpan(TM1)
+DEFINE_GPU_SW_TexturedSpan(TM2)
+#undef DEFINE_GPU_SW_TexturedSpan
+
+static void GPU_SW_ExecuteSpan(const GPU_SW_Packet *p)
+{
+   PS_GPU local;
+   i_group ig;
+   i_deltas idl;
+   unsigned done, i, c;
+   local.vram = p->vram;
+   local.upscale_shift = p->render_shift;
+   local.dither_upscale_shift = p->dither_shift;
+   local.MaskSetOR = p->mask_set;
+   ig.r = p->color[0]; ig.g = p->color[1]; ig.b = p->color[2];
+   idl.dr_dx = p->delta[0]; idl.dg_dx = p->delta[1]; idl.db_dx = p->delta[2];
+   done = DrawSpanVec_NT(&local, p->pixel_y, p->pixel_x, p->count,
+         &ig, &idl, p->gouraud, p->dither_on, p->blend, p->mask_eval);
+   if (done < p->count)
+   {
+      GPU_SW_Packet tail = *p;
+      tail.execute = NULL;
+      tail.dest += done;
+      tail.count -= done;
+      for (i = 0; i < tail.count; i++)
+      {
+         uint16_t pixel = 0x8000;
+         for (c = 0; c < 3; c++)
+         {
+            int value = (p->color[c] + p->delta[c] * (done + i)) >> (COORD_FBS + COORD_POST_PADDING);
+            if (p->gouraud && p->dither_on)
+            {
+               value += dither_table[(p->pixel_y >> p->dither_shift) & 3]
+                  [((p->pixel_x + done + i) >> p->dither_shift) & 3];
+               value >>= 3;
+               if (value < 0) value = 0;
+               if (value > 31) value = 31;
+            }
+            else value >>= 3;
+            pixel |= value << (c * 5);
+         }
+         tail.source[i] = pixel;
+         tail.covered[i] = 0xffff;
+      }
+      GPU_SW_Execute(&tail);
+   }
+}
+
+static INLINE void GPU_SW_QueueSpan(GPU_SW_Packet *p, PS_GPU *gpu,
+      unsigned x, unsigned y, unsigned width, const i_group *ig,
+      const i_deltas *idl, bool gouraud, bool dither)
+{
+   unsigned c;
+   p->execute = GPU_SW_ExecuteSpan;
+   p->vram = gpu->vram;
+   p->pixel_x = x; p->pixel_y = y;
+   p->render_shift = gpu->upscale_shift;
+   p->dither_shift = gpu->dither_upscale_shift;
+   p->color[0] = ig->r; p->color[1] = ig->g; p->color[2] = ig->b;
+   p->delta[0] = gouraud ? idl->dr_dx : 0;
+   p->delta[1] = gouraud ? idl->dg_dx : 0;
+   p->delta[2] = gouraud ? idl->db_dx : 0;
+   p->gouraud = gouraud; p->dither_on = dither;
+   while (width)
+   {
+      p->count = width < GPU_SW_BLOCK ? width : GPU_SW_BLOCK;
+      GPU_SW_Submit(p);
+      for (c = 0; c < 3; c++) p->color[c] += p->delta[c] * p->count;
+      p->dest += p->count;
+      p->pixel_x += p->count;
+      width -= p->count;
+   }
+}
+
 #define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
 static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas *idl, const bool pct) \
 { \
@@ -835,6 +1088,8 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
    int32_t x_ig_adjust; \
    int32_t w; \
    int32_t x; \
+   GPU_SW_Packet packet; \
+   bool batch; \
    /* pct UV precompute scratch.  Only used on the textured perspective- \
     * correct path; PCT_UV_BLOCK pixels are SIMD-computed at a time and the \
     * plot loop reads them back.  pct_idx counts down the pixels remaining \
@@ -896,13 +1151,23 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
       else \
          gpu->DrawTimeAvail -= w >> gpu->upscale_shift; \
    } \
-   /* Native-res, non-textured fast path: vectorise the contiguous run \
-    * (the span lies within [ClipX0,ClipX1] in [0,1023], so it never \
-    * crosses the x==1024 VRAM wrap).  Advances x/w and steps the affine \
-    * colour interpolants past the consumed pixels; the scalar do/while \
-    * below finishes any 4/8-pixel remainder.  Textured spans and any \
-    * upscale are left entirely to the scalar loop. */ \
-   if (!(TEXTURED_LIT)) \
+   /* Untextured spans retain SIMD colour interpolation on the worker. \
+    * Textured spans gather in scalar cache order and defer modulation \
+    * and compositing; feedback spans keep the original pixel loop. */ \
+   batch = GPU_SW_Begin(&packet, gpu, x, y, w, false, (TEXTURED_LIT), (BM_VAL), (ME_LIT)); \
+   if (!(TEXTURED_LIT) && batch) \
+   { \
+      GPU_SW_QueueSpan(&packet, gpu, x, y, w, &ig, idl, (GOURAUD_LIT), DitherEnabled(gpu)); \
+      return; \
+   } \
+   if ((TEXTURED_LIT) && batch) \
+   { \
+      unsigned consumed = GPU_SW_TexturedSpan_TM##MO_LIT(gpu, &packet, x, y, w, &ig, idl, (GOURAUD_LIT), (TM_LIT), pct); \
+      x += consumed; w -= consumed; \
+      if (w <= 0) return; \
+      batch = false; \
+   } \
+   if (!(TEXTURED_LIT) && !batch) \
    { \
       int32_t _vn = DrawSpanVec_NT(gpu, y, x, w, &ig, idl, \
             (GOURAUD_LIT), DitherEnabled(gpu), (BM_VAL), (ME_LIT)); \
