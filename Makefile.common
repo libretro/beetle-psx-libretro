@@ -90,6 +90,19 @@ endif
 
 FLAGS += -DHAVE_PBP
 
+# Software GPU backends. ISA selection follows the compiler target (SSE2 or
+# NEON); either optimisation can be disabled independently for diagnostics.
+SOFTWARE_RENDERER_SIMD ?= 1
+SOFTWARE_RENDERER_THREADS ?= 0
+SOFTWARE_RENDERER_WORKERS ?= 0
+FLAGS += -DGPU_SW_WORKERS=$(SOFTWARE_RENDERER_WORKERS)
+ifeq ($(SOFTWARE_RENDERER_SIMD), 0)
+   FLAGS += -DGPU_DISABLE_SIMD
+endif
+ifeq ($(SOFTWARE_RENDERER_THREADS), 0)
+   FLAGS += -DGPU_DISABLE_THREADS
+endif
+
 ifeq ($(NEED_THREADING), 1)
    FLAGS += -DWANT_THREADING -DHAVE_THREADS
 endif

@@ -117,6 +117,117 @@ static INLINE void AddLineStep_##SUFFIX(line_fxp_coord *point, const line_fxp_st
 DEFINE_AddLineStep(g0, 0)
 DEFINE_AddLineStep(g1, 1)
 
+enum {
+   GPU_SW_LineBlend_BMopaque = -1, GPU_SW_LineBlend_BMavg = 0,
+   GPU_SW_LineBlend_BMadd = 1, GPU_SW_LineBlend_BMsub = 2, GPU_SW_LineBlend_BMaddq = 3
+};
+
+#if defined(GPU_HAVE_SSE2) || defined(GPU_HAVE_NEON)
+static INLINE void GPU_SW_LinePixels(GPU_SW_Packet *p, uint32_t r, uint32_t g,
+      uint32_t b, uint32_t dr, uint32_t dg, uint32_t db, unsigned x, unsigned y, bool dither)
+{
+   unsigned i = 0;
+   GPU_SW_Colors(p->red, r, dr, p->count);
+   GPU_SW_Colors(p->green, g, dg, p->count);
+   GPU_SW_Colors(p->blue, b, db, p->count);
+   GPU_SW_DitherOffsets(p->dither, p->count, x, y, 0, dither);
+   for (; i + 4 <= p->count;)
+   {
+      unsigned count = p->count - i >= 8 ? 8 : 4;
+#if defined(GPU_HAVE_SSE2)
+      __m128i d = GPU_SW_Load16((const uint16_t *)(p->dither + i), count);
+      __m128i red = GPU_SW_Load16(p->red + i, count);
+      __m128i green = GPU_SW_Load16(p->green + i, count);
+      __m128i blue = GPU_SW_Load16(p->blue + i, count);
+#define GPU_SW_LINE_CHANNEL(c) c = _mm_min_epi16(_mm_set1_epi16(31), _mm_max_epi16(_mm_setzero_si128(), _mm_srai_epi16(_mm_add_epi16(c, d), 3)))
+      GPU_SW_LINE_CHANNEL(red); GPU_SW_LINE_CHANNEL(green); GPU_SW_LINE_CHANNEL(blue);
+#undef GPU_SW_LINE_CHANNEL
+      GPU_SW_Store16(p->source + i, _mm_or_si128(_mm_set1_epi16((short)0x8000),
+               _mm_or_si128(red, _mm_or_si128(_mm_slli_epi16(green, 5), _mm_slli_epi16(blue, 10)))), count);
+#else
+      int16x8_t d = vreinterpretq_s16_u16(GPU_SW_Load16((const uint16_t *)(p->dither + i), count));
+      int16x8_t red = vreinterpretq_s16_u16(GPU_SW_Load16(p->red + i, count));
+      int16x8_t green = vreinterpretq_s16_u16(GPU_SW_Load16(p->green + i, count));
+      int16x8_t blue = vreinterpretq_s16_u16(GPU_SW_Load16(p->blue + i, count));
+#define GPU_SW_LINE_CHANNEL(c) c = vminq_s16(vdupq_n_s16(31), vmaxq_s16(vdupq_n_s16(0), vshrq_n_s16(vaddq_s16(c, d), 3)))
+      GPU_SW_LINE_CHANNEL(red); GPU_SW_LINE_CHANNEL(green); GPU_SW_LINE_CHANNEL(blue);
+#undef GPU_SW_LINE_CHANNEL
+      GPU_SW_Store16(p->source + i, vorrq_u16(vdupq_n_u16(0x8000),
+               vorrq_u16(vreinterpretq_u16_s16(red), vorrq_u16(vshlq_n_u16(vreinterpretq_u16_s16(green), 5),
+                     vshlq_n_u16(vreinterpretq_u16_s16(blue), 10)))), count);
+#endif
+      i += count;
+   }
+   for (; i < p->count; i++)
+   {
+      unsigned c, pixel = 0x8000;
+      const uint16_t channels[3] = { p->red[i], p->green[i], p->blue[i] };
+      for (c = 0; c < 3; c++)
+      {
+         int value = ((int)channels[c] + p->dither[i]) >> 3;
+         if (value < 0) value = 0;
+         if (value > 31) value = 31;
+         pixel |= value << (c * 5);
+      }
+      p->source[i] = pixel;
+   }
+}
+
+static INLINE bool GPU_SW_HorizontalLine(PS_GPU *gpu, const line_point *point,
+      const line_fxp_coord *cur, const line_fxp_step *step, unsigned length,
+      bool gouraud, int blend, bool mask_eval)
+{
+   unsigned first = (cur->x >> LINE_XY_FRACTBITS) & 2047;
+   unsigned y = (cur->y >> LINE_XY_FRACTBITS) & 2047;
+   unsigned x, end, offset, width, done;
+   i_group ig;
+   i_deltas idl;
+   GPU_SW_Packet p;
+   /* A wrap in the DDA's 11-bit coordinate domain retains scalar order. */
+   if (first + length > 2048) return false;
+   if (y < gpu->ClipY0 || y > gpu->ClipY1 || LineSkipTest(gpu, y)) return true;
+   x = first < gpu->ClipX0 ? gpu->ClipX0 : first;
+   end = first + length < gpu->ClipX1 + 1u ? first + length : gpu->ClipX1 + 1u;
+   if (end <= x) return true;
+   offset = x - first; width = end - x;
+   /* Promote the line's 12-bit colour fractions into polygon-style 24-bit
+    * fractions. Unsigned shifts preserve the scalar byte truncation exactly. */
+   idl.dr_dx = gouraud ? (uint32_t)step->dr_dk << 12 : 0;
+   idl.dg_dx = gouraud ? (uint32_t)step->dg_dk << 12 : 0;
+   idl.db_dx = gouraud ? (uint32_t)step->db_dk << 12 : 0;
+   ig.r = (gouraud ? cur->r << 12 : (uint32_t)point->r << 24) + idl.dr_dx * offset;
+   ig.g = (gouraud ? cur->g << 12 : (uint32_t)point->g << 24) + idl.dg_dx * offset;
+   ig.b = (gouraud ? cur->b << 12 : (uint32_t)point->b << 24) + idl.db_dx * offset;
+   if (!gpu->upscale_shift)
+   {
+      done = DrawSpanVec_NT(gpu, y, x, width, &ig, &idl, 1, DitherEnabled(gpu), blend, mask_eval);
+      x += done; width -= done;
+      ig.r += idl.dr_dx * done; ig.g += idl.dg_dx * done; ig.b += idl.db_dx * done;
+   }
+   p.execute = NULL; p.modulate = 0; p.textured = 0;
+   p.native_shift = gpu->upscale_shift; p.stride = 1024u << gpu->upscale_shift;
+   p.blend = blend; p.mask_eval = mask_eval; p.mask_set = gpu->MaskSetOR;
+   p.dest = &texel_fetch(gpu, x, y);
+   GPU_SW_Fill16(p.covered, GPU_SW_BLOCK, 0xffff);
+   while (width)
+   {
+      p.count = width < GPU_SW_BLOCK ? width : GPU_SW_BLOCK;
+      GPU_SW_LinePixels(&p, ig.r, ig.g, ig.b, idl.dr_dx, idl.dg_dx, idl.db_dx, x, y, DitherEnabled(gpu));
+      GPU_SW_Execute(&p);
+      ig.r += idl.dr_dx * p.count; ig.g += idl.dg_dx * p.count; ig.b += idl.db_dx * p.count;
+      x += p.count; width -= p.count; p.dest += p.count << p.native_shift;
+   }
+   return true;
+}
+#else
+static INLINE bool GPU_SW_HorizontalLine(PS_GPU *gpu, const line_point *point,
+      const line_fxp_coord *cur, const line_fxp_step *step, unsigned length,
+      bool gouraud, int blend, bool mask_eval)
+{
+   return false;
+}
+#endif
+
 /*
  * DrawLine - rasterise one line segment.
  *
@@ -144,11 +255,14 @@ static void DrawLine_##SUFFIX(PS_GPU *gpu, line_point *points) \
    int32_t delta_x = abs(points[1].x - points[0].x); \
    int32_t delta_y = abs(points[1].y - points[0].y); \
    int32_t k       = (delta_x > delta_y) ? delta_x : delta_y; \
+   GPU_SW_Sync(); \
    if (points[0].x > points[1].x && k) \
       vertex_swap(line_point, points[1], points[0]); \
    gpu->DrawTimeAvail -= k * 2; \
    line_points_to_fixed_point_step_g##GOURAUD_LIT(&points[0], &points[1], k, &step); \
    line_point_to_fixed_point_coord_g##GOURAUD_LIT(&points[0], &step, &cur_point); \
+   if (!delta_y && k >= 7 && GPU_SW_HorizontalLine(gpu, &points[0], &cur_point, &step, k + 1, \
+            GOURAUD_LIT, GPU_SW_LineBlend_##BM_TAG, MASKEVAL_LIT)) return; \
    for (i = 0; i <= k; i++)  /* <= is not a typo. */ \
    { \
       /* Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain. */ \

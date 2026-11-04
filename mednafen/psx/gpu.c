@@ -23,23 +23,7 @@
 
 #include <retro_miscellaneous.h>
 
-#if defined(__SSE2__)
-#include <emmintrin.h>
-#endif
-
-/* NEON counterpart to the SSE2 GPU fast paths.  __ARM_NEON is defined
- * by both AArch64 (-march=armv8-a, NEON is mandatory) and 32-bit ARM
- * built with -mfpu=neon; __ARM_NEON__ is the older spelling some
- * toolchains use.  arm_neon.h provides the same vdupq/vst1q/vld1q
- * intrinsics on both, so a single GPU_HAVE_NEON guard covers 32- and
- * 64-bit.  Only used when __SSE2__ is absent (no target has both). */
-#if !defined(__SSE2__) && \
-    (defined(GPU_HAVE_NEON) || defined(__ARM_NEON) || defined(__ARM_NEON__))
-#include <arm_neon.h>
-#ifndef GPU_HAVE_NEON
-#define GPU_HAVE_NEON 1
-#endif
-#endif
+#include "gpu_sw.h"
 
 #include "../math_ops.h"
 #include "../state_helpers.h"
@@ -470,12 +454,14 @@ GCMD_DRAWPOLY_BMGROUP_ALL(4, 1)
 
 static void Command_ClearCache(PS_GPU* g, const uint32_t *cb)
 {
+   GPU_SW_Sync();
    InvalidateCache(g);
    rhi_intf_invalidate_clut_cache();
 }
 
 static void Command_IRQ(PS_GPU* g, const uint32_t *cb)
 {
+   GPU_SW_Sync();
    g->IRQPending = true;
    IRQ_Assert(IRQ_GPU, g->IRQPending);
 }
@@ -523,6 +509,7 @@ static bool RectOverlapsDisplay(int32_t x, int32_t y, int32_t w, int32_t h)
 
 static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
 {
+   GPU_SW_Sync();
    unsigned y;
    int32_t r                 = cb[0] & 0xFF;
    int32_t g                 = (cb[0] >> 8) & 0xFF;
@@ -555,37 +542,19 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
       if (sw)
       {
          unsigned x = 0;
-#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
-         /* Native-res 8-pixel fast path.  At upscale_shift == 0,
-          * texel_put() reduces to a single vram_put() into a flat
-          * uint16 row whose base is (d_y << 10), so a fill row is a
-          * contiguous run of `fill_value` stores - splat 8 at a time.
-          *
-          * The destination column wraps at x == 1024 (the scalar
-          * loop's `& 1023`); destX is 16-aligned (cb decode `& 0x3F0`)
-          * and width is a multiple of 16 (`& ~0xF`), but destX + width
-          * can exceed 1024, so a single row may straddle the wrap.
-          * We only vectorise the contiguous span up to the wrap and
-          * hand the remainder (if any) back to the scalar loop, which
-          * re-derives d_x with `& 1023` and wraps correctly on its
-          * own.  Bails entirely (x stays 0) when not at native res. */
-         if (GPU.upscale_shift == 0)
+#if defined(GPU_HAVE_SSE2) || defined(GPU_HAVE_NEON)
+         unsigned left = width, column = destX, scale = 1u << GPU.upscale_shift;
+         unsigned stride = 1024u << GPU.upscale_shift;
+         while (left)
          {
-            uint16_t       *row     = &GPU.vram[(uint32_t)d_y << 10];
-            const int32_t   to_wrap = 1024 - destX; /* pixels before x hits 1024 */
-            const int32_t   contig  = (width < to_wrap) ? width : to_wrap;
-#if defined(__SSE2__)
-            const __m128i   splat   = _mm_set1_epi16((short)fill_value);
-
-            for(; (int32_t)x + 8 <= contig; x += 8)
-               _mm_storeu_si128((__m128i*)&row[destX + x], splat);
-#else /* GPU_HAVE_NEON */
-            const uint16x8_t splat  = vdupq_n_u16(fill_value);
-
-            for(; (int32_t)x + 8 <= contig; x += 8)
-               vst1q_u16(&row[destX + x], splat);
-#endif
+            unsigned part = left < 1024u - column ? left : 1024u - column;
+            unsigned dy;
+            for (dy = 0; dy < scale; dy++)
+               GPU_SW_Fill16(GPU.vram + ((d_y << GPU.upscale_shift) + dy) * stride +
+                     (column << GPU.upscale_shift), part << GPU.upscale_shift, fill_value);
+            left -= part; column = 0;
          }
+         x = width;
 #endif
          for(; x < (unsigned)width; x++)
          {
@@ -604,6 +573,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
 
 static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
 {
+   GPU_SW_Sync();
    int32_t sourceX = (cb[1] >> 0) & 0x3FF;
    int32_t sourceY = (cb[1] >> 16) & 0x3FF;
    int32_t destX   = (cb[2] >> 0) & 0x3FF;
@@ -645,22 +615,25 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
             uint16_t tmpbuf[128]; /* TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache. */
             if (chunk_x_max > 128) chunk_x_max = 128;
 
-            for(int32_t chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+            unsigned chunk_x = 0;
+            unsigned s_y = (y + sourceY) & 511, d_y = (y + destY) & 511;
+            while (chunk_x < (unsigned)chunk_x_max)
             {
-               int32_t s_y = (y + sourceY) & 511;
-               int32_t s_x = (x + chunk_x + sourceX) & 1023;
-
-               /* XXX make upscaling-friendly, as it is we copy at 1x */
-               tmpbuf[chunk_x] = texel_fetch(g, s_x, s_y);
+               unsigned s_x = (x + chunk_x + sourceX) & 1023;
+               unsigned part = (unsigned)chunk_x_max - chunk_x;
+               if (part > 1024u - s_x) part = 1024u - s_x;
+               GPU_SW_ReadNative(tmpbuf + chunk_x, &texel_fetch(g, s_x, s_y), part, g->upscale_shift);
+               chunk_x += part;
             }
-
-            for(int32_t chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+            chunk_x = 0;
+            while (chunk_x < (unsigned)chunk_x_max)
             {
-               int32_t d_y = (y + destY) & 511;
-               int32_t d_x = (x + chunk_x + destX) & 1023;
-
-               if(!(texel_fetch(g, d_x, d_y) & g->MaskEvalAND))
-                  texel_put(d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
+               unsigned d_x = (x + chunk_x + destX) & 1023;
+               unsigned part = (unsigned)chunk_x_max - chunk_x;
+               if (part > 1024u - d_x) part = 1024u - d_x;
+               GPU_SW_WriteNative(&texel_fetch(g, d_x, d_y), 1024u << g->upscale_shift,
+                     g->upscale_shift, tmpbuf + chunk_x, part, g->MaskEvalAND, g->MaskSetOR);
+               chunk_x += part;
             }
          }
       }
@@ -674,6 +647,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
 
 static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
 {
+   GPU_SW_Sync();
    /*assert(InCmd == INCMD_NONE); */
 
    g->FBRW_X = (cb[1] >>  0) & 0x3FF;
@@ -714,6 +688,7 @@ static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
 
 static void Command_FBRead(PS_GPU* g, const uint32_t *cb)
 {
+   GPU_SW_Sync();
    /*assert(g->InCmd == INCMD_NONE); */
 
    g->FBRW_X = (cb[1] >>  0) & 0x3FF;
@@ -1201,6 +1176,7 @@ bool GPU_Init(bool pal_clock_and_tv,
 
    GPU.killQuadPart = 0;
 
+   GPU_SW_Init();
    return true;
 }
 
@@ -1215,6 +1191,7 @@ void GPU_RecalcClockRatio(void) {
 
 void GPU_Destroy(void)
 {
+   GPU_SW_Destroy();
    free(GPU.vram);
    GPU.vram = NULL;
    free(state_vram_1x);
@@ -1238,6 +1215,7 @@ void GPU_Destroy(void)
  */
 bool GPU_Rescale(uint8_t ushift)
 {
+   GPU_SW_Sync();
    uint16_t *old_vram = GPU.vram;
    uint8_t     old_shift = GPU.upscale_shift;
    uint16_t *new_vram;
@@ -1256,8 +1234,7 @@ bool GPU_Rescale(uint8_t ushift)
          return false;
 
       for (unsigned y = 0; y < 512; y++)
-         for (unsigned x = 0; x < 1024; x++)
-            vram_new[y * 1024 + x] = texel_fetch(&GPU, x, y);
+         GPU_SW_ReadNative(vram_new + y * 1024, &texel_fetch(&GPU, 0, y), 1024, old_shift);
    }
 
    /* Step 3: allocate the new VRAM at the requested upscale. This
@@ -1281,8 +1258,8 @@ bool GPU_Rescale(uint8_t ushift)
    /* Step 4: copy the scratch buffer into the new VRAM, upscaling
     * via texel_put (nearest neighbour). */
    for (unsigned y = 0; y < 512; y++)
-      for (unsigned x = 0; x < 1024; x++)
-         texel_put(x, y, vram_new[y * 1024 + x]);
+      GPU_SW_WriteNative(&texel_fetch(&GPU, 0, y), 1024u << ushift, ushift,
+            vram_new + y * 1024, 1024, 0, 0);
 
    /* Step 5: free the old buffer (skipping the alias case where
     * old_vram == vram_new) and clear the scratch handle. */
@@ -1296,6 +1273,7 @@ bool GPU_Rescale(uint8_t ushift)
 
 static void GPU_SoftReset(void) /* Control command 0x00 */
 {
+   GPU_SW_Sync();
    GPU.IRQPending = false;
    IRQ_Assert(IRQ_GPU, GPU.IRQPending);
 
@@ -1370,6 +1348,7 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
 
 void GPU_Power(void)
 {
+   GPU_SW_Sync();
    memset(GPU.vram, 0, 512 * 1024 * UPSCALE(&GPU) * UPSCALE(&GPU) * sizeof(*GPU.vram));
 
    memset(GPU.CLUT_Cache, 0, sizeof(GPU.CLUT_Cache));
@@ -1775,6 +1754,7 @@ void GPU_WriteDMA(uint32_t V, uint32_t addr)
 
 static INLINE uint32_t GPU_ReadData(void)
 {
+   GPU_SW_Sync();
    unsigned i;
 
    GPU.DataReadBufferEx = 0;
@@ -1872,6 +1852,88 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A)
    return(ret >> ((A & 3) * 8));
 }
 
+#if defined(GPU_HAVE_SSE2) || defined(GPU_HAVE_NEON)
+/* Recover four 24-bit pixels with the original word addresses, including
+ * samples inside an upscaled word and row wraps. Replication is in 32-bit
+ * lanes; the 16-bit fragment helpers would duplicate individual channels. */
+static INLINE void GPU_SW_Scanout24(const uint16_t *src, uint32_t *dst,
+      int fb_x, unsigned shift, unsigned mask)
+{
+   uint32_t packed[4];
+   unsigned lane, block, scale = 1u << shift;
+#if defined(GPU_HAVE_SSE2)
+   __m128i color, raw, r, g, b;
+#else
+   uint32x4_t color, raw, r, g, b;
+#endif
+   for (lane = 0; lane < 4; lane++)
+   {
+      uint32_t value = src[fb_x >> 1] | ((uint32_t)src[((fb_x >> 1) + scale) & mask] << 16);
+      packed[lane] = value;
+      fb_x = (fb_x + 3 * scale) & mask;
+   }
+#if defined(GPU_HAVE_SSE2)
+   raw = _mm_loadu_si128((const __m128i *)packed);
+   {
+      /* Four advances leave the initial byte phase unchanged. */
+      __m128i odd = ((fb_x >> shift) & 1)
+         ? _mm_setr_epi32(-1, 0, -1, 0) : _mm_setr_epi32(0, -1, 0, -1);
+      raw = GPU_SW_Select16(odd, _mm_srli_epi32(raw, 8), raw);
+   }
+   r = _mm_slli_epi32(_mm_and_si128(raw, _mm_set1_epi32(255)), RED_SHIFT);
+   g = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(raw, 8), _mm_set1_epi32(255)), GREEN_SHIFT);
+   b = _mm_slli_epi32(_mm_and_si128(_mm_srli_epi32(raw, 16), _mm_set1_epi32(255)), BLUE_SHIFT);
+   color = _mm_or_si128(r, _mm_or_si128(g, b));
+#else
+   raw = vld1q_u32(packed);
+   {
+      int32_t shifts[4];
+      for (lane = 0; lane < 4; lane++) shifts[lane] = (((fb_x >> shift) + lane) & 1) ? -8 : 0;
+      raw = vshlq_u32(raw, vld1q_s32(shifts));
+   }
+   r = vshlq_n_u32(vandq_u32(raw, vdupq_n_u32(255)), RED_SHIFT);
+   g = vshlq_n_u32(vandq_u32(vshrq_n_u32(raw, 8), vdupq_n_u32(255)), GREEN_SHIFT);
+   b = vandq_u32(vshrq_n_u32(raw, 16), vdupq_n_u32(255));
+   color = vorrq_u32(r, vorrq_u32(g, b));
+#endif
+#if defined(GPU_HAVE_SSE2)
+   if (shift == 1)
+   {
+      _mm_storeu_si128((__m128i *)dst, _mm_unpacklo_epi32(color, color));
+      _mm_storeu_si128((__m128i *)(dst + 4), _mm_unpackhi_epi32(color, color));
+   }
+   else
+   {
+      __m128i p0 = _mm_shuffle_epi32(color, 0x00), p1 = _mm_shuffle_epi32(color, 0x55);
+      __m128i p2 = _mm_shuffle_epi32(color, 0xaa), p3 = _mm_shuffle_epi32(color, 0xff);
+      for (block = 0; block < scale; block += 4)
+      {
+         _mm_storeu_si128((__m128i *)(dst + block), p0);
+         _mm_storeu_si128((__m128i *)(dst + scale + block), p1);
+         _mm_storeu_si128((__m128i *)(dst + 2 * scale + block), p2);
+         _mm_storeu_si128((__m128i *)(dst + 3 * scale + block), p3);
+      }
+   }
+#else
+   if (shift == 1)
+   {
+      uint32x4x2_t pairs = vzipq_u32(color, color);
+      vst1q_u32(dst, pairs.val[0]); vst1q_u32(dst + 4, pairs.val[1]);
+   }
+   else
+   {
+      uint32x4_t p0 = vdupq_lane_u32(vget_low_u32(color), 0), p1 = vdupq_lane_u32(vget_low_u32(color), 1);
+      uint32x4_t p2 = vdupq_lane_u32(vget_high_u32(color), 0), p3 = vdupq_lane_u32(vget_high_u32(color), 1);
+      for (block = 0; block < scale; block += 4)
+      {
+         vst1q_u32(dst + block, p0); vst1q_u32(dst + scale + block, p1);
+         vst1q_u32(dst + 2 * scale + block, p2); vst1q_u32(dst + 3 * scale + block, p3);
+      }
+   }
+#endif
+}
+#endif
+
 static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
       uint32_t out_Gshift, uint32_t out_Bshift,
       bool bpp24, const uint16_t *src, uint32_t *dest,
@@ -1883,7 +1945,7 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
    if(bpp24)   /* 24bpp */
    {
       int32_t x = dx_start;
-#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+#if defined(GPU_HAVE_SSE2) || defined(GPU_HAVE_NEON)
       /* Native-res fast path.  At upscale_shift == 0 the 24bpp source
        * is a plain byte stream of consecutive R,G,B triplets: output
        * pixel p reads bytes [fb_x + 3*p + 0..2] as R,G,B and writes
@@ -1893,24 +1955,34 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
        * span before the wrap and let the scalar loop finish the tail
        * (it re-derives the wrap via `& fb_mask`).  Upscaled output
        * replicates pixels and strides differently, so it stays scalar. */
+      if (upscale_shift > 0 && upscale_shift <= 3)
+         while (dx_end - x >= (int32_t)(4 * upscale))
+         {
+            GPU_SW_Scanout24(src, dest + x, fb_x, upscale_shift, fb_mask);
+            x += 4 * upscale;
+            fb_x = (fb_x + 12 * upscale) & fb_mask;
+         }
       if (upscale_shift == 0)
       {
          const uint8_t *bytes = (const uint8_t*)src;
-#if defined(__SSE2__)
-         /* 4 px from three stride-3 unaligned words.  word_p has bytes
-          * [R,G,B,next] in ascending memory order; we want B|G<<8|R<<16,
-          * i.e. swap the R and B bytes and drop the 4th. */
+#if defined(GPU_HAVE_SSE2)
+         /* Load exactly twelve bytes, then unpack four RGB triplets.
+          * No unaligned scalar word casts or read into the next row. */
          while (x + 4 <= dx_end)
          {
-            __m128i w, b0, b2, g, out;
-            /* The block reads bytes [fb_x .. fb_x+12]; fb_x wraps at
+            uint32_t tail;
+            __m128i packed, lo, hi, w, b0, b2, g, out;
+            /* The block reads bytes [fb_x .. fb_x+12); fb_x wraps at
              * byte 0x800 (fb_mask is a byte mask).  Bail if the linear
              * read would cross the wrap - the scalar tail handles it. */
             if ((fb_x + 12) > (fb_mask + 1))
                break;
-            w  = _mm_setr_epi32(
-                  *(const uint32_t*)&bytes[fb_x + 0], *(const uint32_t*)&bytes[fb_x + 3],
-                  *(const uint32_t*)&bytes[fb_x + 6], *(const uint32_t*)&bytes[fb_x + 9]);
+            memcpy(&tail, bytes + fb_x + 8, sizeof(tail));
+            packed = _mm_or_si128(_mm_loadl_epi64((const __m128i *)(bytes + fb_x)),
+                  _mm_slli_si128(_mm_cvtsi32_si128((int)tail), 8));
+            lo = _mm_unpacklo_epi32(packed, _mm_srli_si128(packed, 3));
+            hi = _mm_unpacklo_epi32(_mm_srli_si128(packed, 6), _mm_srli_si128(packed, 9));
+            w = _mm_unpacklo_epi64(lo, hi);
             b0  = _mm_and_si128(w, _mm_set1_epi32(0x000000FF));                       /* R */
             b2  = _mm_and_si128(_mm_srli_epi32(w, 16), _mm_set1_epi32(0x000000FF));   /* B */
             g   = _mm_and_si128(w, _mm_set1_epi32(0x0000FF00));                       /* G<<8 */
@@ -1948,7 +2020,7 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
          int i;
          uint32_t color;
          uint32_t srcpix = src[(fb_x >> 1) + 0]
-            | (src[((fb_x >> 1) + (1 << upscale_shift)) & fb_mask] << 16);
+            | ((uint32_t)src[((fb_x >> 1) + (1 << upscale_shift)) & fb_mask] << 16);
          srcpix >>= ((fb_x >> upscale_shift) & 1) * 8;
 
          color =   (((srcpix >> 0) << RED_SHIFT)   & (0xFF << RED_SHIFT))
@@ -1965,7 +2037,7 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
    {
       int32_t x = dx_start;
 
-#if defined(__SSE2__)
+#if defined(GPU_HAVE_SSE2)
       /* 8-pixel SSE2 fast path.  Each PSX 16-bit pixel is
        *   bit  15: mask  (dropped)
        *   bits 10-14: B (5 bits)
@@ -2022,9 +2094,29 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
          x   += 8;
          fb_x = (fb_x + 16) & fb_mask;
       }
+#elif defined(GPU_HAVE_NEON)
+      const uint16x8_t mask5 = vdupq_n_u16(0x001f);
+      const int32_t words_per_row = (fb_mask + 1) >> 1;
+      while ((dx_end - x) >= 8)
+      {
+         const int32_t word_idx = fb_x >> 1;
+         uint16x8_t s, r8, gb;
+         uint16x8x2_t pixels;
+         if (word_idx + 8 > words_per_row)
+            break;
+         s = vld1q_u16(src + word_idx);
+         r8 = vshlq_n_u16(vandq_u16(s, mask5), 3);
+         gb = vorrq_u16(vshlq_n_u16(vandq_u16(vshrq_n_u16(s, 5), mask5), 11),
+               vshlq_n_u16(vandq_u16(vshrq_n_u16(s, 10), mask5), 3));
+         pixels = vzipq_u16(gb, r8);
+         vst1q_u32(dest + x, vreinterpretq_u32_u16(pixels.val[0]));
+         vst1q_u32(dest + x + 4, vreinterpretq_u32_u16(pixels.val[1]));
+         x += 8;
+         fb_x = (fb_x + 16) & fb_mask;
+      }
 #endif
 
-      /* Scalar tail / non-SSE2 fallback / wrap-crossing chunks. */
+      /* Scalar tail / non-SIMD fallback / wrap-crossing chunks. */
       for (; x < dx_end; x++)
       {
          uint32_t srcpix = src[(fb_x >> 1)];
@@ -2670,6 +2762,7 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                          && scanout_cache[dest_line].dx_end   == dx_end
                          && scanout_cache[dest_line].dmw      == (uint32_t)dmw;
 
+                     GPU_SW_Sync();
                      for (uint32_t i = 0; i < _upscale; i++)
                      {
                         const uint16_t *src = GPU.vram +
@@ -2884,6 +2977,7 @@ bool GPU_DeferredScanoutWhole(int32_t lines, int32_t *dmw)
 
 void GPU_FlushDeferredScanout(MDFN_Surface *target)
 {
+   GPU_SW_Sync();
    const unsigned s = GPU.upscale_shift;
    const unsigned up = 1u << s;
    int32_t   pitch_pix;
@@ -3021,6 +3115,7 @@ void GPU_FlushDeferredScanout(MDFN_Surface *target)
  * bytes never read, so nothing has to be brought up to date for it. */
 void GPU_RestoreStateP1(bool load, bool sizing)
 {
+   GPU_SW_Sync();
    /* The idle schedule is not part of a state; the ForceEventUpdates()
     * after a load puts the GPU on a fresh grid, as it always has. */
    if (load && GPU.idle_virtual)
@@ -3081,10 +3176,7 @@ void GPU_RestoreStateP1(bool load, bool sizing)
       {
          /* We must downscale the current VRAM contents back to 1x */
          for (unsigned y = 0; y < 512; y++)
-         {
-            for (unsigned x = 0; x < 1024; x++)
-               vram_new[y * 1024 + x] = texel_fetch(&GPU, x, y);
-         }
+            GPU_SW_ReadNative(vram_new + y * 1024, &texel_fetch(&GPU, 0, y), 1024, GPU.upscale_shift);
       }
    }
 
@@ -3100,16 +3192,15 @@ void GPU_RestoreStateP1(bool load, bool sizing)
 
 void GPU_RestoreStateP2(bool load)
 {
+   GPU_SW_Sync();
    if (GPU.upscale_shift > 0)
    {
       if (load && vram_new)
       {
          /* Restore upscaled VRAM from savestate */
          for (unsigned y = 0; y < 512; y++)
-         {
-            for (unsigned x = 0; x < 1024; x++)
-               texel_put(x, y, vram_new[y * 1024 + x]);
-         }
+            GPU_SW_WriteNative(&texel_fetch(&GPU, 0, y), 1024u << GPU.upscale_shift,
+                  GPU.upscale_shift, vram_new + y * 1024, 1024, 0, 0);
       }
 
       vram_new = NULL;
@@ -3224,6 +3315,7 @@ static void gpu_upload_changed_rows(bool dirty)
 
 static void gpu_restore_state_p3(bool upload_all)
 {
+   GPU_SW_Sync();
    for(unsigned i = 0; i < 256; i++)
    {
       GPU.TexCache[i].Tag = TexCache_Tag[i];
@@ -3284,6 +3376,7 @@ static void gpu_restore_state_p3(bool upload_all)
 
 int GPU_StateAction(StateMem *sm, int load, int data_only)
 {
+   GPU_SW_Sync();
    /* Retain pending UV corrections; adjusted vertices cannot reconstruct them.
     * Neutral defaults keep older states from inheriting a previous draw. */
    uint16_t off_u = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_u : 0;
@@ -3557,6 +3650,7 @@ bool GPU_DMACanWrite(void)
 
 uint16_t *GPU_get_vram(void)
 {
+   GPU_SW_Sync();
    return GPU.vram;
 }
 

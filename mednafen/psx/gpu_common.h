@@ -318,15 +318,18 @@ static INLINE void Update_CLUT_Cache_##SUFFIX(PS_GPU *g, uint16_t raw_clut) \
       const uint32_t new_ccvb = ((raw_clut & 0x7FFF) | ((TM_VAL) << 16)); \
       if (g->CLUT_Cache_VB != new_ccvb) \
       { \
+         GPU_SW_Sync(); \
          uint16_t y = (raw_clut >> 6) & 0x1FF; \
          const uint32_t cxo = (raw_clut & 0x3F) << 4; \
          const uint32_t count = ((TM_VAL) ? 256 : 16); \
          unsigned i; \
          g->DrawTimeAvail -= count; \
-         for (i = 0; i < count; i++) \
+         for (i = 0; i < count;) \
          { \
             uint16_t x = (cxo + i) & 0x3FF; \
-            g->CLUT_Cache[i] = texel_fetch(g, x, y); \
+            unsigned part = count - i < 1024u - x ? count - i : 1024u - x; \
+            GPU_SW_ReadNative(g->CLUT_Cache + i, &texel_fetch(g, x, y), part, g->upscale_shift); \
+            i += part; \
          } \
          g->CLUT_Cache_VB = new_ccvb; \
       } \
@@ -387,13 +390,9 @@ static INLINE void RecalcTexWindowStuff(PS_GPU *g)
  * the matching arm; the if (TM_VAL != 2) and if (TM_VAL == 0) tests
  * are literal so dead arms vanish. */
 #define DEFINE_GetTexel(SUFFIX, TM_VAL) \
-static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg) \
+static INLINE uint16_t GetTexelAddress_##SUFFIX(PS_GPU *g, uint32_t u_ext, uint32_t gro) \
 { \
    uint16_t fbw; \
-   uint32_t u_ext   = ((u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD); \
-   uint32_t fbtex_x = ((u_ext >> (2 - (TM_VAL)))) & 1023; \
-   uint32_t fbtex_y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD; \
-   uint32_t gro     = fbtex_y * 1024U + fbtex_x; \
    uint32_t gro_line = gro & ~0x3U; \
    PS_GPU_TexCache_t *c; \
    if (g->last_tex_line == gro_line && g->last_tex_c) { \
@@ -410,12 +409,9 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
       } \
       if (MDFN_UNLIKELY(c->Tag != gro_line)) \
       { \
-         uint32_t cache_x = fbtex_x & ~3; \
+         uint32_t cache_x = gro & 1020u, fbtex_y = gro >> 10; \
          g->DrawTimeAvail -= 4; \
-         c->Data[0] = texel_fetch(g, cache_x + 0, fbtex_y); \
-         c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y); \
-         c->Data[2] = texel_fetch(g, cache_x + 2, fbtex_y); \
-         c->Data[3] = texel_fetch(g, cache_x + 3, fbtex_y); \
+         GPU_SW_ReadNative(c->Data, &texel_fetch(g, cache_x, fbtex_y), 4, g->upscale_shift); \
          c->Tag     = gro_line; \
       } \
       g->last_tex_line = gro_line; \
@@ -431,6 +427,13 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
       fbw = g->CLUT_Cache[fbw]; \
    } \
    return fbw; \
+} \
+static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg) \
+{ \
+   uint32_t u_ext = (u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD; \
+   uint32_t x = (u_ext >> (2 - (TM_VAL))) & 1023u; \
+   uint32_t y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD; \
+   return GetTexelAddress_##SUFFIX(g, u_ext, y * 1024u + x); \
 }
 
 /* PS_GPU_TexCache_t aliases the nested TexCache_t struct from
@@ -441,6 +444,130 @@ typedef struct TexCache_t PS_GPU_TexCache_t;
 DEFINE_GetTexel(TM0, 0)
 DEFINE_GetTexel(TM1, 1)
 DEFINE_GetTexel(TM2, 2)
+
+/* Address four samples together, then visit the cache in pixel order.
+ * SIMD gathers are unavailable on SSE2/ARMv7; cache fills and CLUT reads
+ * remain ordered so tags, last-line shortcuts and draw timing stay exact. */
+static INLINE void GPU_SW_TextureAddresses(const PS_GPU *g, const int32_t *u,
+      const int32_t *v, uint32_t *extended_u, uint32_t *address, unsigned mode)
+{
+#if defined(GPU_HAVE_SSE2)
+   __m128i ux = _mm_add_epi32(_mm_and_si128(_mm_loadu_si128((const __m128i *)u),
+            _mm_set1_epi32(g->SUCV.TWX_AND)), _mm_set1_epi32(g->SUCV.TWX_ADD));
+   __m128i vy = _mm_add_epi32(_mm_and_si128(_mm_loadu_si128((const __m128i *)v),
+            _mm_set1_epi32(g->SUCV.TWY_AND)), _mm_set1_epi32(g->SUCV.TWY_ADD));
+   __m128i x = _mm_and_si128(_mm_srl_epi32(ux, _mm_cvtsi32_si128(2 - mode)), _mm_set1_epi32(1023));
+   _mm_storeu_si128((__m128i *)extended_u, ux);
+   _mm_storeu_si128((__m128i *)address, _mm_add_epi32(_mm_slli_epi32(vy, 10), x));
+#elif defined(GPU_HAVE_NEON)
+   uint32x4_t ux = vaddq_u32(vandq_u32(vreinterpretq_u32_s32(vld1q_s32(u)),
+            vdupq_n_u32(g->SUCV.TWX_AND)), vdupq_n_u32(g->SUCV.TWX_ADD));
+   uint32x4_t vy = vaddq_u32(vandq_u32(vreinterpretq_u32_s32(vld1q_s32(v)),
+            vdupq_n_u32(g->SUCV.TWY_AND)), vdupq_n_u32(g->SUCV.TWY_ADD));
+   uint32x4_t x = vandq_u32(vshlq_u32(ux, vdupq_n_s32((int)mode - 2)), vdupq_n_u32(1023));
+   vst1q_u32(extended_u, ux);
+   vst1q_u32(address, vaddq_u32(vshlq_n_u32(vy, 10), x));
+#else
+   unsigned i;
+   for (i = 0; i < 4; i++)
+   {
+      uint32_t ux = (u[i] & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD;
+      uint32_t vy = (v[i] & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD;
+      extended_u[i] = ux;
+      address[i] = vy * 1024u + ((ux >> (2 - mode)) & 1023u);
+   }
+#endif
+}
+
+#define DEFINE_GPU_SW_FetchTexels(TAG, MODE) \
+static INLINE void GPU_SW_FetchTexels_##TAG(PS_GPU *g, uint16_t *out, \
+      const int32_t *u, const int32_t *v, unsigned count) \
+{ \
+   unsigned i = 0, lane; \
+   for (; i + 4 <= count; i += 4) \
+   { \
+      uint32_t extended_u[4], address[4]; \
+      GPU_SW_TextureAddresses(g, u + i, v + i, extended_u, address, MODE); \
+      for (lane = 0; lane < 4; lane++) \
+         out[i + lane] = GetTexelAddress_##TAG(g, extended_u[lane], address[lane]); \
+   } \
+   for (; i < count; i++) out[i] = GetTexel_##TAG(g, u[i], v[i]); \
+}
+DEFINE_GPU_SW_FetchTexels(TM0, 0)
+DEFINE_GPU_SW_FetchTexels(TM1, 1)
+DEFINE_GPU_SW_FetchTexels(TM2, 2)
+#undef DEFINE_GPU_SW_FetchTexels
+
+/* Texture cache fills must observe every earlier draw. Within a span we
+ * can defer destination writes only when its native row cannot be sampled
+ * from the current texture window/page. A possible overlap retains the
+ * original fetch -> shade -> write order, including cache-fill side effects.
+ * Palette contents are already latched by Update_CLUT_Cache. */
+static INLINE bool GPU_SW_Begin(GPU_SW_Packet *p, PS_GPU *g,
+      int x, int y, int width, bool native, bool textured, int blend, bool mask_eval)
+{
+   unsigned row, lo = 0, hi = 1023, first = 0, last = 1023, shift = g->upscale_shift;
+   if (width <= 0) return false;
+   /* Tiny synchronous runs are cheaper in the original fused pixel loop.
+    * Keep the original specialised untextured SIMD path synchronous too. */
+   if (!GPU_SW_Threaded() && (!textured || width < 4)) return false;
+#if !defined(GPU_HAVE_SSE2) && !defined(GPU_HAVE_NEON)
+   if (!GPU_SW_Threaded()) return false;
+#endif
+   if (textured)
+   {
+      unsigned mode = g->TexMode > 2 ? 2 : g->TexMode;
+      first = g->SUCV.TWX_ADD >> (2 - mode);
+      last = (g->SUCV.TWX_ADD + (255u & g->SUCV.TWX_AND)) >> (2 - mode);
+      lo = (first & 1023) & ~3u;
+      hi = (last & 1023) | 3u;
+      if (GPU_SW_Threaded() && GPU_SW_TilesDirty(g->SUCV.TWY_ADD,
+               g->SUCV.TWY_ADD + (255u & g->SUCV.TWY_AND), GPU_SW_ColumnMask(lo, hi)))
+         GPU_SW_Sync();
+   }
+#ifdef GPU_SW_REFERENCE
+   return false;
+#endif
+#ifdef PSX_MEASURE_MODULATE
+   /* The optional instrumentation counts modulation on the emulation
+    * thread. Keep that diagnostic's scalar calls and counters intact. */
+   if (textured)
+   {
+      GPU_SW_Sync();
+      return false;
+   }
+#endif
+   row = native ? ((unsigned)y & 511) : (((unsigned)y >> shift) & 511);
+   if (textured && row >= g->SUCV.TWY_ADD &&
+         row - g->SUCV.TWY_ADD <= (255u & g->SUCV.TWY_AND))
+   {
+      unsigned dx0 = native ? (unsigned)x : (unsigned)x >> shift;
+      unsigned dx1 = native ? (unsigned)(x + width - 1) : (unsigned)(x + width - 1) >> shift;
+      bool overlap = (first >> 10) != (last >> 10)
+         ? dx0 <= hi || dx1 >= lo : dx1 >= lo && dx0 <= hi;
+      if (overlap)
+      {
+         GPU_SW_Sync();
+         return false;
+      }
+   }
+   p->stride = 1024u << shift;
+   p->vram = g->vram;
+   p->render_shift = shift;
+   p->native_row = row;
+   p->execute = NULL;
+   p->native_shift = native ? shift : 0;
+   p->dest = g->vram + (native
+         ? (row << shift) * p->stride + ((unsigned)x << shift)
+         : ((unsigned)y & ((512u << shift) - 1)) * p->stride + x);
+   p->count = 0;
+   p->blend = blend;
+   p->mask_eval = mask_eval;
+   p->mask_set = g->MaskSetOR;
+   p->textured = textured;
+   p->modulate = 0;
+   return true;
+}
 
 /* The template-style GetTexel dispatcher previously here is gone
  * in stage 5; callers now reference the right GetTexel_TM<n>
