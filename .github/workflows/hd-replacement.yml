@@ -1,0 +1,77 @@
+name: HD texture replacement
+
+# unit: the replacement latch and the texture directory modes, strict C89,
+# ASan/UBSan (tools/tt_replace/run.sh).
+# uploads: a synthetic pack through the Vulkan renderer, frames compared
+# with replacement off and between the sync and async caching methods
+# (tools/tt_replace/hd_upload.sh).
+# fused pages: paletted uploads served as a fused page and rebuilt in place
+# each frame, under the validation layer's synchronization checks: the page
+# clear, its blits and its layout changes must be ordered
+# (tools/tt_replace/fused_page_sync.sh).
+# sanitizers: the same fused pages on both renderers with an ASan/UBSan
+# core under LeakSanitizer: pages, their rects and uploads are released
+# (tools/tt_replace/fused_page_leaks.sh).
+
+on:
+  push:
+    paths:
+      - 'rhi/**'
+      - 'Makefile*'
+      - 'tools/tt_replace/**'
+      - 'tools/vkhost/**'
+      - '.github/workflows/hd-replacement.yml'
+  pull_request:
+    paths:
+      - 'rhi/**'
+      - 'Makefile*'
+      - 'tools/tt_replace/**'
+      - 'tools/vkhost/**'
+      - '.github/workflows/hd-replacement.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux, C89 and ASan/UBSan
+        run: sh tools/tt_replace/run.sh
+
+  lanes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan (lavapipe, validation layer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libvulkan-dev mesa-vulkan-drivers \
+            vulkan-validationlayers libgl1-mesa-dev libegl1-mesa-dev python3
+      - name: Build the core
+        run: make -j"$(nproc)" HAVE_HW=1
+      - name: HD uploads
+        run: sh tools/tt_replace/hd_upload.sh "$PWD/mednafen_psx_hw_libretro.so"
+      - name: Fused pages under synchronization validation
+        run: sh tools/tt_replace/fused_page_sync.sh "$PWD/mednafen_psx_hw_libretro.so"
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan and GL (lavapipe, llvmpipe)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libvulkan-dev mesa-vulkan-drivers \
+            vulkan-validationlayers libgl1-mesa-dev libegl1-mesa-dev python3
+      - name: Build the core with ASan and UBSan
+        run: make -j"$(nproc)" HAVE_HW=1 SANITIZER=address,undefined
+      - name: Fused pages under the sanitizers
+        run: sh tools/tt_replace/fused_page_leaks.sh "$PWD/mednafen_psx_hw_libretro.so"

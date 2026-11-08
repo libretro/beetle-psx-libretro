@@ -53,6 +53,10 @@
  *   "none".
  *   VKHOST_UPSCALER_STATS: read the transparency mask back every frame and
  *   append to the log line how much of it is set, in thousandths.
+ *   VKHOST_SYNC_VALIDATION=1: enable the layer's synchronization validation.
+ *   HOST_VARIABLE_SIZE=1: accept variable savestate sizes, as RetroArch.
+ *   VKHOST_RAM_OUT: path:offset:length - after the last frame, write that
+ *   window of system RAM to path (content can copy VRAM there via GP0).
  *
  * Exits non-zero on any validation error, on any use the core makes of
  * the frontend's queue without holding lock_queue, and on any wait it
@@ -338,6 +342,46 @@ static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateComputePipelines(VkDevice d,
       const VkAllocationCallbacks *a, VkPipeline *o)
 { count_pipelines(n); return real_create_compute_pipelines(d, c, n, i, a, o); }
 
+/* VKHOST_NONCOHERENT: report every host-visible memory type as
+ * non-coherent, so the core flushes and invalidates as on a GPU without
+ * coherent host memory, and count the bytes those calls cover. */
+static PFN_vkGetPhysicalDeviceMemoryProperties real_get_memory_properties;
+static PFN_vkInvalidateMappedMemoryRanges real_invalidate_ranges;
+static PFN_vkFlushMappedMemoryRanges real_flush_ranges;
+static unsigned long long invalidated_bytes, flushed_bytes;
+static unsigned long invalidate_calls, flush_calls;
+static VKAPI_ATTR void VKAPI_CALL core_vkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice gpu,
+      VkPhysicalDeviceMemoryProperties *props)
+{
+   uint32_t i;
+   real_get_memory_properties(gpu, props);
+   for (i = 0; i < props->memoryTypeCount; i++)
+      props->memoryTypes[i].propertyFlags &= ~VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+}
+static unsigned long long range_bytes(VkDevice device, uint32_t count, const VkMappedMemoryRange *r)
+{
+   unsigned long long n = 0;
+   uint32_t           i;
+   (void)device;
+   for (i = 0; i < count; i++)
+      n += (r[i].size == VK_WHOLE_SIZE) ? (1ull << 40) : r[i].size;
+   return n;
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkInvalidateMappedMemoryRanges(VkDevice device,
+      uint32_t count, const VkMappedMemoryRange *r)
+{
+   __atomic_add_fetch(&invalidated_bytes, range_bytes(device, count, r), __ATOMIC_SEQ_CST);
+   __atomic_add_fetch(&invalidate_calls, 1, __ATOMIC_SEQ_CST);
+   return real_invalidate_ranges(device, count, r);
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkFlushMappedMemoryRanges(VkDevice device,
+      uint32_t count, const VkMappedMemoryRange *r)
+{
+   __atomic_add_fetch(&flushed_bytes, range_bytes(device, count, r), __ATOMIC_SEQ_CST);
+   __atomic_add_fetch(&flush_calls, 1, __ATOMIC_SEQ_CST);
+   return real_flush_ranges(device, count, r);
+}
+
 static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction real)
 {
    if (!real)
@@ -366,6 +410,12 @@ static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction 
    { real_queue_wait_idle = (PFN_vkQueueWaitIdle)real; return (PFN_vkVoidFunction)core_vkQueueWaitIdle; }
    if (!strcmp(name, "vkDeviceWaitIdle"))
    { real_device_wait_idle = (PFN_vkDeviceWaitIdle)real; return (PFN_vkVoidFunction)core_vkDeviceWaitIdle; }
+   if (!strcmp(name, "vkGetPhysicalDeviceMemoryProperties") && getenv("VKHOST_NONCOHERENT"))
+   { real_get_memory_properties = (PFN_vkGetPhysicalDeviceMemoryProperties)real; return (PFN_vkVoidFunction)core_vkGetPhysicalDeviceMemoryProperties; }
+   if (!strcmp(name, "vkInvalidateMappedMemoryRanges"))
+   { real_invalidate_ranges = (PFN_vkInvalidateMappedMemoryRanges)real; return (PFN_vkVoidFunction)core_vkInvalidateMappedMemoryRanges; }
+   if (!strcmp(name, "vkFlushMappedMemoryRanges"))
+   { real_flush_ranges = (PFN_vkFlushMappedMemoryRanges)real; return (PFN_vkVoidFunction)core_vkFlushMappedMemoryRanges; }
    if (!strcmp(name, "vkWaitForFences"))
    { real_wait_for_fences = (PFN_vkWaitForFences)real; return (PFN_vkVoidFunction)core_vkWaitForFences; }
    return real;
@@ -774,6 +824,13 @@ static bool env_cb(unsigned cmd, void *data)
       }
       case RETRO_ENVIRONMENT_SET_GEOMETRY:
          return true;
+      case RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS:
+         /* HOST_VARIABLE_SIZE=1: accept variable state sizes, as RetroArch
+          * does, so the core sizes each state with a counting pass. */
+         if (!getenv("HOST_VARIABLE_SIZE"))
+            return false;
+         *(uint64_t *)data |= RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE;
+         return true;
       case RETRO_ENVIRONMENT_GET_VARIABLE:
       {
          struct retro_variable *var = (struct retro_variable *)data;
@@ -937,6 +994,9 @@ static bool create_instance(void)
 {
    const char *layers[] = { "VK_LAYER_KHRONOS_validation" };
    const char *exts[]   = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
+   static const VkValidationFeatureEnableEXT sync_enable =
+      VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;
+   static VkValidationFeaturesEXT sync_features;
    VkApplicationInfo app = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
    VkInstanceCreateInfo ci = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
 
@@ -955,6 +1015,15 @@ static bool create_instance(void)
    ci.ppEnabledLayerNames = layers;
    ci.enabledExtensionCount = 1;
    ci.ppEnabledExtensionNames = exts;
+   /* VKHOST_SYNC_VALIDATION=1: the layer's synchronization validation too;
+    * its hazards are validation errors and fail the run. */
+   if (getenv("VKHOST_SYNC_VALIDATION") && ci.enabledLayerCount)
+   {
+      sync_features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+      sync_features.enabledValidationFeatureCount = 1;
+      sync_features.pEnabledValidationFeatures = &sync_enable;
+      ci.pNext = &sync_features;
+   }
    if (vkCreateInstance(&ci, NULL, &instance) != VK_SUCCESS)
       return false;
 
@@ -1513,6 +1582,11 @@ run_frames_sw:
          __atomic_load_n(&pipelines_host, __ATOMIC_SEQ_CST),
          __atomic_load_n(&pipelines_host_running, __ATOMIC_SEQ_CST),
          __atomic_load_n(&pipelines_other, __ATOMIC_SEQ_CST));
+   fprintf(stderr, "[vkhost] host caches: %llu bytes invalidated in %lu calls, %llu bytes flushed in %lu calls\n",
+         __atomic_load_n(&invalidated_bytes, __ATOMIC_SEQ_CST),
+         __atomic_load_n(&invalidate_calls, __ATOMIC_SEQ_CST),
+         __atomic_load_n(&flushed_bytes, __ATOMIC_SEQ_CST),
+         __atomic_load_n(&flush_calls, __ATOMIC_SEQ_CST));
    fprintf(stderr, "[vkhost] longest frame after the first: %.2f ms (frame %d)\n",
          longest_frame_ms, longest_frame);
    if (up_on)
@@ -1522,6 +1596,29 @@ run_frames_sw:
            " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
            frames, frame_valid, validation_errors, validation_warnings,
            queue_violations, queue_waits_locked);
+   { const char *ro = getenv("VKHOST_RAM_OUT");
+     if (ro)
+     {
+        typedef void *(*mem_data_t)(unsigned);
+        typedef size_t (*mem_size_t)(unsigned);
+        char path[1024]; unsigned long off = 0, len = 0;
+        const char *c1 = strchr(ro, ':');
+        unsigned char *ram = (unsigned char *)((mem_data_t)dlsym(core,
+              "retro_get_memory_data"))(RETRO_MEMORY_SYSTEM_RAM);
+        size_t ram_size = ((mem_size_t)dlsym(core,
+              "retro_get_memory_size"))(RETRO_MEMORY_SYSTEM_RAM);
+        FILE *f;
+        if (!c1 || (size_t)(c1 - ro) >= sizeof(path) ||
+            sscanf(c1 + 1, "%lx:%lx", &off, &len) != 2 || !ram ||
+            off + len > ram_size)
+        { fprintf(stderr, "[vkhost] VKHOST_RAM_OUT invalid\n"); return 5; }
+        memcpy(path, ro, c1 - ro); path[c1 - ro] = 0;
+        f = fopen(path, "wb");
+        if (!f || fwrite(ram + off, 1, len, f) != len)
+        { fprintf(stderr, "[vkhost] VKHOST_RAM_OUT write failed\n"); return 5; }
+        fclose(f);
+     }
+   }
    { void (*f)(void) = dlsym(core, "retro_unload_game"); if (f) f(); }
    { void (*f)(void) = dlsym(core, "retro_deinit"); if (f) f(); }
    if (next_content && !(validation_errors || queue_violations || queue_waits_locked))

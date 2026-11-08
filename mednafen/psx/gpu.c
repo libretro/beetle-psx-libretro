@@ -3017,7 +3017,9 @@ void GPU_FlushDeferredScanout(MDFN_Surface *target)
 }
 
 
-void GPU_RestoreStateP1(bool load)
+/* sizing: the state is only being measured (retro_serialize_size), its
+ * bytes never read, so nothing has to be brought up to date for it. */
+void GPU_RestoreStateP1(bool load, bool sizing)
 {
    /* The idle schedule is not part of a state; the ForceEventUpdates()
     * after a load puts the GPU on a fresh grid, as it always has. */
@@ -3027,7 +3029,7 @@ void GPU_RestoreStateP1(bool load)
       PSX_EventVirtual(PSX_EVENT_GPU, false);
    }
 
-   if (!load && !rhi_intf_has_software_renderer())
+   if (!load && !sizing && !rhi_intf_has_software_renderer())
    {
       /* Pure hardware renderer: the composited framebuffer lives only on the
        * GPU. CPU-side GPU.vram is coherent solely where the game issued an
@@ -3075,7 +3077,7 @@ void GPU_RestoreStateP1(bool load)
          state_vram_1x = (uint16_t *)malloc(1024 * 512 * sizeof(uint16_t));
       vram_new = state_vram_1x;
 
-      if (vram_new && !load)
+      if (vram_new && !load && !sizing)
       {
          /* We must downscale the current VRAM contents back to 1x */
          for (unsigned y = 0; y < 512; y++)
@@ -3304,7 +3306,7 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
    uint32_t fbw_cury = GPU.FBRW_CurY;
    uint32_t fbw_curx = (GPU.FBRW_CurX - GPU.FBRW_X) & 1023;
    int      ret;
-   GPU_RestoreStateP1(load);
+   GPU_RestoreStateP1(load, sm->sizing);
 
    /* Invalidate cache tags missing from older states. */
    if (load)

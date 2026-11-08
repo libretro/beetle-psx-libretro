@@ -2342,6 +2342,12 @@ static void *deviceallocator_map_memory(struct DeviceAllocator *self,
 static void deviceallocator_unmap_memory(struct DeviceAllocator *self,
       const struct DeviceAllocation *alloc,
       MemoryAccessFlags flags);
+static void deviceallocator_invalidate(struct DeviceAllocator *self,
+      const struct DeviceAllocation *alloc,
+      VkDeviceSize start, VkDeviceSize bytes);
+static void deviceallocator_flush(struct DeviceAllocator *self,
+      const struct DeviceAllocation *alloc,
+      VkDeviceSize start, VkDeviceSize bytes);
 static bool deviceallocator_allocate(struct DeviceAllocator *self,
       uint32_t size,
       uint32_t memory_type,
@@ -5043,6 +5049,8 @@ static void cbh_move(struct CommandBufferHandle *dst,
     * class for private-member access. */
 static void *device_map_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { return deviceallocator_map_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
 static void device_unmap_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { deviceallocator_unmap_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
+static void device_invalidate_host_buffer(Device *self, const Buffer *buffer, VkDeviceSize start, VkDeviceSize bytes) { deviceallocator_invalidate(&self->managers.memory, buffer_get_allocation(buffer), start, bytes); }
+static void device_flush_host_buffer(Device *self, const Buffer *buffer, VkDeviceSize start, VkDeviceSize bytes) { deviceallocator_flush(&self->managers.memory, buffer_get_allocation(buffer), start, bytes); }
 static ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers) { return attachment_allocator_request_attachment(&self->transient_allocator, width, height, format, index, samples, layers); }
 static VkDevice device_get_device(Device *self) { return self->device; }
 static VkPipelineCache device_get_pipeline_cache(Device *self) { return self->pipeline_cache; }
@@ -6489,6 +6497,11 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          unsigned xstart,
          unsigned ystart)
    {
+      /* Games resend unchanged display settings every frame; only a change
+       * makes the cached scanout stale. */
+      if (xstart == self->render_state.display_fb_xstart &&
+          ystart == self->render_state.display_fb_ystart)
+         return;
       ih_reset(&self->last_scanout);
 
       self->render_state.display_fb_xstart = xstart;
@@ -6500,6 +6513,11 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          bool is_480i,
          WidthMode width_mode)
    {
+      if (mode == self->render_state.scanout_mode &&
+          is_pal == self->render_state.is_pal &&
+          is_480i == self->render_state.is_480i &&
+          width_mode == self->render_state.width_mode)
+         return;
       ih_reset(&self->last_scanout);
 
       self->render_state.scanout_mode = mode;
@@ -7490,6 +7508,10 @@ static TTRect renderer_compute_window_rect(Renderer *self,
  * framebuffer. The rects must not overlap: their tiles share the staging
  * buffer, which holds one whole framebuffer. */
 #define RENDERER_READBACK_TILES 32
+/* The packed words of every tile: two pixels to a uint over at most the
+ * whole framebuffer, plus an odd row's last half for each row of each tile. */
+#define RENDERER_READBACK_BYTES \
+   ((VkDeviceSize)FB_WIDTH * FB_HEIGHT * 2 + RENDERER_READBACK_TILES * FB_HEIGHT * 4)
 static void renderer_copy_vram_to_cpu_rects(Renderer *self,
       const TTRect *rects, unsigned count, uint16_t *vram)
 {
@@ -7498,6 +7520,7 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
    uint32_t      tx[RENDERER_READBACK_TILES], ty[RENDERER_READBACK_TILES];
    uint32_t      tw[RENDERER_READBACK_TILES], th[RENDERER_READBACK_TILES];
    unsigned      tiles = 0, r, t;
+   VkDeviceSize  bytes = 0;
 
    for (r = 0; r < count; r++)
    {
@@ -7510,6 +7533,7 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
 
       if (!rect->width || !rect->height)
          continue;
+      hw[1] = vh[1] = 0;
 
       if (rect->width >= FB_WIDTH)
       {
@@ -7544,8 +7568,13 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
       for (j = 0; j < nv; j++)
          for (i = 0; i < nh; i++)
          {
-            if (tiles == RENDERER_READBACK_TILES)
+            VkDeviceSize tile_bytes = (VkDeviceSize)((hw[i] + 1) >> 1) * vh[j] * 4;
+            /* Overlapping rects could ask for more than the staging buffer
+             * holds; the shader must never write past it. */
+            if (tiles == RENDERER_READBACK_TILES ||
+                bytes + tile_bytes > RENDERER_READBACK_BYTES)
                break;
+            bytes    += tile_bytes;
             tx[tiles] = hx[i]; tw[tiles] = hw[i];
             ty[tiles] = vy[j]; th[tiles] = vh[j];
             tiles++;
@@ -7570,7 +7599,7 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
    {
       BufferCreateInfo info;
       info.domain = BufferDomain_CachedHost;
-      info.size   = (VkDeviceSize)FB_WIDTH * FB_HEIGHT * 4;
+      info.size   = RENDERER_READBACK_BYTES;
       info.usage  = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
       bh_move(buffer, device_create_buffer(self->device, &info, NULL));
       if (!bh_get(buffer))
@@ -7613,8 +7642,11 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
    fenceholder_wait(fence_get(&fence));
 
    {
-      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(buffer), MEMORY_ACCESS_READ_BIT));
+      /* Only the bytes the tiles were packed into come back through the
+       * host's caches. */
+      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(buffer), 0));
       uint32_t        wordoff = 0;
+      device_invalidate_host_buffer(self->device, bh_get(buffer), 0, bytes);
       for (t = 0; t < tiles; t++)
       {
          const uint32_t row_words = (tw[t] + 1) >> 1;
@@ -7751,6 +7783,24 @@ static void renderer_mipmap_framebuffer(Renderer *self)
    } }
 }
 
+/* VKHOST_CORE_DUMP, read once rather than per frame. */
+static bool renderer_core_dump(void)
+{
+   static int on = -1;
+   if (on < 0)
+      on = getenv("VKHOST_CORE_DUMP") ? 1 : 0;
+   return on != 0;
+}
+
+/* BEETLE_VK_DIAG, read once rather than per primitive. */
+static bool renderer_vk_diag(void)
+{
+   static int on = -1;
+   if (on < 0)
+      on = getenv("BEETLE_VK_DIAG") ? 1 : 0;
+   return on != 0;
+}
+
 static void renderer_ssaa_framebuffer(Renderer *self)
 {
    /* self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self); */
@@ -7760,18 +7810,8 @@ static void renderer_ssaa_framebuffer(Renderer *self)
    unsigned right = (rect->x + rect->width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
    unsigned bottom = (rect->y + rect->height + BLOCK_HEIGHT - 1) / BLOCK_HEIGHT;
 
-   /* Exact element count is known up front (block grid), so use a single
-    * malloc'd buffer filled by index rather than a growing array. */
-   unsigned resolves_count = (bottom > top && right > left) ? (bottom - top) * (right - left) : 0;
-   VkRect2D *resolves_ssaa = (VkRect2D *)malloc((resolves_count ? resolves_count : 1) * sizeof(VkRect2D));
-   unsigned resolves_n = 0;
-   { unsigned y; for (y = top; y < bottom; y++) { unsigned x; for (x = left; x < right; x++) {
-         VkRect2D r = {
-            { (int)(x * BLOCK_WIDTH % FB_WIDTH), (int)(y * BLOCK_HEIGHT % FB_HEIGHT) },
-            { BLOCK_WIDTH, BLOCK_HEIGHT }
-         };
-         resolves_ssaa[resolves_n++] = r;
-      } } }
+   unsigned cols = right > left ? right - left : 0;
+   unsigned size = (bottom > top && cols) ? (bottom - top) * cols : 0;
 
    renderer_ensure_command_buffer(self);
 
@@ -7790,19 +7830,26 @@ static void renderer_ssaa_framebuffer(Renderer *self)
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
 
    /* No push constants: the unscaled resolve takes its clamp bounds from
-    * textureSize() on the bound source view. */
-   { unsigned size = resolves_n;
+    * textureSize() on the bound source view. The block rects are written
+    * straight into the constant data, 1024 per dispatch. */
    { unsigned i; for (i = 0; i < size; i += 1024) {
-      void * ptr;
+      VkRect2D *ptr;
+      unsigned j;
       unsigned to_run = min_(size - i, 1024u);
 
-      ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
-      memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
+      ptr = (VkRect2D *)commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
+      for (j = 0; j < to_run; j++)
+      {
+         unsigned x = left + (i + j) % cols;
+         unsigned y = top + (i + j) / cols;
+         ptr[j].offset.x      = (int)(x * BLOCK_WIDTH % FB_WIDTH);
+         ptr[j].offset.y      = (int)(y * BLOCK_HEIGHT % FB_HEIGHT);
+         ptr[j].extent.width  = BLOCK_WIDTH;
+         ptr[j].extent.height = BLOCK_HEIGHT;
+      }
       commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
       commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
    } }
-   free(resolves_ssaa);
-   }
 }
 
 static TTRect renderer_compute_vram_framebuffer_rect(Renderer *self)
@@ -9145,7 +9192,9 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          ih_reset(&self->last_scanout);
       }
    }
-   if (ih_is_valid(&self->last_scanout))
+   /* The cable's carrier phase advances every field, so the analog chain
+    * encodes every field even when VRAM and the display are unchanged. */
+   if (ih_is_valid(&self->last_scanout) && !analog)
       return self->last_scanout;
 
    self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
@@ -10043,7 +10092,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       if (feedback)
       {
          param = (int16_t)(param | 0x800);
-         if (getenv("BEETLE_VK_DIAG"))
+         if (renderer_vk_diag())
          {
             static unsigned _fb_n;
             if (_fb_n < 8 || (_fb_n % 512) == 0)
@@ -11519,7 +11568,12 @@ static void renderer_blit_vram(Renderer *self,
       texture_tracker_blit(self->tracker, *dst, *src);
    }
 
-   if (rect_intersects(dst, src))
+   /* Overlap modulo the VRAM size: a copy that wraps can read pixels it
+    * writes even when the unwrapped rects are apart. */
+   if ((((dst->x - src->x) & (FB_WIDTH - 1)) < dst->width ||
+        ((src->x - dst->x) & (FB_WIDTH - 1)) < dst->width) &&
+       (((dst->y - src->y) & (FB_HEIGHT - 1)) < dst->height ||
+        ((src->y - dst->y) & (FB_HEIGHT - 1)) < dst->height))
    {
       unsigned factor;
       /* The software implementation takes texture cache into account by copying
@@ -11535,10 +11589,12 @@ static void renderer_blit_vram(Renderer *self,
          uint32_t dst_offset[2];
          uint32_t extent[2];
          int32_t scaling;
+         uint32_t mask_or;
       };
       struct Push push = {
          { src->x, src->y }, { dst->x, dst->y }, { dst->width, dst->height }, (int)(factor),
       };
+      push.mask_or = self->render_state.force_mask_bit ? 0x8000u : 0u;
       commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 
       if (domain == Domain_Scaled)
@@ -11791,12 +11847,13 @@ static TTGpuImage *vk_tt_page_begin(void *ctx, TTGpuImage *reuse,
          image_get_height((Image *)reuse, 0) == (unsigned)height)
    {
       /* Same handle back (no reference change): switch back into
-       * transfer dst layout for the rebuild. */
+       * transfer dst layout for the rebuild, after the draws that
+       * sampled the old contents. */
       page = (Image *)reuse;
       commandbuffer_image_barrier(cbh_get(cmd), page,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
    }
    else
@@ -11807,6 +11864,12 @@ static TTGpuImage *vk_tt_page_begin(void *ctx, TTGpuImage *reuse,
       page = ih_get(&h);
    }
    commandbuffer_clear_image(cbh_get(cmd), page, &fallthrough);
+   /* The blits land after the clear. */
+   commandbuffer_image_barrier(cbh_get(cmd), page,
+         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
    return (TTGpuImage *)page;
 }
 
@@ -11825,12 +11888,13 @@ static void vk_tt_page_blit(void *ctx, TTGpuImage *page_in, TTGpuImage *src_in,
    dst_offset.x = b->dst_x; dst_offset.y = b->dst_y; dst_offset.z = 0;
    dst_extent.x = b->dst_w; dst_extent.y = b->dst_h; dst_extent.z = 1;
 
-   /* Switch the source into transfer src */
+   /* Switch the source into transfer src, after its sampling draws and
+    * before the blits read it. */
    commandbuffer_image_barrier(cbh_get(cmd), src,
          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
 
    for (dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
       int srcLevel = max_(0, dstLevel - b->full_res_levels);
@@ -11851,24 +11915,30 @@ static void vk_tt_page_blit(void *ctx, TTGpuImage *page_in, TTGpuImage *src_in,
       dst_extent.y = max_(dst_extent.y >> 1, 1);
    }
 
-   /* Change the source back to shader read */
+   /* Change the source back to shader read once the blits read it, and
+    * order the next source's blits into the page after these. */
    commandbuffer_image_barrier(cbh_get(cmd), src,
          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
+         VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   commandbuffer_image_barrier(cbh_get(cmd), page,
+         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
 }
 
 static void vk_tt_page_end(void *ctx, TTGpuImage *page_in)
 {
    Renderer *self = (Renderer *)ctx;
    CommandBufferHandle *cmd = renderer_command_buffer_hack_fixme(self);
-   /* Make the fused texture readable by shaders */
+   /* Make the fused texture's blit writes visible to the shaders */
    commandbuffer_image_barrier(cbh_get(cmd), (Image *)page_in,
          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 }
 
 static TTGpuBackend vk_tt_make_backend(Renderer *self)
@@ -13795,20 +13865,35 @@ static void *deviceallocator_map_memory(struct DeviceAllocator *self,
    if (!alloc->host_base)
       return NULL;
 
-   if ((flags & MEMORY_ACCESS_READ_BIT) &&
-       !(self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
-   {
-      VkDeviceSize offset = alloc->offset & ~(self->atom_alignment - 1);
-      VkDeviceSize size = (alloc->offset + deviceallocation_get_size(alloc) - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
-
-      /* Have to invalidate cache here. */
-      const VkMappedMemoryRange range = {
-         VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc->base, offset, size,
-      };
-      vkInvalidateMappedMemoryRanges(self->device, 1, &range);
-   }
+   if (flags & MEMORY_ACCESS_READ_BIT)
+      deviceallocator_invalidate(self, alloc, 0, deviceallocation_get_size(alloc));
 
    return alloc->host_base;
+}
+
+/* Make the GPU's writes to bytes [start, start + bytes) of a mapped
+ * allocation visible to the host; a no-op on coherent memory. The range
+ * widens to whole non-coherent atoms. */
+static void deviceallocator_invalidate(struct DeviceAllocator *self,
+      const struct DeviceAllocation *alloc,
+      VkDeviceSize start, VkDeviceSize bytes)
+{
+   VkDeviceSize        offset, size;
+   VkMappedMemoryRange range;
+
+   if (!alloc->host_base || !bytes ||
+       (self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return;
+
+   offset = (alloc->offset + start) & ~(self->atom_alignment - 1);
+   size   = (alloc->offset + start + bytes - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
+
+   range.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+   range.pNext  = NULL;
+   range.memory = alloc->base;
+   range.offset = offset;
+   range.size   = size;
+   vkInvalidateMappedMemoryRanges(self->device, 1, &range);
 }
 
 static void deviceallocator_unmap_memory(struct DeviceAllocator *self,
@@ -13819,18 +13904,33 @@ static void deviceallocator_unmap_memory(struct DeviceAllocator *self,
    if (!alloc->host_base)
       return;
 
-   if ((flags & MEMORY_ACCESS_WRITE_BIT) &&
-       !(self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
-   {
-      VkDeviceSize offset = alloc->offset & ~(self->atom_alignment - 1);
-      VkDeviceSize size = (alloc->offset + deviceallocation_get_size(alloc) - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
+   if (flags & MEMORY_ACCESS_WRITE_BIT)
+      deviceallocator_flush(self, alloc, 0, deviceallocation_get_size(alloc));
+}
 
-      /* Have to flush caches here. */
-      const VkMappedMemoryRange range = {
-         VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc->base, offset, size,
-      };
-      vkFlushMappedMemoryRanges(self->device, 1, &range);
-   }
+/* Make the host's writes to bytes [start, start + bytes) of a mapped
+ * allocation visible to the GPU; a no-op on coherent memory. The range
+ * widens to whole non-coherent atoms. */
+static void deviceallocator_flush(struct DeviceAllocator *self,
+      const struct DeviceAllocation *alloc,
+      VkDeviceSize start, VkDeviceSize bytes)
+{
+   VkDeviceSize        offset, size;
+   VkMappedMemoryRange range;
+
+   if (!alloc->host_base || !bytes ||
+       (self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return;
+
+   offset = (alloc->offset + start) & ~(self->atom_alignment - 1);
+   size   = (alloc->offset + start + bytes - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
+
+   range.sType  = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+   range.pNext  = NULL;
+   range.memory = alloc->base;
+   range.offset = offset;
+   range.size   = size;
+   vkFlushMappedMemoryRanges(self->device, 1, &range);
 }
 
 static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory,
@@ -19337,8 +19437,12 @@ fail_jobs:
    static void request_block(Device *device, struct BufferBlock *block, VkDeviceSize size,
          struct BufferPool *pool, struct BufferBlockVec *dma, struct BufferBlockVec *recycle)
    {
+      /* The block is filled from its start: only the used bytes go out. */
       if (block->mapped)
-         device_unmap_host_buffer(device, bh_get(&block->cpu), MEMORY_ACCESS_WRITE_BIT);
+      {
+         device_flush_host_buffer(device, bh_get(&block->cpu), 0, block->offset);
+         device_unmap_host_buffer(device, bh_get(&block->cpu), 0);
+      }
 
       if (block->offset == 0)
       {
@@ -23762,7 +23866,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer_flush(renderer);
 
    /* VKHOST_CORE_DUMP: readback through the core's own machinery. */
-   if (getenv("VKHOST_CORE_DUMP"))
+   if (renderer_core_dump())
    {
       static int dump_n;
       if (++dump_n == 100)
@@ -24210,7 +24314,11 @@ void rhi_vulkan_load_image(
                      w * sizeof(uint16_t));
          }
       }
-      device_unmap_host_buffer(renderer->device, mapped, MEMORY_ACCESS_WRITE_BIT);
+      /* Only this rect's bytes of the ring go out. */
+      device_flush_host_buffer(renderer->device, mapped,
+            (VkDeviceSize)((const uint8_t *)tmp - (const uint8_t *)buffer_get_allocation(mapped)->host_base),
+            (VkDeviceSize)w * h * sizeof(uint16_t));
+      device_unmap_host_buffer(renderer->device, mapped, 0);
 
       /* The staging buffer of its own, when the ring could not hold the
        * rect; the recorded copy keeps its own reference. */

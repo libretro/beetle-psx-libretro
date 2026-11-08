@@ -12,6 +12,7 @@
  *
  * Usage: glhost <core.so> <content> [savestate|-] [frames] [outdir]
  *   GLHOST_VARS: semicolon list of key=value core option overrides.
+ *   HOST_VARIABLE_SIZE=1: accept variable savestate sizes, as RetroArch.
  *   HOST_HDR_*: the display presented through GET_HDR_METADATA and
  *   GET_DISPLAY_METADATA; see tools/hdr_display/host_metadata.h.
  */
@@ -116,6 +117,17 @@ void glTexSubImage2D(GLenum target, GLint level, GLint x, GLint y,
  * GL 1.1 entry points come in through the PLT and are defined here; the
  * rest through get_proc_address, which hands out these wrappers. */
 static unsigned long gl_respec, gl_respec_half, gl_creates, gl_creates_half;
+/* Buffer maps without GL_MAP_UNSYNCHRONIZED_BIT: each may wait for the
+ * GPU, or make the driver rename the buffer. */
+static unsigned long gl_sync_maps, gl_sync_maps_half;
+typedef void *(*mapbufrange_t)(GLenum, GLintptr, GLsizeiptr, GLbitfield);
+static mapbufrange_t real_map_buffer_range;
+static void *count_map_buffer_range(GLenum t, GLintptr o, GLsizeiptr n, GLbitfield f)
+{
+   if (!(f & GL_MAP_UNSYNCHRONIZED_BIT))
+      gl_sync_maps++;
+   return real_map_buffer_range(t, o, n, f);
+}
 typedef void (*bufdata_t)(GLenum, GLsizeiptr, const void *, GLenum);
 typedef void (*gen_t)(GLsizei, GLuint *);
 static bufdata_t real_buffer_data;
@@ -126,6 +138,55 @@ static void count_gen_buffers(GLsizei n, GLuint *o)
 { gl_creates += (unsigned long)n; real_gen_buffers(n, o); }
 static void count_gen_framebuffers(GLsizei n, GLuint *o)
 { gl_creates += (unsigned long)n; real_gen_framebuffers(n, o); }
+/* Bytes glReadPixels hands the core back: the CPU-GPU readback volume.
+ * The host's own reads (frame dumps and hashes) set host_reading. */
+static unsigned long long gl_read_bytes, gl_read_bytes_half;
+static int host_reading;
+void glReadPixels(GLint x, GLint y, GLsizei w, GLsizei h, GLenum f, GLenum t, void *d)
+{
+   typedef void (*readpixels_t)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void *);
+   static readpixels_t real;
+   unsigned bpp = t == GL_FLOAT ? 4u : (t == GL_UNSIGNED_BYTE ? 1u : 0u);
+   unsigned comps = f == GL_RGBA || f == GL_RGBA_INTEGER ? 4u : f == GL_RGB ? 3u : 1u;
+   if (!real)
+      real = (readpixels_t)dlsym(RTLD_NEXT, "glReadPixels");
+   if (!bpp)   /* packed or 16-bit types: one 16-bit value a pixel */
+      bpp = 2u, comps = 1u;
+   if (!host_reading)
+      gl_read_bytes += (unsigned long long)w * (unsigned long long)h * bpp * comps;
+   real(x, y, w, h, f, t, d);
+}
+/* Pixels covered by the core's rect draws: a four-vertex strip drawn
+ * after glUniform4f gave a rect (x0, y0, x1, y1) in whole VRAM pixels, as
+ * the image load, copy and resolve passes do. */
+static unsigned long long gl_rect_pixels, gl_rect_pixels_half;
+static GLfloat last_rect[4];
+static int last_rect_valid;
+typedef void (*uniform4f_t)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
+static uniform4f_t real_uniform4f;
+static void count_uniform4f(GLint loc, GLfloat a, GLfloat b, GLfloat c, GLfloat d)
+{
+   last_rect[0] = a; last_rect[1] = b; last_rect[2] = c; last_rect[3] = d;
+   last_rect_valid = a >= 0 && b >= 0 && c > a && d > b && c <= 1024 && d <= 512
+         && a == (GLfloat)(int)a && b == (GLfloat)(int)b
+         && c == (GLfloat)(int)c && d == (GLfloat)(int)d;
+   real_uniform4f(loc, a, b, c, d);
+}
+typedef void (*drawarrays_t)(GLenum, GLint, GLsizei);
+static drawarrays_t real_draw_arrays;
+static void count_draw_arrays(GLenum mode, GLint first, GLsizei count)
+{
+   if (mode == GL_TRIANGLE_STRIP && first == 0 && count == 4 && last_rect_valid)
+      gl_rect_pixels += (unsigned long long)((last_rect[2] - last_rect[0])
+            * (last_rect[3] - last_rect[1]));
+   real_draw_arrays(mode, first, count);
+}
+void glDrawArrays(GLenum mode, GLint first, GLsizei count)
+{
+   if (!real_draw_arrays)
+      real_draw_arrays = (drawarrays_t)dlsym(RTLD_NEXT, "glDrawArrays");
+   count_draw_arrays(mode, first, count);
+}
 void glGenTextures(GLsizei n, GLuint *o)
 {
    static gen_t real;
@@ -157,8 +218,14 @@ static retro_proc_address_t get_proc_address(const char *sym)
          return f;
       if (!strcmp(sym, "glBufferData"))
       { real_buffer_data = (bufdata_t)f; return (retro_proc_address_t)count_buffer_data; }
+      if (!strcmp(sym, "glMapBufferRange"))
+      { real_map_buffer_range = (mapbufrange_t)f; return (retro_proc_address_t)count_map_buffer_range; }
       if (!strcmp(sym, "glGenBuffers"))
       { real_gen_buffers = (gen_t)f; return (retro_proc_address_t)count_gen_buffers; }
+      if (!strcmp(sym, "glUniform4f"))
+      { real_uniform4f = (uniform4f_t)f; return (retro_proc_address_t)count_uniform4f; }
+      if (!strcmp(sym, "glDrawArrays"))
+      { real_draw_arrays = (drawarrays_t)f; return (retro_proc_address_t)count_draw_arrays; }
       if (!strcmp(sym, "glGenFramebuffers"))
       { real_gen_framebuffers = (gen_t)f; return (retro_proc_address_t)count_gen_framebuffers; }
       return f;
@@ -248,6 +315,13 @@ static bool env_cb(unsigned cmd, void *data)
       case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
       case RETRO_ENVIRONMENT_SET_GEOMETRY:
          return true;
+      case RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS:
+         /* HOST_VARIABLE_SIZE=1: accept variable state sizes, as RetroArch
+          * does, so the core sizes each state with a counting pass. */
+         if (!getenv("HOST_VARIABLE_SIZE"))
+            return false;
+         *(uint64_t *)data |= RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE;
+         return true;
       case RETRO_ENVIRONMENT_GET_VARIABLE:
       {
          struct retro_variable *var = (struct retro_variable *)data;
@@ -315,8 +389,10 @@ static void video_cb(const void *data, unsigned width, unsigned height, size_t p
      if (soft_buf && pbind)
      {
         pbind(GL_FRAMEBUFFER, fbo);
+        host_reading = 1;
         glReadPixels(0, 0, (GLsizei)width, (GLsizei)height,
                      GL_RGBA, GL_UNSIGNED_BYTE, soft_buf);
+        host_reading = 0;
         fprintf(stderr, "[glhost] frame %u hash %08x%s\n",
                 input_frame, fnv1a(soft_buf, need),
                 in_replay ? " (replay)" : "");
@@ -485,14 +561,18 @@ static void dump_frame(const char *path)
       {
          char  rawpath[1100];
          FILE *rf;
+         host_reading = 1;
          glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, fb);
+         host_reading = 0;
          snprintf(rawpath, sizeof(rawpath), "%s.raw", path);
          rf = fopen(rawpath, "wb");
          if (rf) { fwrite(fb, sizeof(float), (size_t)w * h * 4, rf); fclose(rf); }
          free(fb);
       }
    }
+   host_reading = 1;
    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+   host_reading = 0;
    f = fopen(path, "wb");
    if (f)
    {
@@ -688,6 +768,9 @@ int main(int argc, char **argv)
         {
            upload_texels_half = upload_texels;
            gl_respec_half     = gl_respec;
+           gl_sync_maps_half  = gl_sync_maps;
+           gl_read_bytes_half = gl_read_bytes;
+           gl_rect_pixels_half = gl_rect_pixels;
            gl_creates_half    = gl_creates;
         }
         if (preempt && (i < 5 || (i % 50) == 0))
@@ -786,6 +869,12 @@ int main(int argc, char **argv)
    fprintf(stderr, "[glhost] steady state: %lu buffer re-specifications, %lu GL objects created"
            " in the second half of the run\n",
            gl_respec - gl_respec_half, gl_creates - gl_creates_half);
+   fprintf(stderr, "[glhost] steady state: %lu synchronized buffer maps in the second half of the run\n",
+           gl_sync_maps - gl_sync_maps_half);
+   fprintf(stderr, "[glhost] steady state: %llu bytes read back in the second half of the run\n",
+           gl_read_bytes - gl_read_bytes_half);
+   fprintf(stderr, "[glhost] steady state: %llu pixels of rect draws in the second half of the run\n",
+           gl_rect_pixels - gl_rect_pixels_half);
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
 

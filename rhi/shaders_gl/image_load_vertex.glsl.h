@@ -1,22 +1,16 @@
 #include "shaders_common.h"
 
+/* Places the renderer's unit quad on a VRAM rect: uploads from the VRAM
+ * texture into the output framebuffer and resolves back. frag_fb_coord
+ * stays in PlayStation framebuffer coordinates for texelFetch. */
 static const char *image_load_vertex = GLSL_VERTEX(
-      // Vertex shader for uploading textures from the VRAM texture buffer
-      // into the output framebuffer
-
-      // The position in the input and output framebuffer are the same
-      in uvec2 position;
+      layout(location = 0) in vec2 corner;
+      uniform vec4 rect;
       out vec2 frag_fb_coord;
 
       void main() {
-      // Convert VRAM position into OpenGL coordinates
-      float xpos = (float(position.x) / 512.) - 1.0;
-      float ypos = (float(position.y) / 256.) - 1.0;
-
-      gl_Position.xyzw = vec4(xpos, ypos, 0.0, 1.0);
-
-      // frag_fb_coord will remain in PlayStation fb coordinates for
-      // texelFetch
-      frag_fb_coord = vec2(position);
+      vec2 p = mix(rect.xy, rect.zw, corner);
+      gl_Position = vec4(p.x / 512.0 - 1.0, p.y / 256.0 - 1.0, 0.0, 1.0);
+      frag_fb_coord = p;
       }
 );

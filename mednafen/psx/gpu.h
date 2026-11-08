@@ -322,7 +322,7 @@ int32_t  GPU_GetScanlineNum(void);
 /* Used by rhi_lib_gl.c to access the VRAM contents and
  * to drive state restore points. */
 uint16_t *GPU_get_vram(void);
-void     GPU_RestoreStateP1(bool load);
+void     GPU_RestoreStateP1(bool load, bool sizing);
 void     GPU_RestoreStateP2(bool load);
 void     GPU_RestoreStateP3(void);
 

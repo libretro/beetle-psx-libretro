@@ -28,6 +28,7 @@ layout(std430, push_constant) uniform Registers
 	ivec2 dst;
 	ivec2 extent;
 	int scaling;
+	uint mask_or;
 } registers;
 
 void main()
@@ -50,13 +51,13 @@ void main()
 #define DECL_CACHE vec4 cache
 #define DECL_MASK_CACHE vec4 mask_cache
 #define LOAD_SWIZZLE rgba
-#define STORE_CACHE cache
+#define STORE_CACHE vec4(cache.rgb, registers.mask_or != 0u ? 1.0 : cache.a)
 #define TEST_CACHE(v) ((v).a < 0.5)
 #else
 #define DECL_CACHE uint cache
 #define DECL_MASK_CACHE uint mask_cache
 #define LOAD_SWIZZLE r
-#define STORE_CACHE uvec4(cache)
+#define STORE_CACHE uvec4(cache | registers.mask_or)
 #define TEST_CACHE(v) (((v) & 0x8000u) == 0u)
 #endif
 
