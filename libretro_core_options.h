@@ -1889,7 +1889,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(frame_duping),
       "Frame Duping",
       NULL,
-      "Repeat the previous frame if the core has nothing new to display.",
+      "Let the frontend repeat the previous frame when the game has nothing new to display, instead of the core sending it again. With the frontend's 'Skip Duplicate Frames', those repeats are not presented, so the display receives the game's own frame rate (for frame generation and interpolation tools).",
       NULL,
       "video",
       {
