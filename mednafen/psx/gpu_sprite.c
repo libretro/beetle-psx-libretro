@@ -28,7 +28,7 @@
  * samples the right texels.
  */
 
-#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+#if defined(GPU_HAVE_SSE2) || defined(GPU_HAVE_NEON)
 /*
  * Vectorised inner loop for a *flat* (non-textured) sprite fill row
  * at native resolution.  The colour is the constant fill_color (which
@@ -40,9 +40,8 @@
  *
  * Bit-exact with PlotNativePixel_*_T0:
  *   - BM_VAL >= 0: blend fill_color against the framebuffer with the
- *     same SWAR math as PlotPixelBlend_* (AVG/ADD/ADD_FOURTH in 16-bit
- *     lanes 8 px/iter; SUBTRACT in 32-bit lanes 4 px/iter, since its
- *     0x108420 borrow mask has a bit above lane 15);
+ *     same results as PlotPixelBlend_* in eight 16-bit lanes; subtract
+ *     saturates each channel independently instead of using packed borrows;
  *   - ME_LIT: keep the destination word where its 0x8000 bit is set;
  *   - store (pix & 0x7FFF) | MaskSetOR.
  * Caller gates on upscale_shift == 0 (texel_put then reduces to a
@@ -52,20 +51,44 @@
 static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
       int32_t w, uint16_t fill_color, const int BM_VAL, const int ME_LIT)
 {
+   if (w <= 0) return 0;
+   if (gpu->upscale_shift)
+   {
+      unsigned dy, scale = 1u << gpu->upscale_shift;
+      const uint16_t color = (fill_color & 0x7fff) | gpu->MaskSetOR;
+      if (BM_VAL != BLEND_MODE_OPAQUE || ME_LIT) return 0;
+      for (dy = 0; dy < scale; dy++)
+      {
+         uint16_t *dst = gpu->vram + (((unsigned)(y & 511) * scale + dy) * (1024u * scale)) + x * scale;
+         unsigned i = 0, count = (unsigned)w * scale;
+#if defined(GPU_HAVE_SSE2)
+         __m128i fill = _mm_set1_epi16((short)color);
+         for (; i + 8 <= count; i += 8) _mm_storeu_si128((__m128i *)(dst + i), fill);
+#else
+         uint16x8_t fill = vdupq_n_u16(color);
+         for (; i + 8 <= count; i += 8) vst1q_u16(dst + i, fill);
+#endif
+         for (; i < count; i++) dst[i] = color;
+      }
+      return w;
+   }
    uint16_t      *row  = &gpu->vram[(uint32_t)(y & 511) << 10];
    const uint16_t mso  = gpu->MaskSetOR;
-   const int      step = (BM_VAL == BLEND_MODE_SUBTRACT) ? 4 : 8;
+   int            step;
    int32_t        done = 0;
-#if defined(__SSE2__)
+#if defined(GPU_HAVE_SSE2)
    const __m128i  FP    = _mm_set1_epi16((short)fill_color);
    const __m128i  v7FFF = _mm_set1_epi16(0x7FFF);
    const __m128i  v8000 = _mm_set1_epi16((short)0x8000);
    const __m128i  vmso  = _mm_set1_epi16((short)mso);
 
-   for (; done + step <= w; done += step)
+   for (; done + 4 <= w; done += step)
    {
       const int32_t bx = x + done;
-      __m128i pix = FP, bg = _mm_loadu_si128((const __m128i*)&row[bx]), out;
+      __m128i pix = FP, bg, out;
+      step = w - done >= 8 ? 8 : 4;
+      bg = step == 8 ? _mm_loadu_si128((const __m128i*)&row[bx])
+                    : _mm_loadl_epi64((const __m128i*)&row[bx]);
 
       if (BM_VAL == BLEND_MODE_AVERAGE)
       {
@@ -89,20 +112,7 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
          pix = _mm_or_si128(_mm_sub_epi16(sum, car), _mm_sub_epi16(car, _mm_srli_epi16(car, 5)));
       }
       else if (BM_VAL == BLEND_MODE_SUBTRACT)
-      {
-         __m128i z   = _mm_setzero_si128();
-         __m128i m84 = _mm_set1_epi32(0x108420), m80 = _mm_set1_epi32(0x8000);
-         __m128i fp32 = _mm_unpacklo_epi16(pix, z);
-         __m128i bg32 = _mm_unpacklo_epi16(bg, z);
-         __m128i bgo  = _mm_or_si128(bg32, m80);
-         __m128i fpc  = _mm_andnot_si128(m80, fp32);
-         __m128i diff = _mm_add_epi32(_mm_sub_epi32(bgo, fpc), m84);
-         __m128i xr   = _mm_and_si128(_mm_xor_si128(bgo, fpc), m84);
-         __m128i bor  = _mm_and_si128(_mm_sub_epi32(diff, xr), m84);
-         __m128i res  = _mm_and_si128(_mm_sub_epi32(diff, bor), _mm_sub_epi32(bor, _mm_srli_epi32(bor, 5)));
-         res = _mm_and_si128(res, _mm_set1_epi32(0xFFFF));
-         pix = _mm_add_epi16(_mm_packs_epi32(_mm_sub_epi32(res, _mm_set1_epi32(0x8000)), z), _mm_set1_epi16((short)0x8000));
-      }
+         pix = GPU_SW_Subtract16(bg, pix);
 
       out = _mm_or_si128(_mm_and_si128(pix, v7FFF), vmso);
       if (ME_LIT)
@@ -110,10 +120,8 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
          __m128i keep = _mm_srai_epi16(bg, 15);
          out = _mm_or_si128(_mm_and_si128(keep, bg), _mm_andnot_si128(keep, out));
       }
-      if (step == 8)
-         _mm_storeu_si128((__m128i*)&row[bx], out);
-      else
-         _mm_storel_epi64((__m128i*)&row[bx], out);
+      if (step == 8) _mm_storeu_si128((__m128i*)&row[bx], out);
+      else _mm_storel_epi64((__m128i*)&row[bx], out);
    }
 #else /* GPU_HAVE_NEON */
    const uint16x8_t FP    = vdupq_n_u16(fill_color);
@@ -121,10 +129,13 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
    const uint16x8_t v8000 = vdupq_n_u16(0x8000);
    const uint16x8_t vmso  = vdupq_n_u16(mso);
 
-   for (; done + step <= w; done += step)
+   for (; done + 4 <= w; done += step)
    {
       const int32_t bx = x + done;
-      uint16x8_t pix = FP, bg = vld1q_u16(&row[bx]), out;
+      uint16x8_t pix = FP, bg, out;
+      step = w - done >= 8 ? 8 : 4;
+      bg = step == 8 ? vld1q_u16(&row[bx])
+                    : vcombine_u16(vld1_u16(&row[bx]), vdup_n_u16(0));
 
       if (BM_VAL == BLEND_MODE_AVERAGE)
       {
@@ -148,18 +159,7 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
          pix = vorrq_u16(vsubq_u16(sum, car), vsubq_u16(car, vshrq_n_u16(car, 5)));
       }
       else if (BM_VAL == BLEND_MODE_SUBTRACT)
-      {
-         uint32x4_t m84 = vdupq_n_u32(0x108420), m80 = vdupq_n_u32(0x8000);
-         uint32x4_t fp32 = vmovl_u16(vget_low_u16(pix));
-         uint32x4_t bg32 = vmovl_u16(vget_low_u16(bg));
-         uint32x4_t bgo  = vorrq_u32(bg32, m80);
-         uint32x4_t fpc  = vbicq_u32(fp32, m80);
-         uint32x4_t diff = vaddq_u32(vsubq_u32(bgo, fpc), m84);
-         uint32x4_t xr   = vandq_u32(veorq_u32(bgo, fpc), m84);
-         uint32x4_t bor  = vandq_u32(vsubq_u32(diff, xr), m84);
-         uint32x4_t res  = vandq_u32(vsubq_u32(diff, bor), vsubq_u32(bor, vshrq_n_u32(bor, 5)));
-         pix = vcombine_u16(vmovn_u32(res), vdup_n_u16(0));
-      }
+         pix = GPU_SW_Subtract16(bg, pix);
 
       out = vorrq_u16(vandq_u16(pix, v7FFF), vmso);
       if (ME_LIT)
@@ -167,10 +167,8 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
          uint16x8_t keep = vcgeq_u16(bg, v8000);
          out = vbslq_u16(keep, bg, out);
       }
-      if (step == 8)
-         vst1q_u16(&row[bx], out);
-      else
-         vst1_u16(&row[bx], vget_low_u16(out));
+      if (step == 8) vst1q_u16(&row[bx], out);
+      else vst1_u16(&row[bx], vget_low_u16(out));
    }
 #endif
    return done;
@@ -186,6 +184,61 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
    return 0;
 }
 #endif /* SSE2 || NEON */
+
+static void GPU_SW_SolidSprite(GPU_SW_Packet *p, unsigned width, uint16_t color)
+{
+   unsigned i;
+   for (i = 0; i < GPU_SW_BLOCK; i++) { p->source[i] = color; p->covered[i] = 0xffff; }
+   while (width)
+   {
+      p->count = width < GPU_SW_BLOCK ? width : GPU_SW_BLOCK;
+      GPU_SW_Submit(p);
+      width -= p->count; p->dest += p->count << p->native_shift;
+   }
+   p->count = 0;
+}
+
+#define DEFINE_GPU_SW_TexturedSprite(TAG) \
+static unsigned GPU_SW_TexturedSprite_##TAG(PS_GPU *g, GPU_SW_Packet *p, unsigned width, \
+      uint8_t u, uint8_t v, int u_step, unsigned r, unsigned green, unsigned b, bool modulate) \
+{ \
+   unsigned initial_width = width; \
+   p->modulate = modulate; \
+   if (modulate) \
+   { \
+      GPU_SW_Colors(p->red, r << 24, 0, GPU_SW_BLOCK); \
+      GPU_SW_Colors(p->green, green << 24, 0, GPU_SW_BLOCK); \
+      GPU_SW_Colors(p->blue, b << 24, 0, GPU_SW_BLOCK); \
+      memset(p->dither, 0, sizeof(p->dither)); \
+   } \
+   while (width) \
+   { \
+      p->count = width < GPU_SW_BLOCK ? width : GPU_SW_BLOCK; \
+      if (!GPU_SW_Threaded()) p->count &= ~3u; \
+      if (!p->count) break; \
+      if (!g->upscale_shift) \
+      { \
+         unsigned i; \
+         /* Unit-stride native sprites are cheaper with a sequential fetch; \
+          * coverage, modulation and compositing still run in SIMD. */ \
+         for (i = 0; i < p->count; i++) \
+            p->source[i] = GetTexel_##TAG(g, (uint8_t)(u + u_step * (int)i), v); \
+      } \
+      else \
+         GPU_SW_FetchAffine_##TAG(g, p->source, (uint32_t)u << 24, (uint32_t)v << 24, \
+               (uint32_t)u_step << 24, 0, p->count); \
+      GPU_SW_Coverage(p); \
+      u = (uint8_t)(u + u_step * (int)p->count); \
+      GPU_SW_Submit(p); \
+      width -= p->count; p->dest += p->count << p->native_shift; \
+   } \
+   p->count = 0; \
+   return initial_width - width; \
+}
+DEFINE_GPU_SW_TexturedSprite(TM0)
+DEFINE_GPU_SW_TexturedSprite(TM1)
+DEFINE_GPU_SW_TexturedSprite(TM2)
+#undef DEFINE_GPU_SW_TexturedSprite
 
 #define DEFINE_DrawSprite(SUFFIX, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT) \
 static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, \
@@ -243,6 +296,8 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
    { \
       uint8_t u_r = 0; \
       int32_t x; \
+      GPU_SW_Packet packet; \
+      bool batch; \
       if (T_LIT) \
          u_r = u; \
       if (!LineSkipTest(gpu, y)) \
@@ -258,15 +313,23 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
             gpu->DrawTimeAvail -= suck_time; \
          } \
          x = x_start; \
-         /* Native-res flat-fill fast path.  Textured sprites and any \
-          * upscale stay scalar; the run is within [ClipX0,ClipX1] so \
-          * it never crosses the x==1024 VRAM wrap. */ \
-         if (!(T_LIT) && gpu->upscale_shift == 0) \
+         batch = GPU_SW_Begin(&packet, gpu, x, y, x_bound - x_start, true, (T_LIT), (BM_VAL), (ME_LIT)); \
+         if (batch) \
          { \
-            int _vn = DrawSpriteFillVec(gpu, x_start, y, x_bound - x_start, \
-                  fill_color, (BM_VAL), (ME_LIT)); \
-            x = x_start + _vn; \
+            if (T_LIT) \
+            { \
+               unsigned consumed = GPU_SW_TexturedSprite_TM##MO_LIT(gpu, &packet, x_bound - x_start, u_r, v, u_inc, r, g, b, (TM_LIT)); \
+               x += consumed; u_r += consumed * u_inc; \
+               if (x < x_bound) batch = false; \
+            } \
+            else \
+            { \
+               GPU_SW_SolidSprite(&packet, x_bound - x_start, fill_color); \
+               x = x_bound; \
+            } \
          } \
+         if (!(T_LIT) && !batch) \
+            x += DrawSpriteFillVec(gpu, x, y, x_bound - x, fill_color, (BM_VAL), (ME_LIT)); \
          for (; MDFN_LIKELY(x < x_bound); x++) \
          { \
             if (T_LIT) \
@@ -283,7 +346,9 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
                } \
             } \
             else \
+            { \
                PlotNativePixel_##BM_TAG##_ME##ME_LIT##_T0(gpu, x, y, fill_color); \
+            } \
             if (T_LIT) \
                u_r += u_inc; \
          } \
