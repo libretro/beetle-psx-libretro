@@ -42,6 +42,9 @@ static vec2 vadd(vec2 a, vec2 b) { vec2 r; r.v[0]=a.v[0]+b.v[0]; r.v[1]=a.v[1]+b
 
 static double f[N];      /* feed-forward FIR output */
 static double ref[N];
+static vec2 Bpart[LANES][PER_THREAD];
+static mat2 accA_A[LANES]; static vec2 accB_A[LANES];   /* model A */
+static vec2 accB_B[LANES];                              /* model B */
 
 int main(void)
 {
@@ -51,6 +54,7 @@ int main(void)
    double b0 = 1.0, b1 = -2.0*fq*cos(w), b2 = fq*fq;
    double a1 = -2.0*iq*cos(w), a2 = iq*iq;   /* y[n] = f[n] - a1 y[n-1] - a2 y[n-2] */
    mat2 A;
+   mat2 blockA;
    int i, step, lane;
    double maxA = 0.0, maxB = 0.0;
 
@@ -77,10 +81,7 @@ int main(void)
    }
 
    /* ---- shared per-lane block pass (identical in both models) ---- */
-   static vec2 Bpart[LANES][PER_THREAD];
-   static mat2 accA_A[LANES]; static vec2 accB_A[LANES];   /* model A */
-   static vec2 accB_B[LANES];                              /* model B */
-   mat2 blockA = A;
+   blockA = A;
    for (i = 1; i < PER_THREAD; i++) blockA = mmul(A, blockA);
 
    for (lane = 0; lane < LANES; lane++)

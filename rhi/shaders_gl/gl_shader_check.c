@@ -190,10 +190,10 @@ int main(int argc, char **argv)
       EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
       EGL_NONE
    };
-   ctx_attr[1] = want_major;
-   ctx_attr[3] = want_minor;
    PFNEGLGETPLATFORMDISPLAYEXTPROC gpd =
       (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
+   ctx_attr[1] = want_major;
+   ctx_attr[3] = want_minor;
 
    dpy = gpd ? gpd(EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY, NULL)
              : eglGetDisplay(EGL_DEFAULT_DISPLAY);

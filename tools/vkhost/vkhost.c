@@ -1238,10 +1238,10 @@ int main(int argc, char **argv)
    int frames = 120;
    const char *outdir = "/tmp/vkhost_out";
    const char *next_content = getenv("VKHOST_NEXT_CONTENT");
-   if (getenv("VKHOST_NEGOTIATION"))
-      negotiation_offer = (unsigned)atoi(getenv("VKHOST_NEGOTIATION"));
    char next_outdir[600];
    char cmdbuf[1024];
+   if (getenv("VKHOST_NEGOTIATION"))
+      negotiation_offer = (unsigned)atoi(getenv("VKHOST_NEGOTIATION"));
 
    if (argc < 3)
    { fprintf(stderr, "usage: %s core content [state] [frames] [outdir]\n", argv[0]); return 2; }
@@ -1396,14 +1396,6 @@ run_frames_sw:
       struct timespec t0, t1;
       void (*retro_run_fn)(void) = dlsym(core, "retro_run");
 
-      if (bench)
-      {
-         const char *e = getenv("VKHOST_BENCH_SKIP");
-         bench_skip = e ? atoi(e) : 120;
-         if (bench_skip >= frames)
-            bench_skip = frames / 4;
-      }
-
       typedef bool   (*vk_ser_t)(void *, size_t);
       typedef bool   (*vk_unser_t)(const void *, size_t);
       typedef size_t (*vk_ssize_t)(void);
@@ -1418,6 +1410,15 @@ run_frames_sw:
       void      *pbuf = NULL, *pbuf2 = NULL;
       size_t     pcap = 0;
       int        have_prev = 0;
+
+      if (bench)
+      {
+         const char *e = getenv("VKHOST_BENCH_SKIP");
+         bench_skip = e ? atoi(e) : 120;
+         if (bench_skip >= frames)
+            bench_skip = frames / 4;
+      }
+
       for (i = 0; i < frames; i++)
       {
          cur_frame = i;

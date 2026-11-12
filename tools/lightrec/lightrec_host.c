@@ -210,8 +210,10 @@ int main(int argc, char **argv)
    }
 
    {
-      void (*retro_run_fn)(void); SYM(retro_run);
-      void *(*retro_get_memory_data_fn)(unsigned); SYM(retro_get_memory_data);
+      void (*retro_run_fn)(void);
+      void *(*retro_get_memory_data_fn)(unsigned);
+      SYM(retro_run);
+      SYM(retro_get_memory_data);
 
       for (i = 0; i < frames; i++)
          retro_run_fn();
