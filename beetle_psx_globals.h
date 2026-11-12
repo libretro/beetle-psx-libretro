@@ -107,6 +107,7 @@ extern float psx_hdr_black_pq;         /* PQ(panel black), 0 when not reported  
 extern float psx_hdr_to_panel[9];      /* Rec.2020 -> panel RGB, 0 when unknown   */
 extern int   psx_hdr_sdr_eotf;         /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;        /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
+extern bool  psx_frame_duping;         /* the frontend repeats a frame sent as NULL */
 extern int   psx_video_cable;
 extern int   psx_black_setup;          /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 crushed */
 extern float psx_phase_error;          /* decoder carrier misalignment, cycles */          /* 0 = RGB/bypass, 1 = S-Video, 2 = composite */

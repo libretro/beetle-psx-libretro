@@ -129,7 +129,7 @@ static unsigned frame_count = 0;
 static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
 static bool display_notifications = true;
-static bool allow_frame_duping = false;
+bool psx_frame_duping = false;
 static unsigned image_offset = 0;
 static unsigned image_crop = 0;
 static bool enable_memcard1 = false;
@@ -5802,13 +5802,13 @@ static void check_variables(bool startup)
       {
          bool can_dupe = false;
          if (environ_cb(RETRO_ENVIRONMENT_GET_CAN_DUPE, &can_dupe))
-            allow_frame_duping = can_dupe;
+            psx_frame_duping = can_dupe;
       }
       else if (strcmp(var.value, "disabled") == 0)
-         allow_frame_duping = false;
+         psx_frame_duping = false;
    }
    else
-      allow_frame_duping = false;
+      psx_frame_duping = false;
 
    var.key = BEETLE_OPT(display_internal_fps);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -7273,7 +7273,7 @@ void retro_run(void)
             && (GPU_get_display_possibly_dirty()
             || GPU_get_display_change_count()
             || (currently_interlaced || PrevInterlaced)
-            || !allow_frame_duping))
+            || !psx_frame_duping))
          fb = pix;
    }
 
@@ -7303,9 +7303,9 @@ void retro_run(void)
        * frontend dupes, a new picture is converted straight into its own
        * framebuffer and the frames between are dupes; otherwise each is
        * shown from the core's copy. */
-      if (fresh && allow_frame_duping && rhi_intf_is_type() == RHI_SOFTWARE)
+      if (fresh && psx_frame_duping && rhi_intf_is_type() == RHI_SOFTWARE)
          vcd_fb = lend_vcd_picture(vcd_w, vcd_h, &vcd_pitch);
-      if (!vcd_fb && (fresh || !allow_frame_duping))
+      if (!vcd_fb && (fresh || !psx_frame_duping))
          vcd_fb = VCD_GetVideo(&vcd_w, &vcd_h, &vcd_pitch);
 
       if (vcd_fb)
@@ -7439,7 +7439,7 @@ void retro_deinit(void)
    /* Display/notification toggles. */
    display_internal_framerate = false;
    display_notifications      = true;
-   allow_frame_duping         = false;
+   psx_frame_duping         = false;
    reset_hdr_output_state();
 
    /* Capability flags re-detected by retro_init. */

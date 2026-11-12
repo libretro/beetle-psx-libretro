@@ -1282,6 +1282,10 @@ struct gl_renderer {
    gl_texture fb_out_depth;
    /* Current resolution of the frontend's framebuffer */
    uint32_t frontend_resolution[2];
+   /* The frontend resolution the last presented frame was drawn at, both
+    * axes packed, when nothing on the display changed in that frame; 0
+    * otherwise. A repeat is sent only against it. */
+   uint32_t presented_resolution;
    /* Current internal resolution upscaling factor */
    uint32_t internal_upscaling;
    /* Current internal color depth */
@@ -7857,6 +7861,37 @@ static void compute_vram_framebuffer_dimensions(gl_renderer *renderer)
    renderer->config.display_resolution[1] = fb_height;
 }
 
+#define gl_packed_frontend_resolution(r) \
+   (((r)->frontend_resolution[0] << 16) | ((r)->frontend_resolution[1] & 0xffff))
+
+/* Resolve rendered bounds into native VRAM for next-frame sampling.
+ * CPU uploads already update both surfaces. Retain pending bounds if the
+ * draw buffer is unavailable, so a later successful frame can retry.
+ * Scissor, depth test and blending are off when this runs. */
+static void gl_resolve_vram_sync(gl_renderer *renderer)
+{
+   const GLint *loc;
+
+   if (!renderer->vram_sync.pending_count)
+      return;
+
+   loc = renderer->image_load_loc;
+   glActiveTexture(GL_TEXTURE1);
+   glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
+
+   gl_framebuffer_bind(renderer->fb_texture_fbo, &renderer->fb_texture);
+
+   glUseProgram(renderer->image_load_program->id);
+   glUniform1i(loc[GL_LOAD_LOC_FB_TEXTURE], 1);
+   glUniform1ui(loc[GL_LOAD_LOC_UPSCALING], renderer->internal_upscaling);
+   glUniform1ui(loc[GL_LOAD_LOC_CONVERSION],
+         gl_native_mirror_conversion(renderer));
+   gl_vram_sync_draw_pending(renderer, loc[GL_LOAD_LOC_RECT]);
+   gl_vram_sync_clear(renderer);
+
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+}
+
 void rhi_gl_finalize_frame(const void *fb, unsigned width,
                            unsigned height, unsigned pitch)
 {
@@ -7871,6 +7906,7 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    struct gl_post   *post            = NULL;
    int               post_dst_x      = 0;
    int               post_dst_y      = 0;
+   bool              display_changed;
 
    /* Setup 2 triangles that cover the entire framebuffer
       then copy the displayed portion of the screen from fb_out */
@@ -7896,6 +7932,34 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    {
       texture_tracker_endFrame(renderer->tracker);
       renderer->hd_handle = hd_handle_make_none();
+   }
+
+   /* Nothing on the display changed: the frontend repeats the frame it
+    * has, and this one is not drawn. Not where the picture moves on its
+    * own (interlaced fields, the cable chain's subcarrier, the VRAM
+    * viewer), and only against a frame presented at the frontend's
+    * current resolution with nothing changing in it: the display state a
+    * change sets is drawn a frame later, so the frame after a change is
+    * drawn too. Draws above still resolve into VRAM. */
+   display_changed = GPU_get_display_change_count()
+      || GPU_get_display_possibly_dirty();
+   if (     psx_frame_duping
+         && !display_changed
+         && !renderer->config.is_480i
+         && !renderer->display_vram
+         && psx_video_cable == GL_CABLE_NONE
+         && renderer->presented_resolution
+         && renderer->presented_resolution
+            == gl_packed_frontend_resolution(renderer))
+   {
+      glDisable(GL_SCISSOR_TEST);
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_BLEND);
+      gl_resolve_vram_sync(renderer);
+      cleanup_gl_state();
+      video_cb(NULL, renderer->frontend_resolution[0],
+            renderer->frontend_resolution[1], 0);
+      return;
    }
 
    /* Calculate native PSX framebuffer dimensions to update renderer
@@ -8100,39 +8164,14 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
       glClear(GL_COLOR_BUFFER_BIT);
    }
 
-   /* Resolve rendered bounds into native VRAM for next-frame sampling.
-    * CPU uploads already update both surfaces. Retain pending bounds if the
-    * draw buffer is unavailable, so a later successful frame can retry. */
-   if (renderer->vram_sync.pending_count)
-   {
-      const GLint *loc = renderer->image_load_loc;
-      glActiveTexture(GL_TEXTURE1);
-      glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
-
-      /* GL_SCISSOR_TEST and GL_BLEND were disabled at the top of
-       * the finalize block (a few hundred lines up) for the
-       * frontend output draw, and nothing in the output draw or
-       * gl_draw_buffer_draw modifies either, so they are still off
-       * here.  Two reflexive disables removed. */
-
-      gl_framebuffer_bind(renderer->fb_texture_fbo, &renderer->fb_texture);
-
-      glUseProgram(renderer->image_load_program->id);
-      glUniform1i(loc[GL_LOAD_LOC_FB_TEXTURE], 1);
-      glUniform1ui(loc[GL_LOAD_LOC_UPSCALING], renderer->internal_upscaling);
-      glUniform1ui(loc[GL_LOAD_LOC_CONVERSION],
-            gl_native_mirror_conversion(renderer));
-      gl_vram_sync_draw_pending(renderer, loc[GL_LOAD_LOC_RECT]);
-      gl_vram_sync_clear(renderer);
-
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-   }
-
+   gl_resolve_vram_sync(renderer);
    cleanup_gl_state();
 
    /* When using a hardware renderer we set the data pointer to
     * -1 to notify the frontend that the frame has been rendered
     * in the framebuffer. */
+   renderer->presented_resolution = display_changed
+      ? 0 : gl_packed_frontend_resolution(renderer);
    video_cb(   RETRO_HW_FRAME_BUFFER_VALID,
          renderer->frontend_resolution[0],
          renderer->frontend_resolution[1], 0);

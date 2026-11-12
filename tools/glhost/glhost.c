@@ -80,7 +80,7 @@ static EGLDisplay egl_dpy;
 static EGLContext egl_ctx;
 static GLuint fbo, fbo_tex, fbo_depth;
 static unsigned fbo_w = 4096, fbo_h = 4096;
-static unsigned last_w, last_h, frames_presented;
+static unsigned last_w, last_h, frames_presented, frames_duped;
 /* GLHOST_CTX: "core" (default) = accept OPENGL_CORE or OPENGL on a core
  * context; "gl2" = simulate the modern RetroArch gl driver: answer
  * GET_PREFERRED_HW_RENDER with RETRO_HW_CONTEXT_OPENGL, accept ONLY that,
@@ -377,6 +377,7 @@ static void video_cb(const void *data, unsigned width, unsigned height, size_t p
   if (width != last_w || height != last_h)
      fprintf(stderr, "[glhost] geometry %ux%u\n", width, height);
   last_w = width; last_h = height; frames_presented++;
+  if (!data) frames_duped++;
   if ((!data || data == (const void *)-1) && getenv("GLHOST_FRAMEHASH")
       && width && height)
   {
@@ -877,6 +878,7 @@ int main(int argc, char **argv)
            gl_rect_pixels - gl_rect_pixels_half);
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
+   fprintf(stderr, "[glhost] duped: %u frames sent as NULL\n", frames_duped);
 
    { const char *ro = getenv("GLHOST_RAM_OUT");
      if (ro)
