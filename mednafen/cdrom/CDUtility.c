@@ -76,9 +76,10 @@ static void InitScrambleTable(void)
 
       for(b = 0; b < 8; b++)
       {
+         int feedback;
          z |= (cv & 1) << b;
 
-         int feedback = ((cv >> 1) & 1) ^ (cv & 1);
+         feedback = ((cv >> 1) & 1) ^ (cv & 1);
          cv = (cv >> 1) | (feedback << 14);
       }
 

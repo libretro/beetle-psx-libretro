@@ -255,6 +255,7 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
    int32_t _DQB = DQB;
    int16_t _ZSF3 = ZSF3;
    int16_t _ZSF4 = ZSF4;
+   int ret;
 
    /* compatibility variables, transfer to/from CR/DR[32] during save states.
     * Vectors is zero-initialised because the save path only fills
@@ -278,7 +279,8 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
 
    if(!load)
    {
-      for(int i = 0; i < 24; i++)
+      int i;
+      for(i = 0; i < 24; i++)
       {
          int which = i;
          uint32_t value = CR[which];
@@ -383,6 +385,9 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
       //31: Read-only
    }
 
+   /* The table takes the values the save path above has just filled in,
+    * so it opens a block of its own here. */
+   {
    SFORMAT StateRegs[] =
    {
       { CR, (uint32_t)(32 * sizeof(uint32_t)), MDFNSTATE_RLSB32 | 0, "CR" },
@@ -430,7 +435,7 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
 
       SFEND
    };
-   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GTE");
+   ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GTE");
 
    if(load)
    {
@@ -466,6 +471,7 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
       DR[29] = Sat5(IR[1] >> 7) | (Sat5(IR[2] >> 7) << 5) | (Sat5(IR[3] >> 7) << 10);
       DR[30] = LZCS;
       DR[31] = LZCR;
+   }
    }
 
    return(ret);

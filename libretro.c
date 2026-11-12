@@ -621,6 +621,7 @@ enum
 
 static bool search_firmware(char *obtained_sha1, const char *bios_sha1)
 {
+   struct string_list *dir_list;
    int i, r;
    RFILE *BIOSFile;
 
@@ -630,7 +631,7 @@ static bool search_firmware(char *obtained_sha1, const char *bios_sha1)
    log_cb(RETRO_LOG_INFO, "Searching for firmware checksum: %s\n", bios_sha1);
 
    /* Consider setting recursive flag */
-   struct string_list *dir_list = dir_list_new(retro_base_directory, NULL, false, false, false, false);
+   dir_list = dir_list_new(retro_base_directory, NULL, false, false, false, false);
 
    if (dir_list == NULL)
       return false;
@@ -2470,12 +2471,6 @@ static unsigned CalcDiscSCEx(void)
       unsigned i;
       for (i = 0; i < cdifs.count; i++)
       {
-         if (!cdifs.items[i])
-         {
-            cdifs.scex_ids[i] = NULL;
-            continue;
-         }
-
          uint8_t buf[2048];
          uint8_t fbuf[2048 + 1];
          char serial[BEETLE_DISC_SERIAL_SIZE];
@@ -2486,7 +2481,6 @@ static unsigned CalcDiscSCEx(void)
          if (!cdifs.items[i])
          {
             cdifs.scex_ids[i] = NULL;
-            disc_compatibility_set(compatibility_index, NULL);
             continue;
          }
 
@@ -3057,7 +3051,8 @@ close_return:
 
 void lightrec_free_mmap(void)
 {
-	for (int i = 0; i < NUM_MEM; i++)
+	int i;
+	for (i = 0; i < NUM_MEM; i++)
 		UNMAP((void *)((uintptr_t)psx_mem + i * RAM_SIZE), RAM_SIZE);
 
 	if (lightrec_codebuffer)
@@ -3243,6 +3238,7 @@ static void CDEject(void)
 
 static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
 {
+   uint32_t ma;
    unsigned region, i;
    bool emulate_memcard[8];
    bool emulate_multitap[2];
@@ -3329,7 +3325,7 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
    PS_CDC_Init(PSX_CDC);
    PSX_FIO = FrontIO_New(emulate_memcard, emulate_multitap);
    FrontIO_SetAMCT(PSX_FIO, setting_psx_analog_toggle);
-   for(unsigned i = 0; i < 2; i++)
+   for(i = 0; i < 2; i++)
    {
       char buf[64];
       snprintf(buf, sizeof(buf), "psx.input.port%u.gun_chairs", i + 1);
@@ -3396,7 +3392,7 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
       PIOMem = MultiAccessSizeMem_New(PIO_SIZE);
    }
 
-   for(uint32_t ma = 0x00000000; ma < 0x00800000; ma += 2048 * 1024)
+   for(ma = 0x00000000; ma < 0x00800000; ma += 2048 * 1024)
    {
       CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(MainRAM), 0x00000000 + ma, 2048 * 1024);
       CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(MainRAM), 0x80000000 + ma, 2048 * 1024);
@@ -3547,6 +3543,7 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
 
 static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
 {
+   unsigned i;
    uint32_t PC, SP, TextStart, TextSize;
    uint8_t *po;
    uint32_t sa;
@@ -3833,7 +3830,7 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
    }
 
    /* Half-assed instruction cache flush. ;) */
-   for(unsigned i = 0; i < 1024; i++)
+   for(i = 0; i < 1024; i++)
    {
       {
          uint32_t _ev = (uint32_t)(0);
@@ -4555,12 +4552,12 @@ static void fallback_log(enum retro_log_level level, const char *fmt, ...)
 
 void retro_init(void)
 {
-   VCD_Init();
-
    struct retro_log_callback log;
    uint64_t serialization_quirks = RETRO_SERIALIZATION_QUIRK_CORE_VARIABLE_SIZE;
    unsigned dci_version          = 0;
    const char *dir               = NULL;
+
+   VCD_Init();
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
@@ -6059,9 +6056,10 @@ static bool MDFNI_LoadCD(const char *devicename)
 
    if (devicename_len > 4 && !strcasecmp(devicename + devicename_len - 4, ".m3u"))
    {
+      unsigned i;
       ReadM3U(&disk_control_ext_info.image_paths, devicename, 0);
 
-      for (unsigned i = 0; i < disk_control_ext_info.image_paths.count; i++)
+      for (i = 0; i < disk_control_ext_info.image_paths.count; i++)
       {
          char image_label[4096];
          bool success = true;
@@ -6101,6 +6099,7 @@ static bool MDFNI_LoadCD(const char *devicename)
       }
       else
       {
+         unsigned i;
          CD_IsPBP = true;
          PBP_LoadedDisc = 0;
          cdif_array_push(&cdifs, image);
@@ -6110,7 +6109,7 @@ static bool MDFNI_LoadCD(const char *devicename)
          PBP_PhysicalDiscCount = (PBP_DiscCount == 0) ?
                1 : PBP_DiscCount;
 
-         for (unsigned i = 0; i < PBP_PhysicalDiscCount; i++)
+         for (i = 0; i < PBP_PhysicalDiscCount; i++)
          {
             /* image_name is at most 4096 - 4 (removing ".pbp")
              * gives label room to add index and quiets gcc warnings */
@@ -7613,12 +7612,13 @@ bool retro_serialize(void *data, size_t size)
 
 bool retro_unserialize(const void *data, size_t size)
 {
+   StateMem st;
+   bool okay;
+
    /* The fog sidecar ring is keyed by a push counter that restarts with the
     * loaded state while counts inside RAM shadows survive; stale slots must
     * not satisfy post-load lookups. */
    PGXP_GTE_InvalidateFogRing();
-   StateMem st;
-   bool okay;
 
    /* Frontends should only call this when a game is loaded, but be
     * defensive: MDFNSS_LoadSM walks every subsystem's StateAction

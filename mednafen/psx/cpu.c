@@ -323,33 +323,17 @@ void CPU_LightrecClear(uint32_t addr, uint32_t size)
 
 const uint8_t *PSX_LoadExpansion1(void);
 
+/* The ICache union's two arms cover the same bytes. Spelled with the
+ * underlying types: ICache and ICache_Bulk are macros over s_cpu. */
+typedef char cpu_icache_arms_cover_the_same_bytes
+      [(sizeof(CPU_ICache[1024]) == sizeof(uint32_t[2048])) ? 1 : -1];
+
 void CPU_Power(PS_CPU *self)
 {
    unsigned i;
 
    (void)self;
 
-   /* Compile-time check that the ICache union's two arms cover the
-    * same byte range. This used to be a runtime assert spelled
-    *
-    *     assert(sizeof(s_cpu.ic.ICache) == sizeof(s_cpu.ic.ICache_Bulk));
-    *
-    * but `ICache` and `ICache_Bulk` are file-static macros that expand
-    * to `s_cpu.ic.ICache` / `s_cpu.ic.ICache_Bulk` (see the #define
-    * block above), so under DEBUG=1 (where assert() is live and the
-    * macros aren't gated out) the expression became
-    *
-    *     sizeof(s_cpu.ic.s_cpu.ic.ICache) ...
-    *
-    * which fails to compile with `'union <anonymous>' has no member
-    * named 's_cpu'`. The release build masked it because -DNDEBUG
-    * stripped the assert before macro expansion.
-    *
-    * Using the underlying types here sidesteps the macros entirely
-    * and gets us a stronger check (compile-time, runs in every
-    * build) for free. */
-   _Static_assert(sizeof(CPU_ICache[1024]) == sizeof(uint32_t[2048]),
-                  "ICache union arms must cover the same bytes");
 
    memset(GPR, 0, 32 * sizeof(uint32_t));
    memset(&cpu_CP0, 0, sizeof(cpu_CP0));
@@ -950,7 +934,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     timestamp++;
 
    #define DO_LDS() { s_cpu.GPR_full[LDWhich] = LDValue; ReadAbsorb[LDWhich] = LDAbsorb; ReadFudge = LDWhich; ReadAbsorbWhich |= LDWhich & 0x1F; LDWhich = 0x22; }
-   #define BEGIN_OPF(name) { op_##name:
+   #define BEGIN_OPF(name) op_##name: {
 
 #if HAVE_COMPUTED_GOTO && PSX_DISPATCH_REPLICATE
    /* Replicated dispatch: instead of every handler funnelling through
@@ -1035,10 +1019,10 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 	 BRANCH_DISPATCH					\
 	}
 
-   #define ITYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF);
-   #define ITYPE_ZE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = instr & 0xFFFF;
-   #define JTYPE uint32_t target = instr & ((1 << 26) - 1);
-   #define RTYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t rd MDFN_NOWARN_UNUSED = (instr >> 11) & 0x1F; uint32_t shamt MDFN_NOWARN_UNUSED = (instr >> 6) & 0x1F;
+   #define ITYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF)
+   #define ITYPE_ZE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = instr & 0xFFFF
+   #define JTYPE uint32_t target = instr & ((1 << 26) - 1)
+   #define RTYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t rd MDFN_NOWARN_UNUSED = (instr >> 11) & 0x1F; uint32_t shamt MDFN_NOWARN_UNUSED = (instr >> 6) & 0x1F
 
 #if HAVE_COMPUTED_GOTO
    #if 0
@@ -1046,11 +1030,11 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 	// These truncated 32-bit table values apparently can't be calculated at compile/link time by gcc on x86_64, so gcc inserts initialization code, but
 	// the compare for the initialization code path is placed sub-optimally(near where the table value is used instead of at the beginning of the function).
 	//
-	#define CGBEGIN static const uint32_t const op_goto_table[256] = {
+	#define CGBEGIN { static const uint32_t const op_goto_table[256] = {
 	#define CGE(l) (uint32_t)(uintptr_t)&&l,
 	#define CGEND }; goto *(void*)(uintptr_t)op_goto_table[opf];
    #else
-	#define CGBEGIN static const void *const op_goto_table[256] = {
+	#define CGBEGIN { static const void *const op_goto_table[256] = {
 	#define CGE(l) &&l,
 	#define CGEND }; goto *op_goto_table[opf];
    #endif
@@ -1060,9 +1044,11 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
    */
    #define CGBEGIN { enum { CGESB = 1 + __COUNTER__ }; switch((uint8_t)opf) {
    #define CGE(l) case __COUNTER__ - CGESB: goto l;
-   #define CGEND } }
+   #define CGEND }
 #endif
 
+   /* CGBEGIN opens a block, closed after the handlers, so the dispatch
+    * table is declared at the head of one and the handlers see it. */
    CGBEGIN
     CGE(op_SLL)  CGE(op_ILL)   CGE(op_SRL)  CGE(op_SRA)   CGE(op_SLLV)    CGE(op_ILL)   CGE(op_SRLV) CGE(op_SRAV)
     CGE(op_JR)   CGE(op_JALR)  CGE(op_ILL)  CGE(op_ILL)   CGE(op_SYSCALL) CGE(op_BREAK) CGE(op_ILL)  CGE(op_ILL)
@@ -1104,7 +1090,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
    CGEND
 
    {
-    BEGIN_OPF(ILL);
+    BEGIN_OPF(ILL)
 	     DO_LDS();
 	     new_PC = CPU_Exception(EXCEPTION_RI, PC, new_PC, instr);
     END_OPF;
@@ -1112,17 +1098,19 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // ADD - Add Word
     //
-    BEGIN_OPF(ADD);
+    BEGIN_OPF(ADD)
 	RTYPE;
 
+	uint32_t result;
+	bool ep;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] + GPR[rt];
-	bool ep = ((~(GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
+	result = GPR[rs] + GPR[rt];
+	ep = ((~(GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ADD(instr, result, GPR[rs], GPR[rt]);
@@ -1141,16 +1129,18 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // ADDI - Add Immediate Word
     //
-    BEGIN_OPF(ADDI);
+    BEGIN_OPF(ADDI)
 	ITYPE;
 
+        uint32_t result;
+	bool ep;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-        uint32_t result = GPR[rs] + immediate;
-	bool ep = ((~(GPR[rs] ^ immediate)) & (GPR[rs] ^ result)) & 0x80000000;
+        result = GPR[rs] + immediate;
+	ep = ((~(GPR[rs] ^ immediate)) & (GPR[rs] ^ result)) & 0x80000000;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ADDI(instr, result, GPR[rs]);
@@ -1169,15 +1159,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // ADDIU - Add Immediate Unsigned Word
     //
-    BEGIN_OPF(ADDIU);
+    BEGIN_OPF(ADDIU)
 	ITYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] + immediate;
+	result = GPR[rs] + immediate;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ADDIU(instr, result, GPR[rs]);
@@ -1191,16 +1182,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // ADDU - Add Unsigned Word
     //
-    BEGIN_OPF(ADDU);
+    BEGIN_OPF(ADDU)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] + GPR[rt];
+	result = GPR[rs] + GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ADDU(instr, result, GPR[rs], GPR[rt]);
@@ -1216,16 +1208,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // AND - And
     //
-    BEGIN_OPF(AND);
+    BEGIN_OPF(AND)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] & GPR[rt];
+	result = GPR[rs] & GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_AND(instr, result, GPR[rs], GPR[rt]);
@@ -1239,15 +1232,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // ANDI - And Immediate
     //
-    BEGIN_OPF(ANDI);
+    BEGIN_OPF(ANDI)
 	ITYPE_ZE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] & immediate;
+	result = GPR[rs] & immediate;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ANDI(instr, result, GPR[rs]);
@@ -1261,15 +1255,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // BEQ - Branch on Equal
     //
-    BEGIN_OPF(BEQ);
+    BEGIN_OPF(BEQ)
 	ITYPE;
 
+	bool result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	const bool result = (GPR[rs] == GPR[rt]);
+	result = (GPR[rs] == GPR[rt]);
 
 	DO_LDS();
 
@@ -1278,7 +1273,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 
     // Bah, why does MIPS encoding have to be funky like this. :(
     // Handles BGEZ, BGEZAL, BLTZ, BLTZAL
-    BEGIN_OPF(BCOND);
+    BEGIN_OPF(BCOND)
 	const uint32_t tv = GPR[(instr >> 21) & 0x1F];
 	const uint32_t riv = (instr >> 16) & 0x1F;
 	const uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF);
@@ -1299,14 +1294,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // BGTZ - Branch on Greater than Zero
     //
-    BEGIN_OPF(BGTZ);
+    BEGIN_OPF(BGTZ)
 	ITYPE;
 
+	bool result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-	const bool result = (int32_t)GPR[rs] > 0;
+	result = (int32_t)GPR[rs] > 0;
 
 	DO_LDS();
 
@@ -1316,14 +1312,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // BLEZ - Branch on Less Than or Equal to Zero
     //
-    BEGIN_OPF(BLEZ);
+    BEGIN_OPF(BLEZ)
 	ITYPE;
 
+	bool result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-	const bool result = (int32_t)GPR[rs] <= 0;
+	result = (int32_t)GPR[rs] <= 0;
 
 	DO_LDS();
 
@@ -1333,15 +1330,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // BNE - Branch on Not Equal
     //
-    BEGIN_OPF(BNE);
+    BEGIN_OPF(BNE)
 	ITYPE;
 
+	bool result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	const bool result = GPR[rs] != GPR[rt];
+	result = GPR[rs] != GPR[rt];
 
 	DO_LDS();
 
@@ -1351,7 +1349,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // BREAK - Breakpoint
     //
-    BEGIN_OPF(BREAK);
+    BEGIN_OPF(BREAK)
 	DO_LDS();
 	new_PC = CPU_Exception(EXCEPTION_BP, PC, new_PC, instr);
     END_OPF;
@@ -1360,7 +1358,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // COP0 instructions
     //
-    BEGIN_OPF(COP0);
+    BEGIN_OPF(COP0)
 	const uint32_t sub_op = (instr >> 21) & 0x1F;
 	const uint32_t rt = (instr >> 16) & 0x1F;
 	const uint32_t rd = (instr >> 11) & 0x1F;
@@ -1497,7 +1495,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // COP2
     //
-    BEGIN_OPF(COP2);
+    BEGIN_OPF(COP2)
 	const uint32_t sub_op = (instr >> 21) & 0x1F;
 	const uint32_t rt = (instr >> 16) & 0x1F;
 	const uint32_t rd = (instr >> 11) & 0x1F;
@@ -1608,7 +1606,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // COP1, COP3
     //
-    BEGIN_OPF(COP13);
+    BEGIN_OPF(COP13)
 	DO_LDS();
 
 	if(!(CP0.SR & (1U << (28 + ((instr >> 26) & 0x3)))))
@@ -1631,7 +1629,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LWC0, LWC1, LWC3
     //
-    BEGIN_OPF(LWC013);
+    BEGIN_OPF(LWC013)
         ITYPE;
 	const uint32_t address = GPR[rs] + immediate;
 
@@ -1656,7 +1654,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LWC2
     //
-    BEGIN_OPF(LWC2);
+    BEGIN_OPF(LWC2)
         ITYPE;
 	const uint32_t address = GPR[rs] + immediate;
 
@@ -1669,10 +1667,11 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 	}
         else
 	{
+         uint32_t value;
          if(timestamp < gte_ts_done)
           timestamp = gte_ts_done;
 
-         uint32_t value = ReadMemory_u32(&timestamp, address, false, true);
+         value = ReadMemory_u32(&timestamp, address, false, true);
          GTE_WriteDR(rt, value);
 
          if (PGXP_GetModes() & PGXP_MODE_GTE)
@@ -1685,7 +1684,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SWC0, SWC1, SCW3
     //
-    BEGIN_OPF(SWC013);
+    BEGIN_OPF(SWC013)
         ITYPE;
 	const uint32_t address = GPR[rs] + immediate;
 
@@ -1708,7 +1707,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SWC2
     //
-    BEGIN_OPF(SWC2);
+    BEGIN_OPF(SWC2)
         ITYPE;
 	const uint32_t address = GPR[rs] + immediate;
 
@@ -1735,7 +1734,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // DIV - Divide Word
     //
-    BEGIN_OPF(DIV);
+    BEGIN_OPF(DIV)
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1774,7 +1773,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // DIVU - Divide Unsigned Word
     //
-    BEGIN_OPF(DIVU);
+    BEGIN_OPF(DIVU)
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1803,7 +1802,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // J - Jump
     //
-    BEGIN_OPF(J);
+    BEGIN_OPF(J)
 	JTYPE;
 
 	DO_LDS();
@@ -1814,7 +1813,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // JAL - Jump and Link
     //
-    BEGIN_OPF(JAL);
+    BEGIN_OPF(JAL)
 	JTYPE;
 
 	//GPR_DEPRES_BEGIN
@@ -1829,15 +1828,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // JALR - Jump and Link Register
     //
-    BEGIN_OPF(JALR);
+    BEGIN_OPF(JALR)
 	RTYPE;
 
+	uint32_t tmp;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t tmp = GPR[rs];
+	tmp = GPR[rs];
 
 	DO_LDS();
 
@@ -1847,15 +1847,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // JR - Jump Register
     //
-    BEGIN_OPF(JR);
+    BEGIN_OPF(JR)
 	RTYPE;
 
+	uint32_t bt;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t bt = GPR[rs];
+	bt = GPR[rs];
 
 	DO_LDS();
 
@@ -1865,7 +1866,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LUI - Load Upper Immediate
     //
-    BEGIN_OPF(LUI);
+    BEGIN_OPF(LUI)
 	ITYPE_ZE;		// Actually, probably would be sign-extending...if we were emulating a 64-bit MIPS chip :b
 
 	GPR_DEPRES_BEGIN
@@ -1884,7 +1885,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // MFHI - Move from HI
     //
-    BEGIN_OPF(MFHI);
+    BEGIN_OPF(MFHI)
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1919,7 +1920,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // MFLO - Move from LO
     //
-    BEGIN_OPF(MFLO);
+    BEGIN_OPF(MFLO)
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1954,7 +1955,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // MTHI - Move to HI
     //
-    BEGIN_OPF(MTHI);
+    BEGIN_OPF(MTHI)
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1973,7 +1974,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // MTLO - Move to LO
     //
-    BEGIN_OPF(MTLO);
+    BEGIN_OPF(MTLO)
 	RTYPE;
 
 	GPR_DEPRES_BEGIN
@@ -1993,15 +1994,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // MULT - Multiply Word
     //
-    BEGIN_OPF(MULT);
+    BEGIN_OPF(MULT)
 	RTYPE;
 
+	uint64_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	uint64_t result;
 
 	result = (int64_t)(int32_t)GPR[rs] * (int32_t)GPR[rt];
 	muldiv_ts_done = timestamp + MULT_Tab24[MDFN_lzcount32((GPR[rs] ^ ((int32_t)GPR[rs] >> 31)) | 0x400)];
@@ -2018,15 +2019,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // MULTU - Multiply Unsigned Word
     //
-    BEGIN_OPF(MULTU);
+    BEGIN_OPF(MULTU)
 	RTYPE;
 
+	uint64_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	uint64_t result;
 
 	result = (uint64_t)GPR[rs] * GPR[rt];
 	muldiv_ts_done = timestamp + MULT_Tab24[MDFN_lzcount32(GPR[rs] | 0x400)];
@@ -2044,16 +2045,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // NOR - NOR
     //
-    BEGIN_OPF(NOR);
+    BEGIN_OPF(NOR)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = ~(GPR[rs] | GPR[rt]);
+	result = ~(GPR[rs] | GPR[rt]);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_NOR(instr, result, GPR[rs], GPR[rt]);
@@ -2067,16 +2069,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // OR - OR
     //
-    BEGIN_OPF(OR);
+    BEGIN_OPF(OR)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] | GPR[rt];
+	result = GPR[rs] | GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_OR(instr, result, GPR[rs], GPR[rt]);
@@ -2091,15 +2094,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // ORI - OR Immediate
     //
-    BEGIN_OPF(ORI);
+    BEGIN_OPF(ORI)
 	ITYPE_ZE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] | immediate;
+	result = GPR[rs] | immediate;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ORI(instr, result, GPR[rs]);
@@ -2114,15 +2118,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SLL - Shift Word Left Logical
     //
-    BEGIN_OPF(SLL);	// SLL
+    BEGIN_OPF(SLL)	// SLL
 	RTYPE;
+	uint32_t result;
 
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rt] << shamt;
+	result = GPR[rt] << shamt;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLL(instr, result, GPR[rt]);
@@ -2137,16 +2142,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SLLV - Shift Word Left Logical Variable
     //
-    BEGIN_OPF(SLLV);
+    BEGIN_OPF(SLLV)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rt] << (GPR[rs] & 0x1F);
+	result = GPR[rt] << (GPR[rs] & 0x1F);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLLV(instr, result, GPR[rt], GPR[rs]);
@@ -2160,16 +2166,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SLT - Set on Less Than
     //
-    BEGIN_OPF(SLT);
+    BEGIN_OPF(SLT)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = (bool)((int32_t)GPR[rs] < (int32_t)GPR[rt]);
+	result = (bool)((int32_t)GPR[rs] < (int32_t)GPR[rt]);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLT(instr, result, GPR[rs], GPR[rt]);
@@ -2184,15 +2191,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SLTI - Set on Less Than Immediate
     //
-    BEGIN_OPF(SLTI);
+    BEGIN_OPF(SLTI)
 	ITYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32_t result = (bool)((int32_t)GPR[rs] < (int32_t)immediate);
+	result = (bool)((int32_t)GPR[rs] < (int32_t)immediate);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLTI(instr, result, GPR[rs]);
@@ -2207,15 +2215,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SLTIU - Set on Less Than Immediate, Unsigned
     //
-    BEGIN_OPF(SLTIU);
+    BEGIN_OPF(SLTIU)
 	ITYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32_t result = (bool)(GPR[rs] < (uint32_t)immediate);
+	result = (bool)(GPR[rs] < (uint32_t)immediate);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLTIU(instr, result, GPR[rs]);
@@ -2230,16 +2239,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SLTU - Set on Less Than, Unsigned
     //
-    BEGIN_OPF(SLTU);
+    BEGIN_OPF(SLTU)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = (bool)(GPR[rs] < GPR[rt]);
+	result = (bool)(GPR[rs] < GPR[rt]);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLTU(instr, result, GPR[rs], GPR[rt]);
@@ -2254,15 +2264,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SRA - Shift Word Right Arithmetic
     //
-    BEGIN_OPF(SRA);
+    BEGIN_OPF(SRA)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = ((int32_t)GPR[rt]) >> shamt;
+	result = ((int32_t)GPR[rt]) >> shamt;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SRA(instr, result, GPR[rt]);
@@ -2277,16 +2288,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SRAV - Shift Word Right Arithmetic Variable
     //
-    BEGIN_OPF(SRAV);
+    BEGIN_OPF(SRAV)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = ((int32_t)GPR[rt]) >> (GPR[rs] & 0x1F);
+	result = ((int32_t)GPR[rt]) >> (GPR[rs] & 0x1F);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SRAV(instr, result, GPR[rt], GPR[rs]);
@@ -2301,15 +2313,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SRL - Shift Word Right Logical
     //
-    BEGIN_OPF(SRL);
+    BEGIN_OPF(SRL)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rt] >> shamt;
+	result = GPR[rt] >> shamt;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SRL(instr, result, GPR[rt]);
@@ -2323,16 +2336,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SRLV - Shift Word Right Logical Variable
     //
-    BEGIN_OPF(SRLV);
+    BEGIN_OPF(SRLV)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rt] >> (GPR[rs] & 0x1F);
+	result = GPR[rt] >> (GPR[rs] & 0x1F);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SRLV(instr, result, GPR[rt], GPR[rs]);
@@ -2347,17 +2361,19 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SUB - Subtract Word
     //
-    BEGIN_OPF(SUB);
+    BEGIN_OPF(SUB)
 	RTYPE;
 
+	uint32_t result;
+	bool ep;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] - GPR[rt];
-	bool ep = (((GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
+	result = GPR[rs] - GPR[rt];
+	ep = (((GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SUB(instr, result, GPR[rs], GPR[rt]);
@@ -2377,16 +2393,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SUBU - Subtract Unsigned Word
     //
-    BEGIN_OPF(SUBU);
+    BEGIN_OPF(SUBU)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] - GPR[rt];
+	result = GPR[rs] - GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SUBU(instr, result, GPR[rs], GPR[rt]);
@@ -2401,7 +2418,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SYSCALL
     //
-    BEGIN_OPF(SYSCALL);
+    BEGIN_OPF(SYSCALL)
 	DO_LDS();
 
 	new_PC = CPU_Exception(EXCEPTION_SYSCALL, PC, new_PC, instr);
@@ -2411,16 +2428,17 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // XOR
     //
-    BEGIN_OPF(XOR);
+    BEGIN_OPF(XOR)
 	RTYPE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] ^ GPR[rt];
+	result = GPR[rs] ^ GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_XOR(instr, result, GPR[rs], GPR[rt]);
@@ -2434,15 +2452,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // XORI - Exclusive OR Immediate
     //
-    BEGIN_OPF(XORI);
+    BEGIN_OPF(XORI)
 	ITYPE_ZE;
 
+	uint32_t result;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32_t result = GPR[rs] ^ immediate;
+	result = GPR[rs] ^ immediate;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_XORI(instr, result, GPR[rs]);
@@ -2459,14 +2478,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LB - Load Byte
     //
-    BEGIN_OPF(LB);
+    BEGIN_OPF(LB)
 	ITYPE;
 
+	uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-	uint32_t address = GPR[rs] + immediate;
+	address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(LDWhich == rt))
 	 LDWhich = 0;
@@ -2483,14 +2503,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LBU - Load Byte Unsigned
     //
-    BEGIN_OPF(LBU);
+    BEGIN_OPF(LBU)
         ITYPE;
 
+        uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
+        address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(LDWhich == rt))
 	 LDWhich = 0;
@@ -2507,14 +2528,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LH - Load Halfword
     //
-    BEGIN_OPF(LH);
+    BEGIN_OPF(LH)
         ITYPE;
 
+        uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
+        address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(address & 1))
 	{
@@ -2540,14 +2562,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LHU - Load Halfword Unsigned
     //
-    BEGIN_OPF(LHU);
+    BEGIN_OPF(LHU)
         ITYPE;
 
+        uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
+        address = GPR[rs] + immediate;
 
         if(MDFN_UNLIKELY(address & 1))
 	{
@@ -2575,14 +2598,15 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LW - Load Word
     //
-    BEGIN_OPF(LW);
+    BEGIN_OPF(LW)
         ITYPE;
 
+        uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
+        address = GPR[rs] + immediate;
 
         if(MDFN_UNLIKELY(address & 3))
 	{
@@ -2609,15 +2633,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SB - Store Byte
     //
-    BEGIN_OPF(SB);
+    BEGIN_OPF(SB)
 	ITYPE;
 
+	uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	uint32_t address = GPR[rs] + immediate;
+	address = GPR[rs] + immediate;
 
 	WriteMemory_u8(&timestamp, address, GPR[rt]);
 
@@ -2630,15 +2655,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     // 
     // SH - Store Halfword
     //
-    BEGIN_OPF(SH);
+    BEGIN_OPF(SH)
         ITYPE;
 
+        uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
+        address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(address & 0x1))
 	{
@@ -2657,15 +2683,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     // 
     // SW - Store Word
     //
-    BEGIN_OPF(SW);
+    BEGIN_OPF(SW)
         ITYPE;
 
+        uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
+        address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(address & 0x3))
 	{
@@ -2690,16 +2717,18 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LWL - Load Word Left
     //
-    BEGIN_OPF(LWL);
+    BEGIN_OPF(LWL)
 	ITYPE;
 
+	uint32_t address;
+	uint32_t v;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	//GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	uint32_t address = GPR[rs] + immediate;
-	uint32_t v = GPR[rt];
+	address = GPR[rs] + immediate;
+	v = GPR[rt];
 
 	if(LDWhich == rt)
 	{
@@ -2735,15 +2764,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SWL - Store Word Left
     //
-    BEGIN_OPF(SWL);
+    BEGIN_OPF(SWL)
         ITYPE;
 
+        uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
+        address = GPR[rs] + immediate;
 
 	switch(address & 0x3)
 	{
@@ -2769,16 +2799,18 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // LWR - Load Word Right
     //
-    BEGIN_OPF(LWR);
+    BEGIN_OPF(LWR)
         ITYPE;
 
+        uint32_t address;
+	uint32_t v;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	//GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
-	uint32_t v = GPR[rt];
+        address = GPR[rs] + immediate;
+	v = GPR[rt];
 
 	if(LDWhich == rt)
 	{
@@ -2814,15 +2846,16 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // SWR - Store Word Right
     //
-    BEGIN_OPF(SWR);
+    BEGIN_OPF(SWR)
         ITYPE;
 
+        uint32_t address;
 	GPR_DEPRES_BEGIN
 	GPR_DEP(rs);
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32_t address = GPR[rs] + immediate;
+        address = GPR[rs] + immediate;
 
 	switch(address & 0x3)
 	{
@@ -2850,7 +2883,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
     //
     // Mednafen special instruction
     //
-    BEGIN_OPF(INTERRUPT);
+    BEGIN_OPF(INTERRUPT)
 	if(Halted)
 	{
 	 goto SkipNPCStuff;
@@ -2863,6 +2896,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 	}
     END_OPF;
    }
+   } /* CGBEGIN's block: the table, and the handlers that dispatch through it */
 
    OpDone: ;
    PC = new_PC;
@@ -3686,10 +3720,9 @@ static int lightrec_plugin_init(PS_CPU *self)
 
    lightrec_regs = lightrec_get_registers(lightrec_state);
 
-   uint32_t flags = (psx_dynarec_invalidate?LIGHTREC_OPT_INV_DMA_ONLY:0) |
-               (psx_dynarec_spgp_opt?LIGHTREC_OPT_SP_GP_HIT_RAM:0);
-
-   lightrec_set_unsafe_opt_flags(lightrec_state, flags);
+   lightrec_set_unsafe_opt_flags(lightrec_state,
+         (psx_dynarec_invalidate ? LIGHTREC_OPT_INV_DMA_ONLY : 0) |
+         (psx_dynarec_spgp_opt ? LIGHTREC_OPT_SP_GP_HIT_RAM : 0));
 
    /* At 2 cycles per instruction the emulated CPU appears half-speed
     * compared to the interpreter (and to real hardware, for cached

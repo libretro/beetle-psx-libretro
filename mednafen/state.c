@@ -255,6 +255,7 @@ static bool SubWrite(StateMem *st, SFORMAT *sf)
 {
    while(sf->size || sf->name)	/* Size can sometimes be zero, so also check for the text name.  These two should both be zero only at the end of a struct. */
    {
+      int32_t bytesize;
       if(!sf->size || !sf->v)
       {
          sf++;
@@ -270,7 +271,7 @@ static bool SubWrite(StateMem *st, SFORMAT *sf)
          continue;
       }
 
-      int32_t bytesize = sf->size;
+      bytesize = sf->size;
 
       /* exclude text labels from fast savestates */
       if (!FastSaveStates)
@@ -356,7 +357,8 @@ static bool SubWrite(StateMem *st, SFORMAT *sf)
        * Don't do it if we're only saving the raw data. */
       if(sf->flags & MDFNSTATE_BOOL)
       {
-         for(int32_t bool_monster = 0; bool_monster < bytesize; bool_monster++)
+         int32_t bool_monster;
+         for(bool_monster = 0; bool_monster < bytesize; bool_monster++)
          {
             uint8_t tmp_bool = ((bool *)sf->v)[bool_monster];
             if (smem_write(st, &tmp_bool, 1) != 1)
@@ -701,6 +703,7 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 
    while (st->loc < (uint32_t)(temp + size))
    {
+      SFORMAT *tmp;
       /* exclude text labels from fast savestates */
       if (!FastSaveStates)
       {
@@ -720,7 +723,7 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
       if (smem_read32le(st, &recorded_size) != 4)
          return 0;
 
-      SFORMAT *tmp = FindSF((char*)toa + 1, sf);
+      tmp = FindSF((char*)toa + 1, sf);
       /* Fix for unnecessary name checks, when we find 
        * it in the first slot, don't recheck that slot again.
        * Also necessary for fast savestates to work. */

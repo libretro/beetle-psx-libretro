@@ -641,11 +641,12 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
 
          for(x = 0; x < (unsigned)width; x += 128)
          {
+            int32_t chunk_x;
             int32_t chunk_x_max = (int32_t)(width - x);
             uint16_t tmpbuf[128]; /* TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache. */
             if (chunk_x_max > 128) chunk_x_max = 128;
 
-            for(int32_t chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+            for(chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
             {
                int32_t s_y = (y + sourceY) & 511;
                int32_t s_x = (x + chunk_x + sourceX) & 1023;
@@ -654,7 +655,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
                tmpbuf[chunk_x] = texel_fetch(g, s_x, s_y);
             }
 
-            for(int32_t chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+            for(chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
             {
                int32_t d_y = (y + destY) & 511;
                int32_t d_x = (x + chunk_x + destX) & 1023;
@@ -1014,6 +1015,8 @@ static INLINE bool CalcFIFOReadyBit(void)
 
 static void RHI_UpdateDisplayMode(void)
 {
+   bool is_480i_mode;
+   enum width_modes curr_width_mode;
    bool depth_24bpp = !!(GPU.DisplayMode & 0x10);
 
    /*uint16_t yres = GPU.VertEnd - GPU.VertStart; */
@@ -1023,7 +1026,7 @@ static void RHI_UpdateDisplayMode(void)
       is_pal_mode = true;
 
    /* Both 2nd bit and 5th bit have to be enabled to use interlacing properly. */
-   bool is_480i_mode = false;
+   is_480i_mode = false;
    if((GPU.DisplayMode & (DISP_INTERLACED | DISP_VERT480)) == (DISP_INTERLACED | DISP_VERT480))
    {
       /*yres *= 2; */
@@ -1032,7 +1035,6 @@ static void RHI_UpdateDisplayMode(void)
 
    /*unsigned pixelclock_divider; */
 
-   enum width_modes curr_width_mode;
 
    if ((GPU.DisplayMode >> 6) & 1)
    {
@@ -1150,6 +1152,7 @@ static uint16_t *VRAM_Alloc(uint8_t upscale_shift)
 bool GPU_Init(bool pal_clock_and_tv,
       int sls, int sle, uint8_t upscale_shift)
 {
+   int i;
    int x, y, v;
 
    GPU.vram = VRAM_Alloc(upscale_shift);
@@ -1185,7 +1188,7 @@ bool GPU_Init(bool pal_clock_and_tv,
 
    memset(GPU.RGB8SAT_Under, 0, sizeof(GPU.RGB8SAT_Under));
 
-   for(int i = 0; i < 256; i++)
+   for(i = 0; i < 256; i++)
       GPU.RGB8SAT[i] = i;
 
    memset(GPU.RGB8SAT_Over, 0xFF, sizeof(GPU.RGB8SAT_Over));
@@ -1241,6 +1244,8 @@ bool GPU_Rescale(uint8_t ushift)
    uint16_t *old_vram = GPU.vram;
    uint8_t     old_shift = GPU.upscale_shift;
    uint16_t *new_vram;
+   unsigned x;
+   unsigned y;
 
    /* Step 1+2: allocate scratch buffer at 1x. If we're already at 1x
     * we can alias the old vram directly; otherwise allocate scratch
@@ -1255,8 +1260,8 @@ bool GPU_Rescale(uint8_t ushift)
       if (!vram_new)
          return false;
 
-      for (unsigned y = 0; y < 512; y++)
-         for (unsigned x = 0; x < 1024; x++)
+      for (y = 0; y < 512; y++)
+         for (x = 0; x < 1024; x++)
             vram_new[y * 1024 + x] = texel_fetch(&GPU, x, y);
    }
 
@@ -1280,8 +1285,8 @@ bool GPU_Rescale(uint8_t ushift)
 
    /* Step 4: copy the scratch buffer into the new VRAM, upscaling
     * via texel_put (nearest neighbour). */
-   for (unsigned y = 0; y < 512; y++)
-      for (unsigned x = 0; x < 1024; x++)
+   for (y = 0; y < 512; y++)
+      for (x = 0; x < 1024; x++)
          texel_put(x, y, vram_new[y * 1024 + x]);
 
    /* Step 5: free the old buffer (skipping the alias case where
@@ -2247,6 +2252,7 @@ void GPU_WakeFromIdle(bool from_cpu)
 
 static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
 {
+   int32_t next_dt;
    int32_t gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
    const uint32_t dmc = (GPU.DisplayMode & 0x40) ? 4 : (GPU.DisplayMode & 0x3);
@@ -2309,6 +2315,15 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
          }
          else
          {
+            int32_t surf_pitch;
+            uint32_t *dest;
+            unsigned pix_clock_div;
+            unsigned pix_clock;
+            unsigned pix_clock_offset;
+            unsigned dmw_width;
+            unsigned displayfb_yoffset;
+            unsigned int VisibleLineCount;
+            unsigned int FirstVisibleLine;
             unsigned int FirstVisibleLineTemp =
                GPU.LineVisFirst + (crop_overscan == 2 ? GPU.VertStart : (GPU.HardwarePALType ? 20 : 16));
             unsigned int VisibleLineCountTemp =
@@ -2321,8 +2336,8 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                VisibleLineCountTemp =
                   GPU.LineVisLast + 1 - GPU.LineVisFirst; /*HardwarePALType ? 288 : 240; */
             }
-            const unsigned int FirstVisibleLine = FirstVisibleLineTemp;
-            const unsigned int VisibleLineCount = VisibleLineCountTemp;
+            FirstVisibleLine = FirstVisibleLineTemp;
+            VisibleLineCount = VisibleLineCountTemp;
 
             TIMER_SetHRetrace(false);
 
@@ -2387,18 +2402,19 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                {
                   if((bool)(GPU.DisplayMode & DISP_PAL) != GPU.HardwarePALType)
                   {
+                     int32_t y;
                      GPU.DisplayRect->x = 0;
                      GPU.DisplayRect->y = 0;
                      GPU.DisplayRect->w = 384;
                      GPU.DisplayRect->h = VisibleLineCount;
 
-                     for(int32_t y = 0; y < GPU.DisplayRect->h; y++)
+                     for(y = 0; y < GPU.DisplayRect->h; y++)
                      {
-                        uint32_t *dest = GPU.surface->pixels + y * GPU.surface->pitch32;
+                        uint32_t *row = GPU.surface->pixels + y * GPU.surface->pitch32;
 
                         GPU.LineWidths[y] = 384;
 
-                        memset(dest, 0, 384 * sizeof(int32_t));
+                        memset(row, 0, 384 * sizeof(int32_t));
                      }
 
                      /* The mismatch clear zeroes only [0, 384) per
@@ -2412,6 +2428,7 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                   }
                   else
                   {
+                     int i;
                      GPU.espec->InterlaceOn = (bool)(GPU.DisplayMode & DISP_INTERLACED);
                      GPU.espec->InterlaceField = (bool)(GPU.DisplayMode & DISP_INTERLACED) && GPU.field;
 
@@ -2423,7 +2440,7 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                      /* Clear ~0 state. */
                      GPU.LineWidths[0] = 0;
 
-                     for(int i = 0; i < (GPU.DisplayRect->y + GPU.DisplayRect->h); i++)
+                     for(i = 0; i < (GPU.DisplayRect->y + GPU.DisplayRect->h); i++)
                      {
                         GPU.surface->pixels[i * GPU.surface->pitch32 + 0] =
                            GPU.surface->pixels[i * GPU.surface->pitch32 + 1] = 0;
@@ -2481,7 +2498,7 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
             IRQ_Assert(IRQ_VBLANK, GPU.InVBlank);
             TIMER_SetVBlank(GPU.InVBlank);
 
-            unsigned displayfb_yoffset = GPU.DisplayFB_CurYOffset;
+            displayfb_yoffset = GPU.DisplayFB_CurYOffset;
 
             /* Needs to occur even in vblank. */
             /* Not particularly confident about the timing */
@@ -2494,11 +2511,11 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
 
             GPU.DisplayFB_CurLineYReadout = (GPU.DisplayFB_YStart + displayfb_yoffset) & 0x1FF;
 
-            unsigned dmw_width = 0;
-            unsigned pix_clock_offset = 0;
-            unsigned pix_clock = 0;
-            unsigned pix_clock_div = 0;
-            uint32_t *dest = NULL;
+            dmw_width = 0;
+            pix_clock_offset = 0;
+            pix_clock = 0;
+            pix_clock_div = 0;
+            dest = NULL;
 
             /* Surface pitch handed to FrontIO_GPULineHook below.
              * The hook only dereferences this when its `pixels`
@@ -2509,8 +2526,7 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
              * alloc_surface skips the SW surface allocation
              * there.  The placeholder value isn't used; we just
              * need *some* defined value to pass through. */
-            const int32_t surf_pitch =
-               GPU.surface ? GPU.surface->pitch32 : 0;
+            surf_pitch = GPU.surface ? GPU.surface->pitch32 : 0;
 
             /* The display/scanout output below writes renderer-visible state
              * (GPU.LineWidths, the software surface, and the HW scanout
@@ -2661,6 +2677,7 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                   }
                   else
                   {
+                     uint32_t i;
                      /* Margin zero-fill skip: if this dest_line's
                       * (dx_start, dx_end, dmw) hasn't changed since
                       * last frame AND nothing has invalidated the
@@ -2679,7 +2696,7 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                          && scanout_cache[dest_line].dx_end   == dx_end
                          && scanout_cache[dest_line].dmw      == (uint32_t)dmw;
 
-                     for (uint32_t i = 0; i < _upscale; i++)
+                     for (i = 0; i < _upscale; i++)
                      {
                         const uint16_t *src = GPU.vram +
                            ((y + i) << (10 + GPU.upscale_shift));
@@ -2773,7 +2790,7 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
 TheEnd:
    GPU.lastts = sys_timestamp;
 
-   int32_t next_dt = GPU.LineClockCounter;
+   next_dt = GPU.LineClockCounter;
 
    next_dt = (((int64_t)next_dt << 16) - GPU.GPUClockCounter + GPU.GPUClockRatio - 1) / GPU.GPUClockRatio;
 
@@ -3030,6 +3047,7 @@ void GPU_FlushDeferredScanout(MDFN_Surface *target)
  * bytes never read, so nothing has to be brought up to date for it. */
 void GPU_RestoreStateP1(bool load, bool sizing)
 {
+   unsigned i;
    /* The idle schedule is not part of a state; the ForceEventUpdates()
     * after a load puts the GPU on a fresh grid, as it always has. */
    if (load && GPU.idle_virtual)
@@ -3088,20 +3106,23 @@ void GPU_RestoreStateP1(bool load, bool sizing)
 
       if (vram_new && !load && !sizing)
       {
+         unsigned y;
          /* We must downscale the current VRAM contents back to 1x */
-         for (unsigned y = 0; y < 512; y++)
+         for (y = 0; y < 512; y++)
          {
-            for (unsigned x = 0; x < 1024; x++)
+            unsigned x;
+            for (x = 0; x < 1024; x++)
                vram_new[y * 1024 + x] = texel_fetch(&GPU, x, y);
          }
       }
    }
 
-   for(unsigned i = 0; i < 256; i++)
+   for(i = 0; i < 256; i++)
    {
+      unsigned j;
       TexCache_Tag[i] = GPU.TexCache[i].Tag;
 
-      for(unsigned j = 0; j < 4; j++)
+      for(j = 0; j < 4; j++)
          TexCache_Data[i][j] = GPU.TexCache[i].Data[j];
 
    }
@@ -3113,10 +3134,12 @@ void GPU_RestoreStateP2(bool load)
    {
       if (load && vram_new)
       {
+         unsigned y;
          /* Restore upscaled VRAM from savestate */
-         for (unsigned y = 0; y < 512; y++)
+         for (y = 0; y < 512; y++)
          {
-            for (unsigned x = 0; x < 1024; x++)
+            unsigned x;
+            for (x = 0; x < 1024; x++)
                texel_put(x, y, vram_new[y * 1024 + x]);
          }
       }
@@ -3233,11 +3256,13 @@ static void gpu_upload_changed_rows(bool dirty)
 
 static void gpu_restore_state_p3(bool upload_all)
 {
-   for(unsigned i = 0; i < 256; i++)
+   unsigned i;
+   for(i = 0; i < 256; i++)
    {
+      unsigned j;
       GPU.TexCache[i].Tag = TexCache_Tag[i];
 
-      for(unsigned j = 0; j < 4; j++)
+      for(j = 0; j < 4; j++)
          GPU.TexCache[i].Data[j] = TexCache_Data[i][j];
    }
    /* TexCache was rewritten directly; drop the same-line shortcut so it
@@ -3324,6 +3349,9 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       memset(TexCache_Tag, 0xFF, sizeof(TexCache_Tag));
    }
 
+   /* The table takes GPU.vram and its size as GPU_RestoreStateP1 left
+    * them, so it opens a block of its own here. */
+   {
    SFORMAT StateRegs[] =
    {
       /* Hardcode entry name to remain backward compatible with the */
@@ -3514,6 +3542,7 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
             rhi_intf_load_image(fbw_x, fbw_cury, fbw_curx, 1, GPU.vram,
                   false, false);
       }
+   }
    }
 
    return(ret);
