@@ -22122,6 +22122,22 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       }
    }
 
+   /* Whether a draw in the open render pass sampled any block of @rect. */
+   static bool fbatlas_sampled_in_render_pass(FBAtlas *self, const TTRect *rect)
+   {
+      unsigned xbegin = rect->x / BLOCK_WIDTH;
+      unsigned xend   = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+      unsigned ybegin = rect->y / BLOCK_HEIGHT;
+      unsigned yend   = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
+      unsigned x, y;
+
+      for (y = ybegin; y <= yend; y++)
+         for (x = xbegin; x <= xend; x++)
+            if ((*fbatlas_info(self, x, y)) & STATUS_TEXTURE_READ)
+               return true;
+      return false;
+   }
+
    static void fbatlas_extend_render_pass(FBAtlas *self,
          const TTRect *rect,
          bool scissor)
@@ -22143,7 +22159,25 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       }
       else if (!rect_contains(&self->renderpass.rect, &scissored_rect))
       {
-         rect_extend_bounding_box(&self->renderpass.rect, &scissored_rect);
+         TTRect grown = self->renderpass.rect;
+         rect_extend_bounding_box(&grown, &scissored_rect);
+
+         /* Growing over blocks a draw in this pass sampled is a
+          * write-after-read on them: the pass that read them is recorded
+          * first, and the write starts a new one behind the barrier. A
+          * clear over the whole pass discards it below instead. */
+         if (     !(!scissor && rect_eq(&scissored_rect, &grown))
+               && fbatlas_sampled_in_render_pass(self, &grown))
+         {
+            fbatlas_flush_render_pass(self);
+            self->renderpass.rect = scissored_rect;
+            fbatlas_sync_domain(self, Domain_Scaled, &self->renderpass.rect);
+            fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, &self->renderpass.rect);
+            self->renderpass.inside = true;
+            return;
+         }
+
+         self->renderpass.rect = grown;
 
          /* Avoid sync/write domain flushing our own render pass. */
          self->renderpass.inside = false;

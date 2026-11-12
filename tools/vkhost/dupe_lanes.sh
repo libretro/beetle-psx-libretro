@@ -5,8 +5,10 @@
 # part way through, then VRAM read back.
 #   - Frame Duping on: a frame with nothing new on the display reaches
 #     the frontend as NULL, most of the run; off: none does;
-#   - what frames sent as NULL draw reaches VRAM: the readback holds the
-#     quad in the last pass's colour, with the software framebuffer off;
+#   - what frames sent as NULL draw reaches VRAM: the next frame's
+#     sprite samples it, and the readback holds the quad in the last
+#     pass's colour and the sprite in the pass before's, with the
+#     software framebuffer off;
 #   - a new picture painted into the display area, and the display
 #     turned off, each get their frame out: the frontend's frames at 90
 #     (white), 120 (grey) and the last (black), and every frame between,
@@ -52,7 +54,7 @@ out, frames = sys.argv[1], int(sys.argv[2])
 def colour(p):
     c = (8 * (p & 31) + 7) >> 3
     return c | (c << 5)
-want = colour(200)
+want, want_sprite = colour(200), colour(199)
 def ppm(path):
     d = open(path, 'rb').read()
     m = re.match(rb'P6\s+(\d+)\s+(\d+)\s+255\s', d)
@@ -64,7 +66,8 @@ for run in ('off', 'on', 'comp_off', 'comp_on'):
     errors = int(re.search(r'(\d+) validation errors', log).group(1))
     vram = struct.unpack('<%dH' % (1024 * 512), open('%s/%s.bin' % (out, run), 'rb').read()[:2 * 1024 * 512])
     quad = [vram[y * 1024 + x] for y in range(480, 496) for x in range(960, 976)]
-    bad = sum(1 for v in quad if v != want)
+    sprite = [vram[y * 1024 + x] for y in range(300, 316) for x in range(600, 616)]
+    bad = sum(1 for v in quad if v != want) + sum(1 for v in sprite if v != want_sprite)
     every = [ppm('%s/%s/frame_%04d.ppm' % (out, run, f)) for f in range(1, frames + 1)]
     shots = [every[89], every[119], every[frames - 1]]
     if run.endswith('off'):
@@ -73,9 +76,9 @@ for run in ('off', 'on', 'comp_off', 'comp_on'):
     same = not differ
     white, grey, last = (max(x) for x in shots)
     dupe_ok = duped >= frames // 2 if run == 'on' else duped == 0
-    print('%s: %d of %d frames sent as NULL; %d of 256 quad words differ '
-          'from 0x%04x; frames 90/120/last peak at %d/%d/%d, %s the run without duping'
-          % (run, duped, frames, bad, want, white, grey, last,
+    print('%s: %d of %d frames sent as NULL; %d of 512 quad and sprite words differ '
+          'from 0x%04x and 0x%04x; frames 90/120/last peak at %d/%d/%d, %s the run without duping'
+          % (run, duped, frames, bad, want, want_sprite, white, grey, last,
              'as' if same else 'NOT as'))
     if differ:
         print('%s: frames that differ: %s' % (run, differ[:16]))
