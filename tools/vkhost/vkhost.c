@@ -126,7 +126,7 @@ static VkPhysicalDevice gpu;
 static VkDebugUtilsMessengerEXT messenger;
 static int validation_errors, validation_warnings;
 static const struct retro_vulkan_image *last_image;
-static unsigned frame_valid;
+static unsigned frame_valid, frame_duped;
 static unsigned last_w, last_h;
 static char sysdir[512] = "/tmp/vkhost_sys";
 static char savedir[512] = "/tmp/vkhost_save";
@@ -956,7 +956,7 @@ static void host_reinit_context(void)
 }
 
 static void video_cb(const void *data, unsigned width, unsigned height, size_t pitch)
-{ (void)pitch; if (data == RETRO_HW_FRAME_BUFFER_VALID) { frame_valid++;
+{ (void)pitch; if (!data) frame_duped++; if (data == RETRO_HW_FRAME_BUFFER_VALID) { frame_valid++;
    if (last_w != width || last_h != height)
       fprintf(stderr, "[vkhost] geometry %ux%u\n", width, height);
    last_w = width; last_h = height;
@@ -1596,6 +1596,7 @@ run_frames_sw:
            " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
            frames, frame_valid, validation_errors, validation_warnings,
            queue_violations, queue_waits_locked);
+   fprintf(stderr, "[vkhost] duped: %u frames sent as NULL\n", frame_duped);
    { const char *ro = getenv("VKHOST_RAM_OUT");
      if (ro)
      {
@@ -1635,6 +1636,7 @@ run_frames_sw:
       negotiation = NULL;
       last_image  = NULL;
       frame_valid = 0;
+      frame_duped = 0;
       last_w = last_h = 0;
       fprintf(stderr, "[vkhost] next session: %s\n", content);
       goto session;

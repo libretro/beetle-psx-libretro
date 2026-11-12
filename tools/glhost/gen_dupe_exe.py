@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Builds the PS-X EXE for the frame duping lanes (dupe_lanes.sh).
 
-Shows a still picture: the 320x240 display area at (0,0) filled white
-once. Then one pass a frame (paced by the VBlank bit of I_STAT) draws,
+Shows a still picture: the 320x240 display area at (0,0) filled white,
+with a red box whose edges the composite cable's subcarrier crawls over. Then one pass a frame (paced by the VBlank bit of I_STAT) draws,
 far outside the display area, a raw 15 bpp 16x16 sprite at (600,300)
 whose texels are what the previous pass drew at (960,480), then a flat
 16x16 quad at (960,480), its colour stepping with the pass: nothing on
 the display changes while VRAM does, and texels of rendered pixels come
 from the native copy of VRAM, which the previous frame's resolve brought
-up to date. At pass OFF_PASS it turns the display off. After PASSES
+up to date. At pass PAINT_PASS it fills the display area grey, a new
+picture with no display setting changed, and at pass OFF_PASS it turns
+the display off. After PASSES
 passes it copies all of VRAM to RAM at 0x100000 through GP0(C0h) and
 stops, so the dump holds the quad in the last pass's colour and the
 sprite in the pass before's.
@@ -18,6 +20,7 @@ BASE = 0xA0010000
 DEST = 0xA0100000
 GP0 = 0x1F801810
 I_STAT = 0x1F801070
+PAINT_PASS = 100
 OFF_PASS = 150
 PASSES = 200
 def addiu(rt, rs, imm): return (9 << 26) | (rs << 21) | (rt << 16) | (imm & 0xffff)
@@ -65,6 +68,8 @@ gp0(0xE6000000)                        # no mask bits
 wait_ready()
 gp0(0x02FFFFFF); gp0(xy(0, 0)); gp0(xy(320, 240))        # the still picture
 wait_ready()
+gp0(0x020000FF); gp0(xy(96, 64)); gp0(xy(128, 112))      # with a red box in it
+wait_ready()
 # Texture page (960, 256), 15 bpp.
 gp0(0xE1000000 | 15 | (1 << 4) | (2 << 7))
 
@@ -87,6 +92,12 @@ gp0(0x7D000000); gp0(xy(600, 300)); gp0(224 << 8)       # raw 16x16 sprite
 wait_ready()
 li32(T0, 0x28000000); emit(or_(T0, T0, T4)); emit(sw(T0, S1, 0))
 gp0(xy(960, 480)); gp0(xy(976, 480)); gp0(xy(960, 496)); gp0(xy(976, 496))
+li32(T1, PAINT_PASS)
+off = len(code)
+emit(NOP); emit(NOP)                   # bne past the repaint, below
+wait_ready()
+gp0(0x02404040); gp0(xy(0, 0)); gp0(xy(320, 240))        # repaint, once
+code[off] = bne(S0, T1, len(code) - off - 1)
 li32(T1, OFF_PASS)
 off = len(code)
 emit(NOP); emit(NOP)                   # bne past the display off, below

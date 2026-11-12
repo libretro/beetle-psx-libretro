@@ -22548,7 +22548,9 @@ static int initial_scanline;
 static int last_scanline;
 static int initial_scanline_pal;
 static int last_scanline_pal;
-static bool frame_duping_enabled = false;
+/* A frame has been presented on this context, so the frontend has one of
+ * ours to repeat. */
+static bool vk_dupe_ready = false;
 static uint32_t prev_frame_width = 320;
 static uint32_t prev_frame_height = 240;
 static bool show_vram = false;
@@ -22640,6 +22642,9 @@ static void vk_defer_dispatch(void *user, const rhi_defer_op_t *op)
 
 static void vk_context_reset(void)
 {
+   /* A new context: the frontend has no frame of ours to repeat */
+   vk_dupe_ready = false;
+
    if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE, (void**)&vulkan) || !vulkan)
       return;
 
@@ -23230,23 +23235,6 @@ void rhi_vulkan_refresh_variables(void)
    option_display.key = BEETLE_OPT(replace_textures);
    environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
-   var.key = BEETLE_OPT(frame_duping);
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "enabled"))
-      {
-         bool frontend_can_dupe = false;
-         if (environ_cb(RETRO_ENVIRONMENT_GET_CAN_DUPE, &frontend_can_dupe))
-         {
-            frame_duping_enabled = frontend_can_dupe;
-            if (!frontend_can_dupe)
-               log_cb(RETRO_LOG_INFO, "Frontend does not support frame duping. Frame duping will be disabled.\n");
-         }
-      }
-      else
-         frame_duping_enabled = false;
-   }
-
    var.key = BEETLE_OPT(display_vram);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -23760,11 +23748,19 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
 
    tt_frame_advance();
 
-   if (frame_duping_enabled && !GPU_get_display_change_count())
+   /* Nothing on the display changed: the frontend repeats the frame it
+    * has. Not where the picture moves on its own (interlaced fields, the
+    * cable chain's subcarrier, the VRAM viewer), and only once a frame
+    * has been presented. Visual core option changes wait for the next
+    * frame drawn. */
+   if (     psx_frame_duping
+         && vk_dupe_ready
+         && !GPU_get_display_change_count()
+         && !GPU_get_display_possibly_dirty()
+         && !renderer->render_state.is_480i
+         && !show_vram
+         && psx_video_cable == RHI_CABLE_NONE)
    {
-      /* Any visual core option changes will be deferred to next non-duped frame */
-
-      /* printf("No PSX GPU display update; duping frame\n"); */
       renderer_flush(renderer);
       video_refresh_cb(NULL, prev_frame_width, prev_frame_height, 0);
 
@@ -23908,6 +23904,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    ih_assign(&scanout_handles.items[index], &scanout);
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, image_get_width(ih_get(&scanout), 0), image_get_height(ih_get(&scanout), 0), 0);
    inside_frame = false;
+   vk_dupe_ready = true;
 
    prev_frame_width = image_get_width(ih_get(&scanout), 0);
    prev_frame_height = image_get_height(ih_get(&scanout), 0);

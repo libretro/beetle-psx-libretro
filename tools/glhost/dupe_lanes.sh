@@ -9,8 +9,13 @@
 #     the next frame's sprite samples it, and the readback holds the
 #     quad in the last pass's colour and the sprite in the pass before's,
 #     with the software framebuffer off, in both runs;
-#   - the display turned off on that still picture gets a black frame
-#     out: the frontend's last frame is black, after a white one.
+#   - a new picture painted into the display area, and the display
+#     turned off, each get their frame out: the frontend's frames at 90
+#     (white), 120 (grey) and the last (black) are the ones the run
+#     without duping shows;
+#   - through the composite cable, whose subcarrier moves every field,
+#     no frame is sent as NULL and every one matches the run without
+#     duping.
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/glhost/dupe_lanes.sh [core.so]
@@ -37,8 +42,10 @@ run()
       tools/glhost/glhost "$CORE" "$OUT/dupe.exe" - "$FRAMES" "$OUT/$1" \
       > "$OUT/$1.log" 2>&1 || { tail -20 "$OUT/$1.log"; exit 1; }
 }
-run on  "${P}_frame_duping=enabled"
-run off "${P}_frame_duping=disabled"
+run on       "${P}_frame_duping=enabled"
+run off      "${P}_frame_duping=disabled"
+run comp_on  "${P}_frame_duping=enabled;${P}_video_cable=composite"
+run comp_off "${P}_frame_duping=disabled;${P}_video_cable=composite"
 
 python3 - "$OUT" "$FRAMES" <<'PY'
 import re, struct, sys
@@ -52,20 +59,25 @@ def ppm(path):
     m = re.match(rb'P6\s+(\d+)\s+(\d+)\s+255\s', d)
     return d[m.end():]
 ok = True
-for run in ('on', 'off'):
+for run in ('off', 'on', 'comp_off', 'comp_on'):
     log = open('%s/%s.log' % (out, run)).read()
     duped = int(re.search(r'duped: (\d+) frames', log).group(1))
     vram = struct.unpack('<%dH' % (1024 * 512), open('%s/%s.bin' % (out, run), 'rb').read()[:2 * 1024 * 512])
     quad = [vram[y * 1024 + x] for y in range(480, 496) for x in range(960, 976)]
     sprite = [vram[y * 1024 + x] for y in range(300, 316) for x in range(600, 616)]
     bad = sum(1 for v in quad if v != want) + sum(1 for v in sprite if v != want_sprite)
-    white = max(ppm('%s/%s/frame_0090.ppm' % (out, run)))
-    last = max(ppm('%s/%s/frame_%04d.ppm' % (out, run, frames)))
+    shots = [ppm('%s/%s/frame_%04d.ppm' % (out, run, f)) for f in (90, 120, frames)]
+    if run.endswith('off'):
+        ref = shots
+    same = shots == ref
+    white, grey, last = (max(x) for x in shots)
     dupe_ok = duped >= frames // 2 if run == 'on' else duped == 0
     print('%s: %d of %d frames sent as NULL; %d of 512 quad and sprite words differ '
-          'from 0x%04x and 0x%04x; frame 90 peaks at %d, the last frame at %d'
-          % (run, duped, frames, bad, want, want_sprite, white, last))
-    ok &= dupe_ok and bad == 0 and white == 255 and last == 0
+          'from 0x%04x and 0x%04x; frames 90/120/last peak at %d/%d/%d, %s the run without duping'
+          % (run, duped, frames, bad, want, want_sprite, white, grey, last,
+             'as' if same else 'NOT as'))
+    ok &= dupe_ok and bad == 0 and same
+    ok &= run.startswith('comp') or white > grey > last == 0
 print('dupe_lanes: %s' % ('PASS' if ok else 'FAIL'))
 sys.exit(0 if ok else 1)
 PY
