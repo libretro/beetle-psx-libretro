@@ -1653,6 +1653,8 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
          case 0x00:  /* Reset GPU */
             GPU_SoftReset();
+            /* The reset blanks the display */
+            GPU.display_change_count++;
             rhi_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
                                    GPU.ClipX1, GPU.ClipY1);
             rhi_intf_toggle_display(GPU.DisplayOff); /* `true` set by GPU_SoftReset() */
@@ -1675,6 +1677,10 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
 
          case 0x03:  /* Display enable */
+            /* Blanked or shown again is a new picture, even with VRAM
+             * unchanged */
+            if (GPU.DisplayOff != (V & 1))
+               GPU.display_change_count++;
             GPU.DisplayOff = V & 1;
             rhi_intf_toggle_display(GPU.DisplayOff);
             break;
@@ -1710,6 +1716,9 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
 
          case 0x08:
+            /* So is a new width, depth or interlacing */
+            if (GPU.DisplayMode != (V & 0xFF))
+               GPU.display_change_count++;
             GPU.DisplayMode = V & 0xFF;
             RHI_UpdateDisplayMode();
             break;

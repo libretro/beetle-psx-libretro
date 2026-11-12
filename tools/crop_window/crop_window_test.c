@@ -11,7 +11,7 @@
  *
  * Usage: crop_window_test <core> <case>
  *   cases: std320 std368 wide368 wide368_static wide368_off switch368
- *          switch368_dupe
+ *          switch368_dupe off368_dupe mode368_dupe
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,6 +69,7 @@ struct probe_case
    uint32_t    gp1_mode;       /* GP1(08h) */
    uint32_t    x1, x2;         /* GP1(06h) at boot */
    uint32_t    x1_late, x2_late; /* GP1(06h) after the delay, 0 = none */
+   uint32_t    gp1_late;       /* any other GP1 word after the delay, 0 = none */
    unsigned    want_w;
    unsigned    want_white;     /* white columns on the middle line */
    double      want_ar;
@@ -77,18 +78,22 @@ struct probe_case
 static const struct probe_case cases[] =
 {
    /* The standard 2560-clock range keeps its window in every mode */
-   { "std320",        "smart",    "disabled", 0x08000001, 0x260, 0xC60, 0, 0, 320, 320, 4.0 / 3.0 * 2560.0 / 2800.0 },
-   { "std368",        "smart",    "disabled", 0x08000040, 0x260, 0xC60, 0, 0, 366, 366, 4.0 / 3.0 * 2560.0 / 2800.0 },
+   { "std320",        "smart",    "disabled", 0x08000001, 0x260, 0xC60, 0, 0, 0, 320, 320, 4.0 / 3.0 * 2560.0 / 2800.0 },
+   { "std368",        "smart",    "disabled", 0x08000040, 0x260, 0xC60, 0, 0, 0, 366, 366, 4.0 / 3.0 * 2560.0 / 2800.0 },
    /* 384 dots at divider 7 are 2688 clocks */
-   { "wide368",       "smart",    "disabled", 0x08000040, 0x260, 0xCE0, 0, 0, 384, 384, 4.0 / 3.0 * 2688.0 / 2800.0 },
-   { "wide368_static","static",   "disabled", 0x08000040, 0x258, 0xCD8, 0, 0, 384, 384, 4.0 / 3.0 * 2688.0 / 2800.0 },
+   { "wide368",       "smart",    "disabled", 0x08000040, 0x260, 0xCE0, 0, 0, 0, 384, 384, 4.0 / 3.0 * 2688.0 / 2800.0 },
+   { "wide368_static","static",   "disabled", 0x08000040, 0x258, 0xCD8, 0, 0, 0, 384, 384, 4.0 / 3.0 * 2688.0 / 2800.0 },
    /* Uncropped: the whole 2800-clock line, border included, which ends
     * one dot before this range does */
-   { "wide368_off",   "disabled", "disabled", 0x08000040, 0x260, 0xCE0, 0, 0, 400, 383, 4.0 / 3.0 },
+   { "wide368_off",   "disabled", "disabled", 0x08000040, 0x260, 0xCE0, 0, 0, 0, 400, 383, 4.0 / 3.0 },
    /* The range widens on a still picture: with frame duping on, the
     * new range alone has to get a frame out */
-   { "switch368",     "smart",    "disabled", 0x08000040, 0x260, 0xC60, 0x260, 0xCE0, 384, 384, 4.0 / 3.0 * 2688.0 / 2800.0 },
-   { "switch368_dupe","smart",    "enabled",  0x08000040, 0x260, 0xC60, 0x260, 0xCE0, 384, 384, 4.0 / 3.0 * 2688.0 / 2800.0 }
+   { "switch368",     "smart",    "disabled", 0x08000040, 0x260, 0xC60, 0x260, 0xCE0, 0, 384, 384, 4.0 / 3.0 * 2688.0 / 2800.0 },
+   { "switch368_dupe","smart",    "enabled",  0x08000040, 0x260, 0xC60, 0x260, 0xCE0, 0, 384, 384, 4.0 / 3.0 * 2688.0 / 2800.0 },
+   /* With frame duping on, on a still picture: the display turned off
+    * has to get a black frame out, and a new display mode its new width */
+   { "off368_dupe",   "smart",    "enabled",  0x08000040, 0x260, 0xC60, 0, 0, 0x03000001, 366, 0, 4.0 / 3.0 * 2560.0 / 2800.0 },
+   { "mode368_dupe",  "smart",    "enabled",  0x08000001, 0x260, 0xC60, 0, 0, 0x08000040, 366, 366, 4.0 / 3.0 * 2560.0 / 2800.0 }
 };
 
 static const struct probe_case *pc;
@@ -154,11 +159,12 @@ static int write_probe(const char *path)
    n = emit(code, n, 0x256BFFFFu);                    /* addiu t3,t3,-1 */
    n = emit(code, n, 0x1560FFFDu);                    /* bnez t3,-3 */
    n = emit(code, n, 0x00000000u);
-   if (pc->x2_late)
-   {
+   if (pc->x2_late || pc->gp1_late)
       n = emit_delay(code, n);
+   if (pc->x2_late)
       n = emit_store(code, n, 0x1814, 0x06000000u | pc->x1_late | (pc->x2_late << 12));
-   }
+   if (pc->gp1_late)
+      n = emit_store(code, n, 0x1814, pc->gp1_late);
    n = emit(code, n, 0x1000FFFFu);                    /* b . */
    n = emit(code, n, 0x00000000u);
 

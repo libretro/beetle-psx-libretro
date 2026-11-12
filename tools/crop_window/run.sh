@@ -37,7 +37,7 @@ HOST="$(pwd)/$HOST"
 
 fail=0
 for c in std320 std368 wide368 wide368_static wide368_off switch368 \
-         switch368_dupe; do
+         switch368_dupe off368_dupe mode368_dupe; do
    (cd "$WORK" && "$HOST" "$CORE" "$c") || fail=1
 done
 exit $fail
