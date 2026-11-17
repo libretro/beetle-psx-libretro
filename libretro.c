@@ -16,6 +16,7 @@
 #include <string/stdstring.h>
 #include <lrc_hash.h>
 #include <formats/data_transfer.h>
+#include <streams/data_transfer_file.h>
 #include "rhi/rhi_intf.h"
 #include "libretro_cbs.h"
 #include "beetle_psx_globals.h"

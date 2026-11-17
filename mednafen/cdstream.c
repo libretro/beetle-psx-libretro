@@ -21,6 +21,7 @@
 #include "mednafen.h"
 #include "cdstream.h"
 #include "error.h"
+#include <streams/data_transfer_file.h>
 
 bool cdstream_open(cdstream *out, const char *path)
 {

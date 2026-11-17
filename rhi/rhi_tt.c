@@ -30,6 +30,7 @@
 #include <streams/file_stream.h>
 #include <file/file_path.h>
 #include <formats/image.h>
+#include <streams/image_texture_file.h>
 #include <formats/rpng.h>
 
 #include <retro_atomic.h>
