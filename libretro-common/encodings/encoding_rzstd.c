@@ -55,6 +55,8 @@
  *                               256, and the single-segment case where
  *                               the content size doubles as the window.
  *   Blocks (3.1.1.2)            raw, RLE and compressed.
+ *   Checksum (3.1.1)            a frame's XXH64, taken over each block
+ *                               as it is decoded, where it lies.
  *   Reverse bitstream (4)       the backwards, MSB-first reader the
  *                               entropy streams use, and the padding
  *                               marker in the final byte.
@@ -73,10 +75,6 @@
  *
  * Not built:
  *
- *   Checksum                    a frame's XXH64 is skipped, not
- *                               verified. A caller expecting a stated
- *                               checksum to be checked does not get
- *                               that.
  *   Huffman literal encoding    literals are emitted raw. Legal, and
  *                               costs ratio.
  *   Encoder refinements         one hash with no chain, so only the
@@ -156,6 +154,8 @@
 #include <retro_inline.h>
 #include <compat/intrinsics.h>
 #include <encodings/rzstd.h>
+#include <encodings/xxh64.h>
+#include <retro_atomic.h>
 
 /* The decode loops spend much of their time on variable shifts, which
  * BMI2 does in one flagless instruction where baseline x86-64 takes
@@ -169,34 +169,33 @@
  && (defined(__clang__) || __GNUC__ > 4 \
      || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9))
 #define RZSTD_DYNAMIC_BMI2 1
+/* Unity builds bring <cpuid.h> in more than once, and the one in
+ * clang 12 and older has no include guard */
+#ifndef RETRO_CPUID_H_INCLUDED
+#define RETRO_CPUID_H_INCLUDED
 #include <cpuid.h>
+#endif
 #define RZSTD_TARGET_BMI2 __attribute__((target("bmi2")))
 #define RZSTD_BODY_INLINE __attribute__((always_inline)) static INLINE
 
 static int rzstd_cpu_bmi2(void)
 {
-   static volatile int have = -1;
+   static retro_atomic_int_t have;
+   int available = retro_atomic_load_acquire_int(&have);
 
-   if (have < 0)
+   if (!available)
    {
       unsigned a, b = 0, c, d;
 
       /* __get_cpuid_count only exists from GCC 7; __get_cpuid_max and
        * __cpuid_count are in every cpuid.h this branch accepts. Both
-       * racers write the same answer, so the race is benign. */
+       * concurrent probes publish the same immutable answer atomically. */
       if (__get_cpuid_max(0, NULL) >= 7)
          __cpuid_count(7, 0, a, b, c, d);
-      have = (b & (1u << 8)) ? 1 : 0;
+      available = (b & (1u << 8)) ? 2 : 1;
+      retro_atomic_store_release_int(&have, available);
    }
-   return have;
-}
-/* Deciding the flag in a constructor means no thread ever races the
- * lazy path: by the time a second thread can exist, the answer is
- * written. The lazy check stays as the fallback for an environment
- * that skips constructors. */
-__attribute__((constructor)) static void rzstd_cpu_bmi2_init(void)
-{
-   (void)rzstd_cpu_bmi2();
+   return available == 2;
 }
 #else
 #define RZSTD_BODY_INLINE static INLINE
@@ -391,11 +390,6 @@ static int rzstd_read_frame_header(const uint8_t *src, size_t len,
                    : n == 2 ? rzstd_rd16(src + at)
                             : rzstd_rd32(src + at);
       at += n;
-
-      /* A frame needing a dictionary cannot be decoded without it, and
-       * nothing this reads uses one. Refused rather than decoded to
-       * something that looks like data. */
-      return RZ_UNSUPPORTED;
    }
 
    {
@@ -1452,6 +1446,12 @@ RZSTD_BODY_INLINE int rzstd_huf_decode_body(const rzstd_huf_t *huf, const uint8_
                    * The stores were a quarter of this loop. */
                   {
                      uint64_t w0 = 0, w1 = 0, w2 = 0, w3 = 0;
+                     /* where in the word the i-th byte in memory is */
+#ifdef RZSTD_BIG_ENDIAN
+#define RZSTD_LANE(i) (56 - (i) * 8)
+#else
+#define RZSTD_LANE(i) ((i) * 8)
+#endif
 
                      for (i = 0; i < 5; i++)
                      {
@@ -1460,10 +1460,10 @@ RZSTD_BODY_INLINE int rzstd_huf_decode_body(const rzstd_huf_t *huf, const uint8_
                         uint32_t e2 = ent[f[2].bits >> sh];
                         uint32_t e3 = ent[f[3].bits >> sh];
 
-                        w0 |= (uint64_t)(uint8_t)(e0 >> 8) << (i * 8);
-                        w1 |= (uint64_t)(uint8_t)(e1 >> 8) << (i * 8);
-                        w2 |= (uint64_t)(uint8_t)(e2 >> 8) << (i * 8);
-                        w3 |= (uint64_t)(uint8_t)(e3 >> 8) << (i * 8);
+                        w0 |= (uint64_t)(uint8_t)(e0 >> 8) << RZSTD_LANE(i);
+                        w1 |= (uint64_t)(uint8_t)(e1 >> 8) << RZSTD_LANE(i);
+                        w2 |= (uint64_t)(uint8_t)(e2 >> 8) << RZSTD_LANE(i);
+                        w3 |= (uint64_t)(uint8_t)(e3 >> 8) << RZSTD_LANE(i);
 
                         f[0].bits <<= (e0 & 63);
                         f[1].bits <<= (e1 & 63);
@@ -1480,6 +1480,7 @@ RZSTD_BODY_INLINE int rzstd_huf_decode_body(const rzstd_huf_t *huf, const uint8_
                      memcpy(dst + pos[1], &w1, 8);
                      memcpy(dst + pos[2], &w2, 8);
                      memcpy(dst + pos[3], &w3, 8);
+#undef RZSTD_LANE
                   }
                   pos[0] += 5; pos[1] += 5; pos[2] += 5; pos[3] += 5;
                   rzstd_fast_reload(&f[0]);
@@ -1857,8 +1858,30 @@ RZSTD_BODY_INLINE void rzstd_match_copy(uint8_t *to, const uint8_t *from,
 
    if (!slack)
    {
+      uint64_t value[2];
       size_t k;
 
+      if (offset >= n)
+      {
+         memcpy(to, from, n);
+         return;
+      }
+      /* Grow short periods before bounded word copies. No tail overrun. */
+      while (offset < 16 && n > offset)
+      {
+         memcpy(to, from, offset);
+         to     += offset;
+         n      -= offset;
+         offset += offset;
+      }
+      while (n >= 16)
+      {
+         memcpy(value, from, 16);
+         memcpy(to, value, 16);
+         from += 16;
+         to   += 16;
+         n    -= 16;
+      }
       for (k = 0; k < n; k++)
          to[k] = from[k];
       return;
@@ -1867,8 +1890,10 @@ RZSTD_BODY_INLINE void rzstd_match_copy(uint8_t *to, const uint8_t *from,
    /* The wide copy strides two vectors at a time, so it needs the
     * source two vector widths back -- not one, which an earlier draft
     * of this change assumed until the sanitizer produced the
-    * overlapping pair. */
-   if (offset >= RZSTD_VEC_WIDTH * 2)
+    * overlapping pair. The short case is one fixed 32-byte copy, so the
+    * source must also be that far back: on builds with no vectors the
+    * width is eight and two widths is only sixteen. */
+   if (offset >= RZSTD_VEC_WIDTH * 2 && offset >= RZSTD_COPY_SMALL)
    {
       RZSTD_COPY(to, from, n);
       return;
@@ -2181,6 +2206,10 @@ static int rzstd_seq_table(rzstd_fse_t *fse, rzstd_fse_entry_t *storage,
 
 /* Decodes a block's sequences and executes them into @dst.
  *
+ * The output before @dst, when the window is a ring and has come round
+ * to its start, is the @ext_len octets before @ext_end: a match that
+ * reaches back past @dst is copied from there, then on from @dst.
+ *
  * The three offsets most recently used are remembered, and an offset
  * code of 1, 2 or 3 names one of them rather than a distance -- with
  * the wrinkle that when there are no literals the meaning shifts by
@@ -2189,7 +2218,8 @@ static int rzstd_seq_table(rzstd_fse_t *fse, rzstd_fse_entry_t *storage,
 RZSTD_BODY_INLINE int rzstd_decode_sequences_body(rzstd_seq_tables_t *tab,
       const uint8_t *src, size_t src_len,
       const uint8_t *literals, size_t lit_len, size_t lit_readable,
-      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat)
+      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat,
+      const uint8_t *ext_end, size_t ext_len)
 {
    rzstd_rbits_t bits;
    size_t        nseq;
@@ -2440,13 +2470,17 @@ RZSTD_BODY_INLINE int rzstd_decode_sequences_body(rzstd_seq_tables_t *tab,
       }
       else
       {
+         size_t back;
+
          if (!offset)
             return RZ_DATA;
          if (lit_at + lit_run > lit_len)
             return RZ_DATA;
          if (out + lit_run + match_len > dst_len)
             return RZ_DATA;
-         if ((size_t)offset > out + lit_run)
+         back = (size_t)offset > out + lit_run
+            ? (size_t)offset - (out + lit_run) : 0;
+         if (back > ext_len)
             return RZ_DATA;
 
          /* Falling off the fast path does not mean copying narrowly.
@@ -2463,8 +2497,20 @@ RZSTD_BODY_INLINE int rzstd_decode_sequences_body(rzstd_seq_tables_t *tab,
             memcpy(dst + out, literals + lit_at, lit_run);
          out    += lit_run;
          lit_at += lit_run;
-         rzstd_match_copy(dst + out, dst + out - offset, match_len,
-               offset, out + match_len + RZSTD_COPY_SLACK <= dst_len);
+         if (back)
+         {
+            /* from the end of the ring, then from its start */
+            size_t k = back < match_len ? back : match_len;
+            memcpy(dst + out, ext_end - back, k);
+            out       += k;
+            match_len -= (uint32_t)k;
+            if (match_len)
+               rzstd_match_copy(dst + out, dst, match_len, (uint32_t)out,
+                     out + match_len + RZSTD_COPY_SLACK <= dst_len);
+         }
+         else
+            rzstd_match_copy(dst + out, dst + out - offset, match_len,
+                  offset, out + match_len + RZSTD_COPY_SLACK <= dst_len);
          out += match_len;
       }
 
@@ -2489,41 +2535,45 @@ RZSTD_BODY_INLINE int rzstd_decode_sequences_body(rzstd_seq_tables_t *tab,
 static int rzstd_decode_sequences_sse(rzstd_seq_tables_t *tab,
       const uint8_t *src, size_t src_len,
       const uint8_t *literals, size_t lit_len, size_t lit_readable,
-      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat)
+      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat,
+      const uint8_t *ext_end, size_t ext_len)
 {
    return rzstd_decode_sequences_body(tab, src, src_len, literals, lit_len,
-         lit_readable, dst, dst_len, dst_at, repeat);
+         lit_readable, dst, dst_len, dst_at, repeat, ext_end, ext_len);
 }
 
 RZSTD_TARGET_BMI2
 static int rzstd_decode_sequences_bmi2(rzstd_seq_tables_t *tab,
       const uint8_t *src, size_t src_len,
       const uint8_t *literals, size_t lit_len, size_t lit_readable,
-      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat)
+      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat,
+      const uint8_t *ext_end, size_t ext_len)
 {
    return rzstd_decode_sequences_body(tab, src, src_len, literals, lit_len,
-         lit_readable, dst, dst_len, dst_at, repeat);
+         lit_readable, dst, dst_len, dst_at, repeat, ext_end, ext_len);
 }
 
 static int rzstd_decode_sequences(rzstd_seq_tables_t *tab,
       const uint8_t *src, size_t src_len,
       const uint8_t *literals, size_t lit_len, size_t lit_readable,
-      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat)
+      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat,
+      const uint8_t *ext_end, size_t ext_len)
 {
    if (rzstd_cpu_bmi2())
       return rzstd_decode_sequences_bmi2(tab, src, src_len, literals, lit_len,
-         lit_readable, dst, dst_len, dst_at, repeat);
+         lit_readable, dst, dst_len, dst_at, repeat, ext_end, ext_len);
    return rzstd_decode_sequences_sse(tab, src, src_len, literals, lit_len,
-         lit_readable, dst, dst_len, dst_at, repeat);
+         lit_readable, dst, dst_len, dst_at, repeat, ext_end, ext_len);
 }
 #else
 static int rzstd_decode_sequences(rzstd_seq_tables_t *tab,
       const uint8_t *src, size_t src_len,
       const uint8_t *literals, size_t lit_len, size_t lit_readable,
-      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat)
+      uint8_t *dst, size_t dst_len, size_t *dst_at, uint32_t *repeat,
+      const uint8_t *ext_end, size_t ext_len)
 {
    return rzstd_decode_sequences_body(tab, src, src_len, literals, lit_len,
-         lit_readable, dst, dst_len, dst_at, repeat);
+         lit_readable, dst, dst_len, dst_at, repeat, ext_end, ext_len);
 }
 #endif
 
@@ -2550,10 +2600,6 @@ static void rzstd_read_block_header(const uint8_t *p,
    out->size = v >> 3;
 }
 
-/* Decodes one frame into @dst, which must be large enough for what the
- * frame states. Returns bytes written through @wrote and how much of
- * @src the frame occupied through @used, so a caller holding several
- * frames can walk them. */
 /* What survives from one block to the next within a frame: the Huffman
  * table a treeless block reuses, the three sequence tables a repeat
  * mode reuses, and the recent offsets. */
@@ -2568,14 +2614,36 @@ typedef struct rzstd_frame_state
    uint8_t            literals[RZSTD_BLOCK_MAX + 128];
 } rzstd_frame_state_t;
 
-static int rzstd_decode_frame(const uint8_t *src, size_t src_len,
-      uint8_t *dst, size_t dst_len, size_t *wrote, size_t *used,
-      rzstd_frame_state_t *st)
+/* A dictionary (section 5): content a frame's matches reach back into
+ * as if it came before the frame, and, in the formatted kind, the
+ * entropy tables and recent offsets the first block starts from. Read
+ * only once built, so any number of threads can share one. */
+#define RZSTD_DICT_MAGIC    0xEC30A437U
+#define RZSTD_DICT_HASH_LOG 16
+
+struct rzstd_dict
 {
-   rzstd_frame_header_t h;
-   size_t               at  = 0;
-   size_t               out = 0;
-   int                  e;
+   rzstd_huf_t        huf;
+   rzstd_seq_tables_t tables;
+   uint8_t           *content;
+   /* the encoder's index of the content: the newest position for each
+    * hash and the one before each position, both plus one */
+   uint32_t          *head;
+   uint32_t          *chain;
+   size_t             content_len;
+   uint32_t           id;
+   uint32_t           repeat[3];
+   int                entropy;
+};
+
+/* The frame's header read and the state its blocks share set, ready
+ * for its first block; *@at is where that is. A frame naming a
+ * dictionary needs that one in @dict. */
+static int rzstd_frame_begin(const uint8_t *src, size_t src_len,
+      rzstd_frame_header_t *h, size_t *at, rzstd_frame_state_t *st,
+      const rzstd_dict_t *dict)
+{
+   int e;
 
    /* Only the three flags need clearing.
     *
@@ -2600,97 +2668,178 @@ static int rzstd_decode_frame(const uint8_t *src, size_t src_len,
    st->repeat[1] = 4;
    st->repeat[2] = 8;
 
-   if ((e = rzstd_read_frame_header(src, src_len, &h)) != RZ_OK)
+   if ((e = rzstd_read_frame_header(src, src_len, h)) != RZ_OK)
       return e;
-   at = h.header_len;
-
-   for (;;)
+   if (h->dict_id && (!dict || h->dict_id != dict->id))
+      return RZ_UNSUPPORTED;
+   if (dict && dict->entropy)
    {
-      rzstd_block_header_t b;
-
-      if (src_len < at + 3)
-         return RZ_TRUNCATED;
-      rzstd_read_block_header(src + at, &b);
-      at += 3;
-
-      if (b.type == RZSTD_BLOCK_RESERVED)
-         return RZ_DATA;
-      if (b.size > RZSTD_BLOCK_MAX)
-         return RZ_DATA;
-
-      switch (b.type)
-      {
-         case RZSTD_BLOCK_RAW:
-            /* The block's bytes are its content, uncompressed. */
-            if (src_len < at + b.size)
-               return RZ_TRUNCATED;
-            if (out + b.size > dst_len)
-               return RZ_DATA;
-            memcpy(dst + out, src + at, b.size);
-            out += b.size;
-            at  += b.size;
-            break;
-
-         case RZSTD_BLOCK_RLE:
-            /* One byte stands for @size copies of itself, so the block
-             * occupies a single byte however long its content. */
-            if (src_len < at + 1)
-               return RZ_TRUNCATED;
-            if (out + b.size > dst_len)
-               return RZ_DATA;
-            memset(dst + out, src[at], b.size);
-            out += b.size;
-            at  += 1;
-            break;
-
-         default:
-         {
-            /* Compressed: a literals section, then the sequences that
-             * weave it together with matches into earlier output. */
-            rzstd_literals_t lit;
-            size_t           lit_used = 0;
-            size_t           before   = out;
-
-            if (src_len < at + b.size)
-               return RZ_TRUNCATED;
-
-            e = rzstd_read_literals(&lit, &st->huf, &st->huf_valid,
-                  src + at, b.size, st->literals, sizeof(st->literals),
-                  &lit_used);
-            if (e != RZ_OK)
-               return e;
-
-            e = rzstd_decode_sequences(&st->tables,
-                  src + at + lit_used, b.size - lit_used,
-                  lit.data, lit.size, lit.readable,
-                  dst, dst_len, &out, st->repeat);
-            if (e != RZ_OK)
-               return e;
-
-            if (out - before > RZSTD_BLOCK_MAX)
-               return RZ_DATA;
-            at += b.size;
-            break;
-         }
-      }
-
-      if (b.last)
-         break;
+      memcpy(st->huf.entry, dict->huf.entry, sizeof(st->huf.entry));
+      st->huf.max_bits     = dict->huf.max_bits;
+      st->huf_valid        = 1;
+      st->tables.ll_fse    = dict->tables.ll_fse;
+      st->tables.ml_fse    = dict->tables.ml_fse;
+      st->tables.of_fse    = dict->tables.of_fse;
+      st->tables.valid     = 1;
+      st->repeat[0]        = dict->repeat[0];
+      st->repeat[1]        = dict->repeat[1];
+      st->repeat[2]        = dict->repeat[2];
    }
+   *at = h->header_len;
+   return RZ_OK;
+}
 
-   /* Section 3.1.1: the optional checksum is the low four bytes of the
-    * frame content's XXH64. It is skipped rather than verified, which
-    * is noted because a caller may reasonably expect it to be checked
-    * when the frame says it is there. */
-   if (h.has_checksum)
-   {
-      if (src_len < at + 4)
-         return RZ_TRUNCATED;
-      at += 4;
-   }
+/* The body of the block @b, its @avail octets at @src, decoded into
+ * @dst from *@out on, with the @ext_len octets before @ext_end before
+ * @dst; *@used is how many octets of @src it took */
+static int rzstd_block_body(const rzstd_block_header_t *b,
+      const uint8_t *src, size_t avail, size_t *used, uint8_t *dst,
+      size_t dst_len, size_t *out, rzstd_frame_state_t *st,
+      const uint8_t *ext_end, size_t ext_len)
+{
+   int e;
 
-   if (h.has_content_size && out != h.content_size)
+   if (b->type == RZSTD_BLOCK_RESERVED)
       return RZ_DATA;
+   if (b->size > RZSTD_BLOCK_MAX)
+      return RZ_DATA;
+
+   switch (b->type)
+   {
+      case RZSTD_BLOCK_RAW:
+         /* The block's bytes are its content, uncompressed. */
+         if (avail < b->size)
+            return RZ_TRUNCATED;
+         if (*out + b->size > dst_len)
+            return RZ_DATA;
+         memcpy(dst + *out, src, b->size);
+         *out  += b->size;
+         *used  = b->size;
+         break;
+
+      case RZSTD_BLOCK_RLE:
+         /* One byte stands for @size copies of itself, so the block
+          * occupies a single byte however long its content. */
+         if (avail < 1)
+            return RZ_TRUNCATED;
+         if (*out + b->size > dst_len)
+            return RZ_DATA;
+         memset(dst + *out, src[0], b->size);
+         *out  += b->size;
+         *used  = 1;
+         break;
+
+      default:
+      {
+         /* Compressed: a literals section, then the sequences that
+          * weave it together with matches into earlier output. */
+         rzstd_literals_t lit;
+         size_t           lit_used = 0;
+         size_t           before   = *out;
+
+         if (avail < b->size)
+            return RZ_TRUNCATED;
+
+         e = rzstd_read_literals(&lit, &st->huf, &st->huf_valid,
+               src, b->size, st->literals, sizeof(st->literals),
+               &lit_used);
+         if (e != RZ_OK)
+            return e;
+
+         e = rzstd_decode_sequences(&st->tables,
+               src + lit_used, b->size - lit_used,
+               lit.data, lit.size, lit.readable,
+               dst, dst_len, out, st->repeat, ext_end, ext_len);
+         if (e != RZ_OK)
+            return e;
+
+         if (*out - before > RZSTD_BLOCK_MAX)
+            return RZ_DATA;
+         *used = b->size;
+         break;
+      }
+   }
+   return RZ_OK;
+}
+
+/* The block at *@at, decoded into @dst from *@out on, its matches
+ * reaching back into what is before that; *@last is set by the frame's
+ * last. */
+static int rzstd_frame_block(const uint8_t *src, size_t src_len,
+      size_t *at, uint8_t *dst, size_t dst_len, size_t *out,
+      rzstd_frame_state_t *st, int *last, const uint8_t *ext_end,
+      size_t ext_len)
+{
+   rzstd_block_header_t b;
+   size_t               used = 0;
+   int                  e;
+
+   if (src_len < *at + 3)
+      return RZ_TRUNCATED;
+   rzstd_read_block_header(src + *at, &b);
+   *at += 3;
+   if ((e = rzstd_block_body(&b, src + *at, src_len - *at, &used, dst,
+               dst_len, out, st, ext_end, ext_len)) != RZ_OK)
+      return e;
+   *at  += used;
+   *last = b.last;
+   return RZ_OK;
+}
+
+/* After the last block: the frame's end, and all of it, @total octets
+ * whose XXH64 @xs holds, what the header said. */
+static int rzstd_frame_end(const uint8_t *src, size_t src_len,
+      const rzstd_frame_header_t *h, size_t *at, uint64_t total,
+      const xxh64_state_t *xs)
+{
+   /* Section 3.1.1: the optional checksum is the low four bytes of the
+    * frame content's XXH64 */
+   if (h->has_checksum)
+   {
+      if (src_len < *at + 4)
+         return RZ_TRUNCATED;
+      if (rzstd_rd32(src + *at) != (uint32_t)xxh64_digest(xs))
+         return RZ_DATA;
+      *at += 4;
+   }
+   if (h->has_content_size && total != h->content_size)
+      return RZ_DATA;
+   return RZ_OK;
+}
+
+/* Decodes one frame into @dst, which must be large enough for what the
+ * frame states. Returns bytes written through @wrote and how much of
+ * @src the frame occupied through @used, so a caller holding several
+ * frames can walk them. */
+static int rzstd_decode_frame(const uint8_t *src, size_t src_len,
+      uint8_t *dst, size_t dst_len, size_t *wrote, size_t *used,
+      rzstd_frame_state_t *st, const rzstd_dict_t *dict)
+{
+   const uint8_t       *ext_end = dict ? dict->content + dict->content_len
+                                       : NULL;
+   size_t               ext_len = dict ? dict->content_len : 0;
+   rzstd_frame_header_t h;
+   xxh64_state_t        xs;
+   size_t               at   = 0;
+   size_t               out  = 0;
+   int                  last = 0;
+   int                  e;
+
+   if ((e = rzstd_frame_begin(src, src_len, &h, &at, st, dict)) != RZ_OK)
+      return e;
+   xxh64_reset(&xs, 0);
+   while (!last)
+   {
+      size_t from = out;
+      if ((e = rzstd_frame_block(src, src_len, &at, dst, dst_len, &out,
+                  st, &last, ext_end, ext_len)) != RZ_OK)
+         return e;
+      /* while the block is still in cache */
+      if (h.has_checksum)
+         xxh64_update(&xs, dst + from, out - from);
+   }
+   if ((e = rzstd_frame_end(src, src_len, &h, &at, out, &xs)) != RZ_OK)
+      return e;
 
    if (wrote)
       *wrote = out;
@@ -2699,26 +2848,282 @@ static int rzstd_decode_frame(const uint8_t *src, size_t src_len,
    return RZ_OK;
 }
 
+/* -------- a frame a block at a time -------- */
+
+struct rzstd_blocks
+{
+   rzstd_frame_state_t  st;
+   rzstd_frame_header_t h;
+   xxh64_state_t        xs;       /* the checksum so far */
+   uint64_t             total;    /* octets decoded */
+   const uint8_t       *src;
+   uint8_t             *buf;      /* the window, and room for a block */
+   size_t               src_len;
+   size_t               at;       /* where in src the next block is */
+   size_t               cap;
+   size_t               window;   /* how far back matches reach */
+   size_t               out;      /* where in buf the next block goes */
+   size_t               ext;      /* where the ring's last time round
+                                     ended, 0 before it has come round */
+   size_t               want;     /* given a piece at a time: the next */
+   rzstd_block_header_t next;     /* the block that piece holds */
+   int                  done;
+   int                  stage;    /* 0 a whole frame, 1 and 2 its header
+                                     in pieces, 3 its blocks */
+   uint8_t              head[RZSTD_FRAME_HEADER_MAX + 3];
+};
+
+/* The frame header's length, from its first five octets */
+static size_t rzstd_header_len(const uint8_t *p)
+{
+   uint32_t desc = p[4];
+   uint32_t dict = desc & 3;
+   int      one  = (desc >> 5) & 1;
+   return 5 + (one ? 0 : 1) + (dict == 3 ? 4 : dict)
+      + rzstd_fcs_bytes(desc >> 6, one);
+}
+
+/* The window buffer, for the header in @z->h: a ring of the window,
+ * two blocks and a wide copy's overrun. A block goes where it fits
+ * whole, at the start again once one would not; matches reaching back
+ * before the start are copied from the end. A single segment's window
+ * is all of it, which can be more than a descriptor may say, and never
+ * comes round. */
+#define RZSTD_RING_SPARE (2 * RZSTD_BLOCK_MAX + RZSTD_COPY_SLACK)
+/* A small window's ring comes round no more than once a megabyte: a
+ * match back into the end is copied in two */
+#define RZSTD_RING_MIN   (1024 * 1024)
+static int rzstd_blocks_buffer(rzstd_blocks_t *z)
+{
+   uint64_t window, cap;
+   window = z->h.single_segment ? z->h.content_size : z->h.window_size;
+   cap    = window + RZSTD_RING_SPARE;
+   if (!z->h.single_segment && cap < RZSTD_RING_MIN)
+      cap = RZSTD_RING_MIN;
+   if (     window > (uint64_t)((size_t)-1) - RZSTD_RING_SPARE
+         || !(z->buf = (uint8_t*)malloc((size_t)cap)))
+      return 0;
+   z->cap    = (size_t)cap;
+   z->window = (size_t)window;
+   return 1;
+}
+
+static rzstd_blocks_t *rzstd_blocks_alloc(void)
+{
+   rzstd_blocks_t *z = (rzstd_blocks_t*)malloc(sizeof(*z));
+   if (!z)
+      return NULL;
+   z->src     = NULL;
+   z->src_len = 0;
+   z->total   = 0;
+   z->out     = 0;
+   z->ext     = 0;
+   z->done    = 0;
+   z->stage   = 0;
+   z->want    = 0;
+   z->buf     = NULL;
+   xxh64_reset(&z->xs, 0);
+   return z;
+}
+
+/* Room for a block: where the last left off, or the start of the ring
+ * again; and how much of the end of the ring the block's matches may
+ * reach back into, short of what the block and a wide copy past it can
+ * have written over */
+static size_t rzstd_blocks_room(rzstd_blocks_t *z)
+{
+   if (z->out + RZSTD_BLOCK_MAX > z->cap)
+   {
+      z->ext = z->out;
+      z->out = 0;
+   }
+   return z->ext > z->out + RZSTD_BLOCK_MAX + RZSTD_COPY_SLACK
+      ? z->ext - (z->out + RZSTD_BLOCK_MAX + RZSTD_COPY_SLACK) : 0;
+}
+
+/* What a block's piece is: its body, then the next block's header or
+ * the frame's checksum */
+static size_t rzstd_piece(const rzstd_frame_header_t *h,
+      const rzstd_block_header_t *b)
+{
+   size_t body = b->type == RZSTD_BLOCK_RLE ? 1 : b->size;
+   return body + (b->last ? (h->has_checksum ? 4 : 0) : 3);
+}
+
+rzstd_blocks_t *rzstd_blocks_begin(const uint8_t *src, size_t src_len)
+{
+   rzstd_blocks_t *z;
+
+   if (!src || !(z = rzstd_blocks_alloc()))
+      return NULL;
+   z->src     = src;
+   z->src_len = src_len;
+   if (     rzstd_frame_begin(src, src_len, &z->h, &z->at, &z->st, NULL)
+                != RZ_OK
+         || !rzstd_blocks_buffer(z))
+   {
+      free(z);
+      return NULL;
+   }
+   return z;
+}
+
+int rzstd_blocks_step(rzstd_blocks_t *z, const uint8_t **data, size_t *len)
+{
+   size_t from, ext;
+   int    last = 0;
+
+   *data = NULL;
+   *len  = 0;
+   if (!z || z->stage)
+      return RZSTD_PROCESS_ERROR;
+   if (z->done)
+      return RZSTD_PROCESS_END;
+
+   ext  = rzstd_blocks_room(z);
+   from = z->out;
+   if (rzstd_frame_block(z->src, z->src_len, &z->at, z->buf, z->cap,
+            &z->out, &z->st, &last, z->buf + z->ext, ext) != RZ_OK)
+      return RZSTD_PROCESS_ERROR;
+   z->total += z->out - from;
+   if (z->h.has_checksum)
+      xxh64_update(&z->xs, z->buf + from, z->out - from);
+   *data     = z->buf + from;
+   *len      = z->out - from;
+   if (last)
+   {
+      /* the frame's end, and nothing after it */
+      if (     rzstd_frame_end(z->src, z->src_len, &z->h, &z->at, z->total,
+                  &z->xs) != RZ_OK
+            || z->at != z->src_len)
+         return RZSTD_PROCESS_ERROR;
+      z->done = 1;
+   }
+   return RZSTD_PROCESS_NEXT;
+}
+
+rzstd_blocks_t *rzstd_blocks_open(void)
+{
+   rzstd_blocks_t *z = rzstd_blocks_alloc();
+   if (!z)
+      return NULL;
+   z->stage = 1;
+   z->want  = 5;
+   return z;
+}
+
+size_t rzstd_blocks_want(const rzstd_blocks_t *z)
+{
+   return z && !z->done ? z->want : 0;
+}
+
+int rzstd_blocks_give(rzstd_blocks_t *z, const uint8_t *src, size_t len,
+      const uint8_t **data, size_t *dlen)
+{
+   *data = NULL;
+   *dlen = 0;
+   if (!z || !z->stage || z->done || !src || len != z->want)
+      return RZSTD_PROCESS_ERROR;
+
+   switch (z->stage)
+   {
+      case 1:
+         /* the magic and the descriptor, which say how long the rest of
+          * the header is */
+         memcpy(z->head, src, 5);
+         if (     rzstd_rd32(z->head) != RZSTD_MAGIC
+               || rzstd_header_len(z->head) > RZSTD_FRAME_HEADER_MAX)
+            return RZSTD_PROCESS_ERROR;
+         z->want  = rzstd_header_len(z->head) - 5 + 3;
+         z->stage = 2;
+         return RZSTD_PROCESS_NEXT;
+      case 2:
+      {
+         /* the rest of the header and the first block's */
+         size_t at = 0;
+         memcpy(z->head + 5, src, len);
+         if (     rzstd_frame_begin(z->head, 5 + len - 3, &z->h, &at,
+                     &z->st, NULL) != RZ_OK
+               || at != 5 + len - 3
+               || !rzstd_blocks_buffer(z))
+            return RZSTD_PROCESS_ERROR;
+         rzstd_read_block_header(z->head + at, &z->next);
+         if (z->next.type == RZSTD_BLOCK_RESERVED
+               || z->next.size > RZSTD_BLOCK_MAX)
+            return RZSTD_PROCESS_ERROR;
+         z->want  = rzstd_piece(&z->h, &z->next);
+         z->stage = 3;
+         return RZSTD_PROCESS_NEXT;
+      }
+      default:
+      {
+         /* a block, decoded where it was read */
+         size_t used = 0;
+         size_t ext  = rzstd_blocks_room(z);
+         size_t from = z->out;
+         if (rzstd_block_body(&z->next, src, len, &used, z->buf, z->cap,
+                  &z->out, &z->st, z->buf + z->ext, ext) != RZ_OK)
+            return RZSTD_PROCESS_ERROR;
+         z->total += z->out - from;
+         if (z->h.has_checksum)
+            xxh64_update(&z->xs, z->buf + from, z->out - from);
+         *data = z->buf + from;
+         *dlen = z->out - from;
+         if (z->next.last)
+         {
+            size_t at = used;
+            if (rzstd_frame_end(src, len, &z->h, &at, z->total, &z->xs)
+                  != RZ_OK)
+               return RZSTD_PROCESS_ERROR;
+            z->done = 1;
+            z->want = 0;
+            return RZSTD_PROCESS_NEXT;
+         }
+         rzstd_read_block_header(src + used, &z->next);
+         if (z->next.type == RZSTD_BLOCK_RESERVED
+               || z->next.size > RZSTD_BLOCK_MAX)
+            return RZSTD_PROCESS_ERROR;
+         z->want = rzstd_piece(&z->h, &z->next);
+         return RZSTD_PROCESS_NEXT;
+      }
+   }
+}
+
+void rzstd_blocks_free(rzstd_blocks_t *z)
+{
+   if (!z)
+      return;
+   free(z->buf);
+   free(z);
+}
+
 /* -------- the public interface -------- */
 
-int rzstd_decode(uint8_t *dst, size_t dst_len, const uint8_t *src,
-      size_t src_len, size_t *wrote)
+rzstd_decoder_t *rzstd_decoder_new(void)
 {
-   rzstd_frame_state_t *st;
+   return (rzstd_decoder_t*)malloc(sizeof(rzstd_frame_state_t));
+}
+
+void rzstd_decoder_free(rzstd_decoder_t *decoder)
+{
+   free(decoder);
+}
+
+int rzstd_decode_reuse_dict(rzstd_decoder_t *st, uint8_t *dst,
+      size_t dst_len, const uint8_t *src, size_t src_len,
+      const rzstd_dict_t *dict, size_t *wrote)
+{
    size_t               out  = 0;
    size_t               used = 0;
    int                  e;
 
-   if (!dst || !src)
+   if (wrote)
+      *wrote = 0;
+   if (!st || !dst || !src)
       return RZSTD_PROCESS_ERROR;
 
-   /* The per-frame state carries a literal buffer of the maximum block
-    * size, which is too large to put on the stack. */
-   if (!(st = (rzstd_frame_state_t*)malloc(sizeof(*st))))
-      return RZSTD_PROCESS_ERROR;
-
-   e = rzstd_decode_frame(src, src_len, dst, dst_len, &out, &used, st);
-   free(st);
+   e = rzstd_decode_frame(src, src_len, dst, dst_len, &out, &used, st,
+         dict);
 
    if (e != RZ_OK)
       return RZSTD_PROCESS_ERROR;
@@ -2733,6 +3138,127 @@ int rzstd_decode(uint8_t *dst, size_t dst_len, const uint8_t *src,
    if (wrote)
       *wrote = out;
    return RZSTD_PROCESS_END;
+}
+
+int rzstd_decode_reuse(rzstd_decoder_t *st, uint8_t *dst, size_t dst_len,
+      const uint8_t *src, size_t src_len, size_t *wrote)
+{
+   return rzstd_decode_reuse_dict(st, dst, dst_len, src, src_len, NULL,
+         wrote);
+}
+
+int rzstd_decode_dict(uint8_t *dst, size_t dst_len, const uint8_t *src,
+      size_t src_len, const rzstd_dict_t *dict, size_t *wrote)
+{
+   rzstd_decoder_t *decoder = rzstd_decoder_new();
+   int status = rzstd_decode_reuse_dict(decoder, dst, dst_len, src,
+         src_len, dict, wrote);
+   rzstd_decoder_free(decoder);
+   return status;
+}
+
+int rzstd_decode(uint8_t *dst, size_t dst_len, const uint8_t *src,
+      size_t src_len, size_t *wrote)
+{
+   return rzstd_decode_dict(dst, dst_len, src, src_len, NULL, wrote);
+}
+
+static uint32_t rzstd_dict_hash(const uint8_t *p)
+{
+   return (((uint32_t)p[0] | ((uint32_t)p[1] << 8)
+         | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24))
+         * 2654435761u) >> (32 - RZSTD_DICT_HASH_LOG);
+}
+
+rzstd_dict_t *rzstd_dict_new(const uint8_t *data, size_t len)
+{
+   size_t        at = 0;
+   size_t        i;
+   rzstd_dict_t *d;
+
+   if (!data && len)
+      return NULL;
+   if (!(d = (rzstd_dict_t*)calloc(1, sizeof(*d))))
+      return NULL;
+   d->repeat[0] = 1;
+   d->repeat[1] = 4;
+   d->repeat[2] = 8;
+
+   /* Section 5: the formatted kind is the magic, its ID, the literals'
+    * Huffman tree, the offset, match length and literals length tables
+    * in that order, and the three recent offsets; what does not start
+    * with the magic is content alone. */
+   if (len >= 8 && rzstd_rd32(data) == RZSTD_DICT_MAGIC)
+   {
+      size_t used = 0;
+
+      d->id = rzstd_rd32(data + 4);
+      at    = 8;
+      if (rzstd_huf_read(&d->huf, data + at, len - at, &used) != RZ_OK)
+         goto error;
+      at += used;
+      if (rzstd_seq_table(&d->tables.of_fse, d->tables.of, RZSTD_SEQ_FSE,
+               rzstd_of_default, 29, 5, 31, 8, data + at, len - at, &used,
+               0, rzstd_of_predef) != RZ_OK)
+         goto error;
+      at += used;
+      if (rzstd_seq_table(&d->tables.ml_fse, d->tables.ml, RZSTD_SEQ_FSE,
+               rzstd_ml_default, 53, 6, 52, 9, data + at, len - at, &used,
+               0, rzstd_ml_predef) != RZ_OK)
+         goto error;
+      at += used;
+      if (rzstd_seq_table(&d->tables.ll_fse, d->tables.ll, RZSTD_SEQ_FSE,
+               rzstd_ll_default, 36, 6, 35, 9, data + at, len - at, &used,
+               0, rzstd_ll_predef) != RZ_OK)
+         goto error;
+      at += used;
+      if (len - at < 12)
+         goto error;
+      for (i = 0; i < 3; i++)
+         d->repeat[i] = rzstd_rd32(data + at + 4 * i);
+      at        += 12;
+      d->entropy = 1;
+      for (i = 0; i < 3; i++)
+         if (!d->repeat[i] || d->repeat[i] > len - at)
+            goto error;
+   }
+
+   d->content_len = len - at;
+   d->content     = (uint8_t*)malloc(d->content_len ? d->content_len : 1);
+   d->head        = (uint32_t*)calloc((size_t)1 << RZSTD_DICT_HASH_LOG,
+         sizeof(uint32_t));
+   d->chain       = (uint32_t*)malloc((d->content_len ? d->content_len : 1)
+         * sizeof(uint32_t));
+   if (!d->content || !d->head || !d->chain)
+      goto error;
+   if (d->content_len)
+      memcpy(d->content, data + at, d->content_len);
+   for (i = 0; i + 4 <= d->content_len; i++)
+   {
+      uint32_t h  = rzstd_dict_hash(d->content + i);
+      d->chain[i] = d->head[h];
+      d->head[h]  = (uint32_t)(i + 1);
+   }
+   return d;
+
+error:
+   rzstd_dict_free(d);
+   return NULL;
+}
+
+void rzstd_dict_free(rzstd_dict_t *dict)
+{
+   if (!dict)
+      return;
+   free(dict->content);
+   free(dict->head);
+   free(dict->chain);
+   free(dict);
+}
+
+uint32_t rzstd_dict_id(const rzstd_dict_t *dict)
+{
+   return dict ? dict->id : 0;
 }
 
 int rzstd_frame_header_size(const uint8_t *src, size_t src_len)
@@ -2792,7 +3318,7 @@ int rzstd_probe_frame(const uint8_t *src, size_t src_len,
    static rzstd_frame_state_t state;
 
    return rzstd_decode_frame(src, src_len, dst, dst_len, wrote, used,
-         &state);
+         &state, NULL);
 }
 
 /* Builds an FSE table from given counts and reports the widths it
@@ -3138,34 +3664,40 @@ size_t rzstd_compress_bound(size_t src_len)
 }
 
 /* Writes a frame header stating the content size, so a decoder can size
- * its output before decoding (3.1.1.1). Single-segment, no checksum, no
- * dictionary. */
-static size_t rzstd_write_frame_header(uint8_t *dst, uint64_t size)
+ * its output before decoding (3.1.1.1). Single-segment, no checksum,
+ * and the dictionary's ID when @dict_id is not 0. */
+static size_t rzstd_write_frame_header(uint8_t *dst, uint64_t size,
+      uint32_t dict_id)
 {
-   size_t at = 0;
+   size_t  at   = 0;
+   uint8_t dict = dict_id ? 3 : 0;            /* a four-byte ID */
 
-   dst[at++] = (uint8_t)(RZSTD_MAGIC);
-   dst[at++] = (uint8_t)(RZSTD_MAGIC >> 8);
-   dst[at++] = (uint8_t)(RZSTD_MAGIC >> 16);
+   dst[at++] = (uint8_t)(RZSTD_MAGIC & 255);
+   dst[at++] = (uint8_t)((RZSTD_MAGIC >> 8) & 255);
+   dst[at++] = (uint8_t)((RZSTD_MAGIC >> 16) & 255);
    dst[at++] = (uint8_t)(RZSTD_MAGIC >> 24);
 
    /* Single segment means no window descriptor: the content size is the
     * window, which is what lets a decoder allocate exactly once. */
-   if (size < 256)
+   dst[at++] = (uint8_t)((size < 256 ? 0x20
+                        : size < 65536 + 256 ? 0x60 : 0xa0) | dict);
+   if (dict_id)
    {
-      dst[at++] = 0x20;                       /* fcs 1 byte    */
-      dst[at++] = (uint8_t)size;
+      dst[at++] = (uint8_t)dict_id;
+      dst[at++] = (uint8_t)(dict_id >> 8);
+      dst[at++] = (uint8_t)(dict_id >> 16);
+      dst[at++] = (uint8_t)(dict_id >> 24);
    }
+   if (size < 256)                            /* fcs 1 byte    */
+      dst[at++] = (uint8_t)size;
    else if (size < 65536 + 256)
    {
       uint32_t v = (uint32_t)(size - 256);    /* stored biased */
-      dst[at++] = 0x60;                       /* fcs 2 bytes   */
       dst[at++] = (uint8_t)v;
       dst[at++] = (uint8_t)(v >> 8);
    }
    else
    {
-      dst[at++] = 0xa0;                       /* fcs 4 bytes   */
       dst[at++] = (uint8_t)size;
       dst[at++] = (uint8_t)(size >> 8);
       dst[at++] = (uint8_t)(size >> 16);
@@ -4014,6 +4546,13 @@ literals_done:
 int rzstd_encode(uint8_t *dst, size_t dst_len, const uint8_t *src,
       size_t src_len, int level, size_t *wrote)
 {
+   return rzstd_encode_dict(dst, dst_len, src, src_len, level, NULL,
+         wrote);
+}
+
+int rzstd_encode_dict(uint8_t *dst, size_t dst_len, const uint8_t *src,
+      size_t src_len, int level, const rzstd_dict_t *dict, size_t *wrote)
+{
    size_t    at   = 0;
    size_t    in   = 0;
    uint32_t  enc_log;
@@ -4060,11 +4599,12 @@ int rzstd_encode(uint8_t *dst, size_t dst_len, const uint8_t *src,
       enc_log = want;
    }
 
-   rep[0] = 1;
-   rep[1] = 4;
-   rep[2] = 8;
+   rep[0] = dict ? dict->repeat[0] : 1;
+   rep[1] = dict ? dict->repeat[1] : 4;
+   rep[2] = dict ? dict->repeat[2] : 8;
 
-   at = rzstd_write_frame_header(dst, (uint64_t)src_len);
+   at = rzstd_write_frame_header(dst, (uint64_t)src_len,
+         dict ? dict->id : 0);
 
    /* An empty input still needs a block, because a frame with none is
     * not a frame. */
@@ -4238,7 +4778,7 @@ int rzstd_encode(uint8_t *dst, size_t dst_len, const uint8_t *src,
 
                {
                   size_t best_len  = 0;
-                  size_t best_from = 0;
+                  size_t best_off  = 0;
                   int    depth     = depth_max;
 
                   while (cand && depth--)
@@ -4276,7 +4816,7 @@ int rzstd_encode(uint8_t *dst, size_t dst_len, const uint8_t *src,
                      if (n > best_len)
                      {
                         best_len  = n;
-                        best_from = from;
+                        best_off  = in + pos - from;
                      }
                      /* A match this long will not be beaten by
                       * enough to pay for finding out. Walking on costs
@@ -4289,6 +4829,37 @@ int rzstd_encode(uint8_t *dst, size_t dst_len, const uint8_t *src,
                      cand = chain[abs_from & (((size_t)1 << enc_log) - 1)];
                      if (cand && (size_t)cand - 1 >= abs_from)
                         break;   /* not strictly older: stop */
+                  }
+
+                  /* Then the dictionary, as if its content came just
+                   * before the input. A match stops at its end. */
+                  if (dict && best_len < 64)
+                  {
+                     uint32_t dc = dict->head[rzstd_dict_hash(p)];
+                     int      dd = depth_max;
+
+                     while (dc && dd--)
+                     {
+                        size_t         dfrom = (size_t)dc - 1;
+                        const uint8_t *q     = dict->content + dfrom;
+                        size_t         lim   = dict->content_len - dfrom;
+                        size_t         n;
+
+                        if (lim > take - pos)
+                           lim = take - pos;
+                        if (     lim >= RZSTD_ENC_MIN_MATCH
+                              && memcmp(q, p, 4) == 0
+                              && (n = rzstd_match_len(p, q, lim)) > best_len)
+                        {
+                           best_len = n;
+                           best_off = in + pos + dict->content_len - dfrom;
+                           if (best_len >= 64)
+                              break;
+                        }
+                        dc = dict->chain[dfrom];
+                        if (dc && (size_t)dc - 1 >= dfrom)
+                           break;
+                     }
                   }
 
                   /* The repeat wins unless the search found something
@@ -4365,9 +4936,10 @@ int rzstd_encode(uint8_t *dst, size_t dst_len, const uint8_t *src,
                    * took out of the literals: on a memory image the
                    * matches are mostly short and far. A remembered
                    * offset has no extra bits and is always worth it. */
-                  if (window && best_len >= RZSTD_ENC_MIN_MATCH && best_len < 8)
+                  if ((window || dict) && best_len >= RZSTD_ENC_MIN_MATCH
+                        && best_len < 8)
                   {
-                     uint32_t off  = (uint32_t)(in + pos - best_from);
+                     uint32_t off  = (uint32_t)best_off;
                      uint32_t bits = 16;
                      if (off != rep[0] && off != rep[1] && off != rep[2])
                         bits += rzstd_of_code(off + 3);
@@ -4377,7 +4949,6 @@ int rzstd_encode(uint8_t *dst, size_t dst_len, const uint8_t *src,
 
                   if (best_len >= RZSTD_ENC_MIN_MATCH)
                   {
-                     size_t from = best_from;
                      size_t n    = best_len;
 
                      rzstd_seq_t *sq = &seq[nseq++];
@@ -4385,7 +4956,7 @@ int rzstd_encode(uint8_t *dst, size_t dst_len, const uint8_t *src,
                      sq->literals = (uint32_t)(pos - lit_from);
                      sq->match    = (uint32_t)n;
                      sq->offset = rzstd_enc_offset(rep,
-                           (uint32_t)(in + pos - from), sq->literals);
+                           (uint32_t)best_off, sq->literals);
 
                      memcpy(lits + lit_len, src + in + lit_from,
                            sq->literals);

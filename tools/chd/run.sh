@@ -35,7 +35,7 @@ SRC="tools/chd/chd_read_test.c tools/chd/stub.c
      $CD/cdaccess_track.c $CD/CDUtility.c $CD/galois.c
      $CD/l-ec.c $CD/lec.c $CD/recover-raw.c $CD/edc_crc32.c
      $LC/formats/chd/rchd.c $LC/encodings/encoding_huffman.c
-     $LC/encodings/encoding_rzstd.c $LC/encodings/encoding_deflate.c
+     $LC/encodings/encoding_rzstd.c $LC/encodings/encoding_xxh64.c $LC/encodings/encoding_deflate.c
      $LC/encodings/encoding_crc32.c $LC/encodings/encoding_utf.c
      $LC/formats/7z/r7z_lzma.c $LC/formats/flac/rflac.c
      $LC/formats/vorbis/rvorbis.c
@@ -46,7 +46,7 @@ SRC="tools/chd/chd_read_test.c tools/chd/stub.c
      $LC/cdrom/cdrom.c $LC/file/file_path.c $LC/file/file_path_io.c
      $LC/file/retro_dirent.c $LC/memmap/memalign.c $LC/memmap/memmap.c
      $LC/lists/string_list.c $LC/lists/dir_list.c
-     $LC/formats/data_transfer.c $LC/hash/lrc_hash.c
+     $LC/formats/data_transfer.c $LC/streams/data_transfer_file.c $LC/hash/lrc_hash.c
      $LC/compat/compat_strl.c $LC/compat/fopen_utf8.c
      $LC/compat/compat_posix_string.c $LC/compat/compat_strcasestr.c
      $LC/string/stdstring.c $LC/string/rstrtod.c $LC/time/rtime.c

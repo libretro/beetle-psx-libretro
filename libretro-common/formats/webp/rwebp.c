@@ -152,9 +152,40 @@ static INLINE uint32_t vbr_read(vbr *b, int n)
  * entries) an entry with bits > VH_ROOT is a pointer: value is the offset
  * (relative to the entry) to its second-level table, and bits is the total
  * code length. Otherwise value is the symbol and bits its code length. */
-typedef struct { uint32_t *t; int sz, rb; } vh;
+typedef struct { uint32_t *t; size_t off; int sz, rb; } vh;
 
-static void vh_free(vh *h) { free(h->t); h->t = NULL; }
+/* Where the tables live: one block that every table of a stream is
+ * carved out of in turn, rather than an allocation per table.  An
+ * image with a meta-Huffman image has five tables per group and can
+ * have hundreds of groups, and each table used to cost a calloc of its
+ * own plus a malloc and free of its symbol scratch - all of it at
+ * decode time, and per frame for an animation.  The block grows by
+ * doubling when a table does not fit, which can move it, so a table
+ * is recorded by its offset and the pointers are set once the last
+ * one is built (vh_arena_bind).  A fixed arena (the code-length
+ * table's, on the stack) cannot grow and fails instead. */
+typedef struct { uint32_t *base; size_t used, cap; int fixed; } vh_arena;
+
+static uint32_t *vh_arena_take(vh_arena *a, size_t n, size_t *off)
+{
+   if (n > a->cap - a->used)
+   {
+      size_t    cap = a->cap ? a->cap : 1024;
+      uint32_t *nb;
+      if (a->fixed)
+         return NULL;
+      while (cap - a->used < n)
+         cap *= 2;
+      if (!(nb = (uint32_t*)realloc(a->base, cap * sizeof(uint32_t))))
+         return NULL;
+      a->base = nb;
+      a->cap  = cap;
+   }
+   *off     = a->used;
+   a->used += n;
+   memset(a->base + *off, 0, n * sizeof(uint32_t));
+   return a->base + *off;
+}
 
 /* GetNextKey: reversed-prefix increment (libwebp). */
 static uint32_t vh_next_key(uint32_t key, int len)
@@ -184,47 +215,46 @@ static int vh_next_tbl_bits(const int *count, int len, int root_bits)
    return len - root_bits;
 }
 
-static int vh_build(vh *h, const uint8_t *lens, int ns, int root)
+/* sorted is the caller's symbol scratch, room for ns entries.  Not a
+ * stack array here: as int sorted[4096] it was 16 KiB in one frame -
+ * twice the 8 KiB a GEKKO thread gets (the GEKKO STACKSIZE in
+ * rthreads.c) - and this is reachable from a task handler, so it runs
+ * on a worker rather than the main thread whenever the task queue is
+ * threaded: task_file_load_handler -> task_image_load_handler ->
+ * task_image_process -> image_transfer_process -> rwebp_process_image
+ * -> ... -> vh_build, and the same via task_overlay_handler.  Wii and
+ * GameCube build HAVE_RWEBP and HAVE_THREADS both.  So the stream
+ * decode carries it, allocated once with the code-length scratch,
+ * instead of every table allocating and freeing its own.
+ *
+ * uint16_t rather than int as well: every value here is a symbol
+ * index, bounded by the ns > 4096 rejection below, and every read
+ * of it is already masked with 0xFFFF. */
+static int vh_build(vh *h, const uint8_t *lens, int ns, int root,
+      uint16_t *sorted, vh_arena *a)
 {
    int count[VH_MAXCL + 1], offset[VH_MAXCL + 1];
-   /* Symbol scratch, heap rather than stack.  As int sorted[4096] this
-    * was 16 KiB in one frame - twice the 8 KiB a GEKKO thread gets
-    * (the GEKKO STACKSIZE in rthreads.c) - and it is reachable from
-    * a task handler, so it runs on a worker rather than the main
-    * thread whenever the task queue is threaded:
-    * task_file_load_handler -> task_image_load_handler ->
-    * task_image_process -> image_transfer_process ->
-    * rwebp_process_image -> ... -> vh_build, and the same via
-    * task_overlay_handler.  Wii and GameCube build HAVE_RWEBP and
-    * HAVE_THREADS both.
-    *
-    * uint16_t rather than int as well: every value here is a symbol
-    * index, bounded by the ns > 4096 rejection below, and every read
-    * of it is already masked with 0xFFFF. */
-   uint16_t *sorted = (uint16_t*)malloc(4096 * sizeof(*sorted));
    int total_size = 1 << root;
    int len, symbol, i, pass;
    uint32_t *t = NULL;
 
-   if (!sorted)
-      return -1;
    if (ns > 4096)
-      goto fail;
+      return -1;
    memset(count, 0, sizeof(count));
    for (symbol = 0; symbol < ns; symbol++)
    {
       if (lens[symbol] > VH_MAXCL)
-         goto fail;
+         return -1;
       count[lens[symbol]]++;
    }
    if (count[0] == ns)
-      goto fail;
+      return -1;
 
    offset[1] = 0;
    for (len = 1; len < VH_MAXCL; len++)
    {
       if (count[len] > (1 << len))
-         goto fail;
+         return -1;
       offset[len + 1] = offset[len] + count[len];
    }
    for (symbol = 0; symbol < ns; symbol++)
@@ -237,13 +267,11 @@ static int vh_build(vh *h, const uint8_t *lens, int ns, int root)
    if (offset[VH_MAXCL] == 1)
    {
       total_size = 1 << root;
-      h->t = (uint32_t*)calloc(total_size, sizeof(uint32_t));
-      if (!h->t)
-         goto fail;
+      if (!(h->t = vh_arena_take(a, (size_t)total_size, &h->off)))
+         return -1;
       h->sz = total_size; h->rb = root;
       for (i = 0; i < total_size; i++)
          h->t[i] = (uint32_t)(sorted[0] & 0xFFFF);
-      free(sorted);
       return 0;
    }
 
@@ -301,21 +329,13 @@ static int vh_build(vh *h, const uint8_t *lens, int ns, int root)
             key = vh_next_key(key, len);
          }
 
-      if (pass == 0)
-      {
-         t = (uint32_t*)calloc(total_size + 1, sizeof(uint32_t));
-         if (!t)
-            goto fail;
-      }
+      if (pass == 0
+            && !(t = vh_arena_take(a, (size_t)total_size + 1, &h->off)))
+         return -1;
    }
 
    h->t = t; h->sz = total_size; h->rb = root;
-   free(sorted);
    return 0;
-
-fail:
-   free(sorted);
-   return -1;
 }
 
 static INLINE int vh_read(const vh *h, vbr *b)
@@ -360,21 +380,29 @@ static int vh_read_codes(vbr *br, int ns, uint8_t *lens)
    else
    {
       uint8_t cl[19];
+      uint16_t cls[19];
+      /* Code lengths are three bits, so no code here is longer than
+       * the 7-bit root: one root table and no second level, 128
+       * entries and the build's spare one. */
+      uint32_t clb[(1 << 7) + 1];
+      vh_arena cla;
       vh clt;
       int ncl, prev = 8, si, ms;
+      cla.base = clb; cla.used = 0;
+      cla.cap  = sizeof(clb) / sizeof(clb[0]); cla.fixed = 1;
       memset(&clt, 0, sizeof(clt));
       memset(cl, 0, 19);
       ncl = vbr_read(br, 4) + 4;
       if (ncl > 19) ncl = 19;
       for (i = 0; i < ncl; i++)
          cl[vh_cl_order[i]] = (uint8_t)vbr_read(br, 3);
-      if (vh_build(&clt, cl, 19, 7) < 0) return -1;
+      if (vh_build(&clt, cl, 19, 7, cls, &cla) < 0) return -1;
       ms = ns;
       if (vbr_read(br, 1))
       {
          int nb = 2 + 2 * vbr_read(br, 3);
          ms = 2 + vbr_read(br, nb);
-         if (ms > ns) { vh_free(&clt); return -1; }   /* invalid per libwebp */
+         if (ms > ns) return -1;   /* invalid per libwebp */
       }
       si = 0;
       while (si < ns)
@@ -394,7 +422,6 @@ static int vh_read_codes(vbr *br, int ns, uint8_t *lens)
             while (r-- > 0) lens[si++] = (uint8_t)val;
          }
       }
-      vh_free(&clt);
    }
    return 0;
 }
@@ -504,22 +531,27 @@ typedef struct { vh t[5]; } vh_group;
 
 /* Read a single Huffman group's 5 trees. The green tree's alphabet is
  * enlarged by the color-cache size (shared across all groups). */
-static int vl_read_group(vbr *br, vh_group *g, int ccs, uint8_t *cl)
+static int vl_read_group(vbr *br, vh_group *g, int ccs, uint8_t *cl,
+      uint16_t *sorted, vh_arena *a)
 {
    int ns[5], i;
    ns[0] = 256 + 24 + ccs; ns[1] = 256; ns[2] = 256; ns[3] = 256; ns[4] = 40;
    for (i = 0; i < 5; i++)
    {
       if (vh_read_codes(br, ns[i], cl) < 0) return -1;
-      if (vh_build(&g->t[i], cl, ns[i], VH_ROOT) < 0) return -1;
+      if (vh_build(&g->t[i], cl, ns[i], VH_ROOT, sorted, a) < 0) return -1;
    }
    return 0;
 }
 
-static void vl_free_group(vh_group *g)
+/* Point every table at where it ended up in the arena. */
+static void vh_arena_bind(vh_group *groups, int num_groups,
+      const vh_arena *a)
 {
-   int i;
-   for (i = 0; i < 5; i++) vh_free(&g->t[i]);
+   int gi, i;
+   for (gi = 0; gi < num_groups; gi++)
+      for (i = 0; i < 5; i++)
+         groups[gi].t[i].t = a->base + groups[gi].t[i].off;
 }
 
 /* Forward decl: entropy image is itself a VP8L image stream (no transforms,
@@ -538,6 +570,7 @@ typedef struct vlds
    uint32_t *pix;
    uint32_t *huff_img;
    vh_group *groups;
+   uint32_t *tables;    /* the arena every group's tables are in */
    uint32_t *cc;
    uint8_t *cl;
    int ccb, ccs;
@@ -549,16 +582,11 @@ typedef struct vlds
 
 static void vlds_abort(vlds *s)
 {
-   int gi;
    free(s->cl);
    free(s->cc);
    free(s->huff_img);
-   if (s->groups)
-   {
-      for (gi = 0; gi < s->num_groups; gi++)
-         vl_free_group(&s->groups[gi]);
-      free(s->groups);
-   }
+   free(s->tables);
+   free(s->groups);
    free(s->pix);
    memset(s, 0, sizeof(*s));
 }
@@ -572,11 +600,13 @@ static int vlds_begin(vlds *s, vbr *br, int w, int h, int allow_meta)
    vh_group *groups = NULL;
    uint32_t *cc = NULL;
    uint8_t *cl = NULL;
+   vh_arena arena;
    int ccb = 0, ccs = 0;
    int hbits = 0, hxs = 0;
    int num_groups = 1, gi;
 
    memset(s, 0, sizeof(*s));
+   memset(&arena, 0, sizeof(arena));
 
    /* --- Color cache (before Huffman codes, per DecodeImageStream) --- */
    if (vbr_read(br, 1))
@@ -609,12 +639,21 @@ static int vlds_begin(vlds *s, vbr *br, int w, int h, int allow_meta)
    }
 
    /* --- Read the Huffman groups --- */
-   cl = (uint8_t*)malloc(4096);
+   /* Code lengths (4096 bytes) and the table build's symbol scratch
+    * (4096 uint16_t) in one block, for every table of the stream.  The
+    * arena starts at the five root tables of every group, which is
+    * all most groups need; second-level tables grow it. */
+   cl = (uint8_t*)malloc(4096 + 4096 * sizeof(uint16_t));
    if (!cl) goto bfail;
    groups = (vh_group*)calloc(num_groups, sizeof(vh_group));
    if (!groups) goto bfail;
+   arena.cap  = (size_t)num_groups * 5 * (1 << VH_ROOT) + 1024;
+   arena.base = (uint32_t*)malloc(arena.cap * sizeof(uint32_t));
+   if (!arena.base) goto bfail;
    for (gi = 0; gi < num_groups; gi++)
-      if (vl_read_group(br, &groups[gi], ccs, cl) < 0) goto bfail;
+      if (vl_read_group(br, &groups[gi], ccs, cl,
+               (uint16_t*)(cl + 4096), &arena) < 0) goto bfail;
+   vh_arena_bind(groups, num_groups, &arena);
 
    pix = (uint32_t*)malloc((size_t)w * h * sizeof(uint32_t));
    if (!pix) goto bfail;
@@ -623,6 +662,7 @@ static int vlds_begin(vlds *s, vbr *br, int w, int h, int allow_meta)
    s->pix = pix;
    s->huff_img = huff_img;
    s->groups = groups;
+   s->tables = arena.base;
    s->cc = cc;
    s->cl = cl;
    s->ccb = ccb; s->ccs = ccs;
@@ -636,7 +676,8 @@ bfail:
    free(cl);
    free(cc);
    free(huff_img);
-   if (groups) { for (gi = 0; gi < num_groups; gi++) vl_free_group(&groups[gi]); free(groups); }
+   free(arena.base);
+   free(groups);
    return -1;
 }
 
@@ -910,6 +951,21 @@ static int vlbd_xform_rows(vlbd *s, int nrows)
             int nc = x->dw, bits = x->bits, rw = (int)width;
             uint32_t *out;
             int px2, py2;
+            if (bits == 0)
+            {
+               /* One index per pixel, so the image is not packed: each
+                * index becomes its colour where it lies, no expansion
+                * buffer.  (Packed indices need one, rows being read
+                * top to bottom while the expansion would overwrite the
+                * packed rows below it.) */
+               size_t j, j1 = (size_t)r1 * cw;
+               for (j = (size_t)r0 * cw; j < j1; j++)
+               {
+                  int idx = (int)((pix[j] >> 8) & 0xFF);
+                  pix[j]  = pal[idx < nc ? idx : 0];
+               }
+               break;
+            }
             if (!s->xout)
             {
                s->xout = (uint32_t*)malloc((size_t)rw * height * sizeof(uint32_t));
@@ -1158,50 +1214,71 @@ static void alph_unfilter_row(int filter, const uint8_t *prev,
    }
 }
 
-/* Decode an ALPH chunk into a w*h byte plane. Returns NULL on failure
- * (caller keeps opaque alpha). */
-static uint8_t *alph_decode(const uint8_t *data, size_t len,
-      unsigned w, unsigned h)
+/* Decode an ALPH chunk straight into the alpha byte (the top byte of
+ * the word, in either channel order) of the w*h frame at pix.  No
+ * plane: each row's filtered bytes go through a two-row buffer - the
+ * row, and the one above it that the vertical and gradient filters
+ * predict from - and are merged as soon as they are unfiltered, so
+ * the frame is walked once while it is cache-warm instead of building
+ * a w*h plane, unfiltering it and merging it in passes of their own.
+ * Returns 0, with pix untouched (opaque alpha kept), on any failure:
+ * every check that can fail is made before the first row is written. */
+static int alph_apply(const uint8_t *data, size_t len,
+      unsigned w, unsigned h, uint32_t *pix)
 {
    int method, filter, rsrv;
-   uint8_t *plane;
-   unsigned y;
+   uint8_t  *lines, *row, *prev;
+   uint32_t *src32 = NULL;
+   unsigned  x, y;
 
    if (len < 1 || w == 0 || h == 0)
-      return NULL;
+      return 0;
    method = data[0] & 3;
    filter = (data[0] >> 2) & 3;
    rsrv   = (data[0] >> 6) & 3;
    if (method > 1 || rsrv != 0)
-      return NULL;
-
-   plane = (uint8_t*)malloc((size_t)w * h);
-   if (!plane)
-      return NULL;
-
+      return 0;
    if (method == 0)
    {
-      if (len - 1 < (size_t)w * h) { free(plane); return NULL; }
-      memcpy(plane, data + 1, (size_t)w * h);
+      if (len - 1 < (size_t)w * h)
+         return 0;
    }
    else
    {
       vbr br;
-      uint32_t *pix;
-      size_t n = (size_t)w * h, k;
       vbr_init(&br, data + 1, len - 1);
-      pix = vl_decode_body(&br, w, h, 0);
-      if (!pix) { free(plane); return NULL; }
-      for (k = 0; k < n; k++)
-         plane[k] = (uint8_t)((pix[k] >> 8) & 0xFF); /* green */
-      free(pix);
+      if (!(src32 = vl_decode_body(&br, w, h, 0)))
+         return 0;
    }
-
+   if (!(lines = (uint8_t*)malloc((size_t)w * 2)))
+   {
+      free(src32);
+      return 0;
+   }
+   row  = lines;
+   prev = lines + w;
    for (y = 0; y < h; y++)
-      alph_unfilter_row(filter, y ? plane + (size_t)(y-1)*w : NULL,
-            plane + (size_t)y*w, (int)w);
-
-   return plane;
+   {
+      uint32_t *out = pix + (size_t)y * w;
+      uint8_t  *t;
+      if (src32)
+      {
+         const uint32_t *s = src32 + (size_t)y * w;
+         for (x = 0; x < w; x++)
+            row[x] = (uint8_t)((s[x] >> 8) & 0xFF); /* green */
+      }
+      else
+         memcpy(row, data + 1 + (size_t)y * w, w);
+      alph_unfilter_row(filter, y ? prev : NULL, row, (int)w);
+      for (x = 0; x < w; x++)
+         out[x] = (out[x] & 0x00FFFFFFu) | ((uint32_t)row[x] << 24);
+      t    = prev;
+      prev = row;
+      row  = t;
+   }
+   free(lines);
+   free(src32);
+   return 1;
 }
 
 
@@ -1225,16 +1302,7 @@ static uint32_t *rwebp_do(const uint8_t *buf, size_t len,
    {
       pix = rvp8_decode(c.vp8, c.vp8s, w, h, rgba ? 1 : 0);
       if (pix && c.alph && c.alphs > 0)
-      {
-         uint8_t *ap = alph_decode(c.alph, c.alphs, *w, *h);
-         if (ap)
-         {
-            size_t k, n = (size_t)*w * *h;
-            for (k = 0; k < n; k++)
-               pix[k] = (pix[k] & 0x00FFFFFFu) | ((uint32_t)ap[k] << 24);
-            free(ap);
-         }
-      }
+         alph_apply(c.alph, c.alphs, *w, *h, pix);
    }
    return pix;
 }
@@ -1275,16 +1343,7 @@ static uint32_t *rwebp_anim_frame_pixels(const uint8_t *d, size_t sz,
          *out_opaque = 1;
       pix = rvp8_decode(fv, fvs, &w, &h, swap_rb); /* canvas order */
       if (pix && fa && fas > 0)
-      {
-         uint8_t *ap = alph_decode(fa, fas, w, h);
-         if (ap)
-         {
-            size_t k, n = (size_t)w * h;
-            for (k = 0; k < n; k++)
-               pix[k] = (pix[k] & 0x00FFFFFFu) | ((uint32_t)ap[k] << 24);
-            free(ap);
-         }
-      }
+         alph_apply(fa, fas, w, h, pix);
    }
    if (!pix) return NULL;
    /* Frames of both kinds decode straight into the canvas's current
@@ -1724,6 +1783,7 @@ const uint32_t *rwebp_anim_stream_next(rwebp_anim_stream_t *s,
       uint32_t *sub;
       int is_key, x, y;
       int sub_opaque = 0;
+      int swapped;
 
       if (s->cursor >= s->num_anmf)
       {
@@ -1771,14 +1831,22 @@ const uint32_t *rwebp_anim_stream_next(rwebp_anim_stream_t *s,
       else
          is_key = s->prev_disp_bg && (s->prev_full || s->prev_key);
 
-      if (is_key)
+      /* A frame that covers the canvas and is copied rather than
+       * blended (no_blend, or a source with every alpha byte 0xFF)
+       * replaces every canvas pixel, and its decoded buffer is exactly
+       * canvas-sized: it becomes the canvas, and the old one is freed
+       * in its place, instead of being copied over - and nothing the
+       * copy would overwrite (the key-frame clear, the previous frame's
+       * disposal) needs doing first. */
+      swapped = (no_blend || sub_opaque) && rwebp_full_frame(fw, fh, cw, ch);
+      if (swapped)
       {
-         /* When a full-canvas opaque copy follows, the memset would be
-          * overwritten entirely - skip it. */
-         if (!(   (no_blend || sub_opaque)
-               && rwebp_full_frame(fw, fh, cw, ch)))
-            memset(s->canvas, 0, (size_t)cw * ch * sizeof(uint32_t));
+         uint32_t *old = s->canvas;
+         s->canvas     = sub;
+         sub           = old;
       }
+      else if (is_key)
+         memset(s->canvas, 0, (size_t)cw * ch * sizeof(uint32_t));
       else if (s->prev_disp_bg)
       {
          /* Lazily apply the previous frame's dispose-to-background:
@@ -1789,18 +1857,21 @@ const uint32_t *rwebp_anim_stream_next(rwebp_anim_stream_t *s,
                   0, (size_t)s->prev_fw * sizeof(uint32_t));
       }
 
-      for (y = 0; y < fh; y++)
+      if (!swapped)
       {
-         uint32_t *crow = s->canvas + (size_t)(fy + y) * cw + fx;
-         const uint32_t *srow = sub + (size_t)y * fw;
-         /* A fully opaque source blends to a plain copy (the per-pixel
-          * fast path in rwebp_blend_px), so frames known opaque at
-          * parse time skip the per-pixel loop entirely. */
-         if (no_blend || sub_opaque)
-            memcpy(crow, srow, (size_t)fw * sizeof(uint32_t));
-         else
-            for (x = 0; x < fw; x++)
-               crow[x] = rwebp_blend_px(srow[x], crow[x]);
+         for (y = 0; y < fh; y++)
+         {
+            uint32_t *crow = s->canvas + (size_t)(fy + y) * cw + fx;
+            const uint32_t *srow = sub + (size_t)y * fw;
+            /* A fully opaque source blends to a plain copy (the per-pixel
+             * fast path in rwebp_blend_px), so frames known opaque at
+             * parse time skip the per-pixel loop entirely. */
+            if (no_blend || sub_opaque)
+               memcpy(crow, srow, (size_t)fw * sizeof(uint32_t));
+            else
+               for (x = 0; x < fw; x++)
+                  crow[x] = rwebp_blend_px(srow[x], crow[x]);
+         }
       }
       free(sub);
 

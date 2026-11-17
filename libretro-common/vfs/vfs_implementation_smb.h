@@ -58,7 +58,39 @@ typedef struct {
                               * listings on different threads never share it */
 } smb_dir_handle;
 
+/* Hands the client new settings: they are copied, strings included,
+ * so the caller may change or free @new_cfg once this returns. */
 bool smb_init_cfg(const struct smb_settings *new_cfg);
+
+/* What the last connect for a share came to. */
+enum smb_failure
+{
+   SMB_FAILURE_UNKNOWN = 0,  /* no record */
+   SMB_FAILURE_CONNECTED,
+   SMB_FAILURE_RESOLVE,      /* the server name did not resolve */
+   SMB_FAILURE_CONNECT,      /* refused, timed out, dropped */
+   SMB_FAILURE_LOGIN,
+   SMB_FAILURE_SHARE         /* no such share, or access to it denied */
+};
+
+/* The code of the share @url reaches under the current settings, as a
+ * stat would; no I/O. Two threads failing on one share at once may
+ * leave either's code. */
+enum smb_failure smb_url_failure(const char *url);
+
+/* Whether a URL can be read under the settings. */
+enum smb_url_result
+{
+   SMB_URL_OK = 0,
+   SMB_URL_NO_SERVER,
+   SMB_URL_SHARE_DIFFERS     /* a share is configured and the URL's differs */
+};
+
+/* Checks @url's share against the settings, ignoring case; on a
+ * difference @detail gets the configured share, else "". The URL's
+ * host is not compared: the configured server is always read. No
+ * I/O. */
+enum smb_url_result smb_url_check(const char *url, char *detail, size_t len);
 
 /* File operations */
 bool    retro_vfs_file_open_smb(libretro_vfs_implementation_file *stream,
@@ -84,14 +116,25 @@ int retro_vfs_stat_smb(const char *path, int64_t *size);
 
 /* Errors */
 int retro_vfs_file_error_smb(libretro_vfs_implementation_file *stream);
+/* Why the last connect, share listing or opendir failed; "" if none has. */
+const char *smb_get_last_error(void);
 
 /* Context management */
 void smb_shutdown(void);
+
+/* For libsmb2 contexts made outside the VFS (cloud sync): libsmb2
+ * keeps every context on one list with no lock of its own. */
+struct smb2_context *smb_ctx_new(void);
+void smb_ctx_free(struct smb2_context *ctx);
 
 /* What read-ahead served from its windows and what it missed, in KiB,
  * over the files closed since the last call; the counts are then reset.
  * Both are 0 while read-ahead is off. */
 void smb_take_readahead_stats(unsigned *window_kib, unsigned *direct_kib);
+
+/* Whether every idle pooled connection has its pool's read-ahead
+ * window. For the tests. */
+bool smb_pool_windows_ok(void);
 
 #ifdef __cplusplus
 }

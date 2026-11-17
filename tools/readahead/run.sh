@@ -16,7 +16,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 SRC="tools/readahead/mapped_readahead_test.c mednafen/cdstream.c
      $LC/streams/file_stream.c $LC/vfs/vfs_implementation.c
-     $LC/formats/data_transfer.c $LC/file/file_path.c
+     $LC/formats/data_transfer.c $LC/streams/data_transfer_file.c $LC/file/file_path.c
      $LC/file/file_path_io.c $LC/compat/compat_strl.c
      $LC/compat/fopen_utf8.c $LC/encodings/encoding_utf.c
      $LC/string/stdstring.c $LC/string/rstrtod.c $LC/time/rtime.c

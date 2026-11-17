@@ -179,7 +179,11 @@ void rmp4_video_stream_set_output(rmp4_video_stream_t *stream,
 int rmp4_video_stream_set_output_stride(rmp4_video_stream_t *stream,
       uint32_t *out, unsigned stride);
 
-/* H.264/HEVC/AV1 on the hardware backend: true when the
+/* Owner-thread hardware HEVC input pipelining; default off. Persists across
+ * rewind and leaves software behavior unchanged. */
+void rmp4_video_stream_set_decode_ahead(rmp4_video_stream_t *stream, int enable);
+
+/* H.264/HEVC/VP9/AV1 on the hardware backend: true when the
  * frames will come from it, false when they stay in software - another
  * codec, a colour the GPU frame cannot carry, or a backend that will
  * not take the stream. A stream already under way starts over from
@@ -302,6 +306,13 @@ int64_t rmp4_video_stream_presentation_delay_ns(const rmp4_video_stream_t *strea
  * after a successful next/skip. -1 before a frame, after rewind, or
  * when no timestamp is available. Decoder-relative seek APIs are unchanged. */
 int64_t rmp4_video_stream_frame_time_ns(const rmp4_video_stream_t *stream);
+/* Upcoming frame's end on the millisecond pacing clock, in ns; -1 if unknown.
+ * Reads metadata only and does not advance the stream. */
+int64_t rmp4_video_stream_next_end_time_ns(const rmp4_video_stream_t *stream);
+
+/* Synchronous movie-coordinate counterpart of seek_ms. Leaves the selected
+ * picture for next/skip; returns movie ms, preserving an empty-interval target. */
+int64_t rmp4_video_stream_seek_movie_ms(rmp4_video_stream_t *stream, int64_t ms);
 
 /* Movie-relative bounded seek, including leading and trailing empty
  * video intervals. The decoder-relative APIs below remain unchanged. */

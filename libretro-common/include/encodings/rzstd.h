@@ -30,15 +30,17 @@
  * That covers raw, RLE and compressed blocks; literals sections in raw,
  * RLE, Huffman and Huffman-repeat modes including the four-stream
  * layout; sequence sections in predefined, RLE, FSE and repeat modes;
- * repeated offsets; skippable frames; and the optional whole-frame
- * XXH64 checksum. Dictionaries are the one omission: no format this
- * tree reads uses them, and a dictionary-compressed frame is rejected
- * rather than silently mis-decoded.
+ * repeated offsets; skippable frames; the optional whole-frame XXH64
+ * checksum; and dictionaries, raw content or formatted with entropy
+ * tables (section 5), through the _dict entry points. A frame naming a
+ * dictionary is refused by the others rather than mis-decoded.
  *
  * Encoding is minimal: it produces frames any conforming decoder reads,
  * but makes no attempt to match the reference implementation's ratio or
- * its output byte-for-byte. There is no optimal parse, no long-distance
- * matching and no dictionary support. This is sized for the one caller
+ * its output byte-for-byte. There is no optimal parse and no
+ * long-distance matching; with a dictionary, matches reach into its
+ * content and the first block starts from its recent offsets, but the
+ * blocks write tables of their own. This is sized for the one caller
  * that compresses -- input replay payloads -- where the input is small,
  * the work happens off the critical path, and a few percent of ratio is
  * not worth an order of magnitude more code.
@@ -144,6 +146,52 @@ int rzstd_frame_header_size(const uint8_t *src, size_t src_len);
 int rzstd_decode(uint8_t *dst, size_t dst_len,
       const uint8_t *src, size_t src_len, size_t *wrote);
 
+/* Retain decode scratch across independent frames.
+ * One caller at a time per decoder; every call resets frame/table validity,
+ * including after an error. Output goes directly into the caller's buffer. */
+typedef struct rzstd_frame_state rzstd_decoder_t;
+rzstd_decoder_t *rzstd_decoder_new(void);
+void rzstd_decoder_free(rzstd_decoder_t *decoder);
+int rzstd_decode_reuse(rzstd_decoder_t *decoder, uint8_t *dst, size_t dst_len,
+      const uint8_t *src, size_t src_len, size_t *wrote);
+
+/* -------- dictionaries -------- */
+
+typedef struct rzstd_dict rzstd_dict_t;
+
+/**
+ * rzstd_dict_new:
+ * @dict       : a dictionary as the reference trainer writes it (magic
+ *               0xEC30A437, ID, entropy tables, recent offsets, then
+ *               content), or anything else, taken as content alone
+ * @len        : length of @dict
+ *
+ * Copies what it needs, so @dict may be freed after. The result is
+ * only read from, and may be shared by any number of threads.
+ *
+ * Returns: the dictionary, or NULL when out of memory or when a
+ * formatted dictionary's tables are malformed.
+ */
+rzstd_dict_t *rzstd_dict_new(const uint8_t *dict, size_t len);
+void rzstd_dict_free(rzstd_dict_t *dict);
+
+/* The ID a formatted dictionary carries; 0 for content alone. */
+uint32_t rzstd_dict_id(const rzstd_dict_t *dict);
+
+/**
+ * rzstd_decode_dict:
+ *
+ * rzstd_decode() for a frame compressed with @dict. A frame naming a
+ * dictionary that is not @dict is an error; one naming none is decoded
+ * with @dict, as the reference does. @dict may be NULL.
+ */
+int rzstd_decode_dict(uint8_t *dst, size_t dst_len,
+      const uint8_t *src, size_t src_len, const rzstd_dict_t *dict,
+      size_t *wrote);
+int rzstd_decode_reuse_dict(rzstd_decoder_t *decoder, uint8_t *dst,
+      size_t dst_len, const uint8_t *src, size_t src_len,
+      const rzstd_dict_t *dict, size_t *wrote);
+
 /**
  * rzstd_compress_bound:
  * @src_len    : length of the input to be compressed
@@ -171,21 +219,96 @@ size_t rzstd_compress_bound(size_t src_len);
 int rzstd_encode(uint8_t *dst, size_t dst_len,
       const uint8_t *src, size_t src_len, int level, size_t *wrote);
 
+/**
+ * rzstd_encode_dict:
+ *
+ * rzstd_encode() with @dict: the frame names it (when it has an ID)
+ * and needs it to decode. @dict may be NULL.
+ */
+int rzstd_encode_dict(uint8_t *dst, size_t dst_len,
+      const uint8_t *src, size_t src_len, int level,
+      const rzstd_dict_t *dict, size_t *wrote);
+
 /* Window size the decoder is willing to allocate for a frame. Frames
  * declaring a larger window are rejected; this is well above what any
  * encoder in this tree produces and above the reference
  * implementation's default. */
 #define RZSTD_WINDOW_LOG_MAX 27
 
-/* No streaming interface is offered.
+/* -------- a frame a block at a time -------- */
+
+typedef struct rzstd_blocks rzstd_blocks_t;
+
+/* the most rzstd_blocks_want() asks for: a block of 128 KiB, and the
+ * next block's header or the frame's checksum */
+#define RZSTD_WANT_MAX (128 * 1024 + 4)
+
+/**
+ * rzstd_blocks_begin:
+ * @src        : one complete frame, which stays where it is until the
+ *               stream is freed
+ * @src_len    : its exact length
  *
- * One was declared here, both directions, for a caller that cannot hold
- * a whole frame. No caller in this tree is one: both CHD readers hold a
- * hunk entire, and every other user above starts from a complete frame.
- * Eleven entry points were declared and none was ever implemented:
- * nothing would have noticed them breaking, because nothing called
- * them. Absent is honest where declared was not.
+ * A frame decoded a block at a time, for one too big to have whole in
+ * memory: through a ring of its window and two blocks more, at least a
+ * megabyte, which the matches reach back into. Each block comes out
+ * whole where it was decoded.
+ *
+ * Returns: the stream, or NULL when @src is not a frame or its window
+ * cannot be had.
  */
+rzstd_blocks_t *rzstd_blocks_begin(const uint8_t *src, size_t src_len);
+
+/**
+ * rzstd_blocks_step:
+ * @data       : receives where the block's octets are, until the next
+ *               call
+ * @len        : receives how many
+ *
+ * Returns: RZSTD_PROCESS_NEXT with a block, RZSTD_PROCESS_END once the
+ * frame is all out and its size and end are as they should be, or
+ * RZSTD_PROCESS_ERROR.
+ */
+int rzstd_blocks_step(rzstd_blocks_t *z, const uint8_t **data, size_t *len);
+
+/**
+ * rzstd_blocks_open:
+ *
+ * A frame decoded a block at a time, as for rzstd_blocks_begin(), from
+ * input handed over a piece at a time: what rzstd_blocks_want() asks
+ * for each time, which is the next block and the next block's header.
+ * Each piece is decoded where it is, so it can be read straight into a
+ * buffer of RZSTD_WANT_MAX octets that is used over again.
+ *
+ * Returns: the stream, or NULL when there is no memory.
+ */
+rzstd_blocks_t *rzstd_blocks_open(void);
+
+/**
+ * rzstd_blocks_want:
+ *
+ * Returns: how many octets of the frame rzstd_blocks_give() is to be
+ * handed next, or 0 once the frame is all out.
+ */
+size_t rzstd_blocks_want(const rzstd_blocks_t *z);
+
+/**
+ * rzstd_blocks_give:
+ * @src        : the next rzstd_blocks_want() octets of the frame, which
+ *               need not stay where they are after the call
+ * @len        : how many
+ * @data       : receives where the octets it decoded are, until the next
+ *               call; there may be none
+ * @dlen       : receives how many
+ *
+ * Returns: RZSTD_PROCESS_NEXT, or RZSTD_PROCESS_ERROR. Once
+ * rzstd_blocks_want() is 0 the frame is all out, its size and checksum
+ * as they should be.
+ */
+int rzstd_blocks_give(rzstd_blocks_t *z, const uint8_t *src, size_t len,
+      const uint8_t **data, size_t *dlen);
+
+void rzstd_blocks_free(rzstd_blocks_t *z);
 
 /**
  * rzstd_error_name:

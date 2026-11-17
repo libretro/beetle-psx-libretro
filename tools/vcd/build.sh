@@ -47,7 +47,7 @@ VFS="$LC/streams/file_stream.c $LC/vfs/vfs_implementation.c
      $LC/vfs/vfs_implementation_cdrom.c $LC/cdrom/cdrom.c
      $LC/file/file_path.c $LC/file/file_path_io.c $LC/file/retro_dirent.c
      $LC/memmap/memalign.c $LC/memmap/memmap.c $LC/lists/string_list.c
-     $LC/lists/dir_list.c $LC/formats/data_transfer.c"
+     $LC/lists/dir_list.c $LC/formats/data_transfer.c $LC/streams/data_transfer_file.c"
 
 case "$HARNESS" in
 vcd_probe|vcd_pipeline|vcd_state|vcd_churn)
@@ -70,7 +70,7 @@ vcd_disc)
         $LC/formats/vorbis/rvorbis.c $LC/formats/flac/rflac.c
         $LC/formats/chd/rchd.c $LC/encodings/encoding_huffman.c
         $LC/formats/7z/r7z_lzma.c
-        $LC/encodings/encoding_rzstd.c $LC/streams/trans_stream_rzstd.c
+        $LC/encodings/encoding_rzstd.c $LC/encodings/encoding_xxh64.c $LC/streams/trans_stream_rzstd.c
         $LC/streams/chd_stream.c $LC/vfs/vfs_prefetch.c $LC/streams/memory_stream.c
         $LC/streams/interface_stream.c $LC/streams/trans_stream.c
         $LC/streams/trans_stream_pipe.c $LC/streams/rzip_stream.c

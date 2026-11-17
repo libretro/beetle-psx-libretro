@@ -6,9 +6,12 @@
  * memory-resident files.  Leading tags are stepped over by the
  * frame-sync scan rather than parsed.
  *
- * What it does not implement: ID3/APE tag parsing, Xing/Info/LAME
- * header interpretation (VBR duration estimates and gapless
- * delay/padding trimming are the caller's concern), and encoding.
+ * The Xing/Info and VBRI tag frames are read by rmp3_parse_vbr_tag; the
+ * pull interface uses them for gapless playback, dropping the tag frame,
+ * the encoder delay and padding the LAME extension gives, and the
+ * decoder's own delay.  The stream interface leaves that to its caller.
+ *
+ * What it does not implement: ID3/APE tag parsing, and encoding.
  *
  * Two interfaces share the decode core.  The original pull interface
  * (rmp3_init_memory / rmp3_read_s16 / rmp3_read_f32 /
@@ -2624,8 +2627,12 @@ static uint32_t rmp3_decode_next_frame(rmp3* pMP3)
 
       if (samples != 0)
       {
-         pMP3->framesConsumed  = 0;
-         pMP3->framesRemaining = samples;
+         /* The start the encoder and the synthesis added is dropped. */
+         uint32_t skip = pMP3->skipLeft < samples
+               ? (uint32_t)pMP3->skipLeft : samples;
+         pMP3->skipLeft       -= skip;
+         pMP3->framesConsumed  = skip;
+         pMP3->framesRemaining = samples - skip;
          pMP3->frameChannels   = (uint32_t)info.channels;
          if (pMP3->sampleRate == 0)
          {
@@ -2633,6 +2640,8 @@ static uint32_t rmp3_decode_next_frame(rmp3* pMP3)
             pMP3->channels   = (uint32_t)info.channels;
             pMP3->sampleRate = (uint32_t)info.hz;
          }
+         if (pMP3->framesRemaining == 0)
+            continue;
          return 1;
       }
       /* samples == 0 with frame_bytes > 0: junk was skipped; continue. */
@@ -2726,6 +2735,108 @@ static void rmp3_set_output_mode(rmp3* pMP3, uint32_t f32)
          * pMP3->frameChannels, f32);
 }
 
+static uint32_t rmp3_be32(const uint8_t *p)
+{
+   return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16)
+        | ((uint32_t)p[2] << 8) | p[3];
+}
+
+int rmp3_parse_vbr_tag(const uint8_t *frame, size_t frame_bytes,
+      rmp3_vbr_tag *tag)
+{
+   const uint8_t *p;
+   const uint8_t *end;
+   uint32_t       flags;
+   size_t         side;
+
+   if (!frame || !tag || frame_bytes < RMP3_HDR_SIZE
+         || !rmp3_hdr_valid(frame))
+      return 0;
+   memset(tag, 0, sizeof(*tag));
+   tag->frame_samples = rmp3_hdr_frame_samples(frame);
+   end = frame + frame_bytes;
+
+   /* VBRI sits 32 bytes past the header, whatever the mode. */
+   p = frame + RMP3_HDR_SIZE + 32;
+   if (p + 18 <= end && !memcmp(p, "VBRI", 4))
+   {
+      tag->is_vbri = 1;
+      tag->bytes   = rmp3_be32(p + 10);
+      tag->frames  = rmp3_be32(p + 14);
+      return 1;
+   }
+
+   /* Xing and Info follow the side information. */
+   if (RMP3_HDR_TEST_MPEG1(frame))
+      side = RMP3_HDR_IS_MONO(frame) ? 17 : 32;
+   else
+      side = RMP3_HDR_IS_MONO(frame) ? 9 : 17;
+   p = frame + RMP3_HDR_SIZE + (RMP3_HDR_IS_CRC(frame) ? 2 : 0) + side;
+   if (p + 8 > end || (memcmp(p, "Xing", 4) && memcmp(p, "Info", 4)))
+      return 0;
+   flags = rmp3_be32(p + 4);
+   p    += 8;
+   if (flags & 1)
+   {
+      if (p + 4 > end)
+         return 1;
+      tag->frames = rmp3_be32(p);
+      p += 4;
+   }
+   if (flags & 2)
+   {
+      if (p + 4 > end)
+         return 1;
+      tag->bytes = rmp3_be32(p);
+      p += 4;
+   }
+   if (flags & 4)
+      p += 100; /* seek table */
+   if (flags & 8)
+      p += 4;   /* quality */
+
+   /* LAME's extension: a 9-byte encoder name, then the delay and the
+    * padding as two 12-bit fields 21 bytes in. */
+   if (p + 24 <= end && (!memcmp(p, "LAME", 4)
+            || !memcmp(p, "Lavf", 4) || !memcmp(p, "Lavc", 4)))
+   {
+      tag->encoder_delay   = ((uint32_t)p[21] << 4) | (p[22] >> 4);
+      tag->encoder_padding = ((uint32_t)(p[22] & 0x0F) << 8) | p[23];
+      tag->has_delay       = 1;
+   }
+   return 1;
+}
+
+/* Reads the tag frame at the stream's first frame, if there is one, and
+ * sets the reads to skip it and trim what the encoder added. */
+static void rmp3_setup_gapless(rmp3 *pMP3)
+{
+   rmp3_vbr_tag tag;
+   int          free_format_bytes = 0;
+   int          frame_bytes       = 0;
+   int          avail = pMP3->dataSize > (size_t)INT_MAX
+         ? INT_MAX : (int)pMP3->dataSize;
+   int          i = rmp3d_find_frame(pMP3->pData, avail,
+         &free_format_bytes, &frame_bytes);
+
+   if (!frame_bytes || i + frame_bytes > avail
+         || !rmp3_parse_vbr_tag(pMP3->pData + i, (size_t)frame_bytes, &tag))
+      return;
+   pMP3->dataStart = (size_t)i + (size_t)frame_bytes;
+   pMP3->readPos   = pMP3->dataStart;
+   if (!tag.has_delay)
+      return;
+   pMP3->startSkip = (uint64_t)tag.encoder_delay + RMP3_DECODER_DELAY;
+   pMP3->skipLeft  = pMP3->startSkip;
+   if (tag.frames)
+   {
+      uint64_t samples = (uint64_t)tag.frames * tag.frame_samples;
+      uint64_t added   = (uint64_t)tag.encoder_delay + tag.encoder_padding;
+      if (samples > added)
+         pMP3->totalFrames = samples - added;
+   }
+}
+
 uint32_t rmp3_init_memory(rmp3* pMP3, const void* pData, size_t dataSize)
 {
     if (!pMP3)
@@ -2758,6 +2869,7 @@ uint32_t rmp3_init_memory(rmp3* pMP3, const void* pData, size_t dataSize)
         pMP3->sampleRate = (uint32_t)info.hz;
     }
 
+    rmp3_setup_gapless(pMP3);
     return 1;
 }
 
@@ -2776,6 +2888,15 @@ uint64_t rmp3_read_f32(rmp3* pMP3, uint64_t framesToRead, float* pBufferOut)
       return 0;
 
    rmp3_set_output_mode(pMP3, 1);
+
+   /* Nothing past the track's end: the encoder's padding. */
+   if (pMP3->totalFrames)
+   {
+      uint64_t left = pMP3->totalFrames > pMP3->framesRead
+            ? pMP3->totalFrames - pMP3->framesRead : 0;
+      if (framesToRead > left)
+         framesToRead = left;
+   }
 
    while (framesToRead > 0)
    {
@@ -2820,6 +2941,7 @@ uint64_t rmp3_read_f32(rmp3* pMP3, uint64_t framesToRead, float* pBufferOut)
          break;
    }
 
+   pMP3->framesRead += totalFramesRead;
    return totalFramesRead;
 }
 
@@ -2834,6 +2956,15 @@ uint64_t rmp3_read_s16(rmp3* pMP3, uint64_t framesToRead, int16_t* pBufferOut)
       return 0;
 
    rmp3_set_output_mode(pMP3, 0);
+
+   /* Nothing past the track's end: the encoder's padding. */
+   if (pMP3->totalFrames)
+   {
+      uint64_t left = pMP3->totalFrames > pMP3->framesRead
+            ? pMP3->totalFrames - pMP3->framesRead : 0;
+      if (framesToRead > left)
+         framesToRead = left;
+   }
 
    while (framesToRead > 0)
    {
@@ -2873,6 +3004,7 @@ uint64_t rmp3_read_s16(rmp3* pMP3, uint64_t framesToRead, int16_t* pBufferOut)
          break;
    }
 
+   pMP3->framesRead += totalFramesRead;
    return totalFramesRead;
 }
 
@@ -2884,9 +3016,11 @@ uint32_t rmp3_seek_to_frame(rmp3* pMP3, uint64_t frameIndex)
    /* Rewind to the start of the stream and decode-skip forward.  MP3
     * frames depend on the bit reservoir of their predecessors, so
     * decoding from the top is the only sample-accurate way in. */
-   pMP3->readPos         = 0;
+   pMP3->readPos         = pMP3->dataStart;
    pMP3->framesConsumed  = 0;
    pMP3->framesRemaining = 0;
+   pMP3->framesRead      = 0;
+   pMP3->skipLeft        = pMP3->startSkip;
    pMP3->atEnd           = 0;
    pMP3->decoder.header[0] = 0;
 
@@ -3081,7 +3215,12 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
       rmp3dec_frame_info info;
       const uint8_t     *src;
       size_t             avail;
+      size_t             left;
       int                samples;
+      int                direct_in;
+      void              *dst;
+      int16_t           *ps;
+      float             *pf;
       int                parse_only =
             ((!s->out && !s->outf) || !s->out_frames);
 
@@ -3121,8 +3260,17 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
          break;
       }
 
+      /* With nothing held and the window holding as much as a full
+       * hold would (or all there will be), the frame is decoded where
+       * it lies: the decoder is handed exactly the bytes the hold would
+       * have been given, so nothing it does changes, and the hold only
+       * reassembles a frame that straddles two windows. */
+      left      = s->in_size - s->in_pos;
+      direct_in = !s->hold_len && left
+         && (left >= RMP3_STREAM_HOLD || s->eof_in);
+
       /* Top the hold up so a frame split across windows is whole. */
-      if (s->hold_len < RMP3_STREAM_HOLD)
+      if (!direct_in && s->hold_len < RMP3_STREAM_HOLD)
       {
          size_t take = RMP3_STREAM_HOLD - s->hold_len;
          if (take > s->in_size - s->in_pos)
@@ -3136,8 +3284,16 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
          }
       }
 
-      src   = s->hold;
-      avail = s->hold_len;
+      if (direct_in)
+      {
+         src   = s->in + s->in_pos;
+         avail = (left < RMP3_STREAM_HOLD) ? left : RMP3_STREAM_HOLD;
+      }
+      else
+      {
+         src   = s->hold;
+         avail = s->hold_len;
+      }
 
       if (!avail)
       {
@@ -3158,7 +3314,7 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
        * not all arrived from junk - and acting on that discards the
        * frame.  So wait until the hold is full, or until the caller
        * says nothing more is coming and a short tail is all there is. */
-      if (s->hold_len < RMP3_STREAM_HOLD && !s->eof_in)
+      if (!direct_in && s->hold_len < RMP3_STREAM_HOLD && !s->eof_in)
       {
          ret = RMP3_STREAM_NEED_IN;
          break;
@@ -3169,13 +3325,36 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
        * this is the offset a caller would seek back to. */
       s->frame_off = s->in_total - (uint64_t)s->hold_len;
 
+      /* With room for any frame the stream can carry - a frame is at
+       * most 1152 frames of up to two channels, and a channel change
+       * is fixed up in place - the frame is decoded straight into the
+       * caller's buffer rather than into pcm to be copied out.  The
+       * synthesis stores sample by sample, so any alignment will do. */
+      dst = parse_only ? NULL : (void*)&s->pcm;
+      if (     !parse_only && s->started
+            && (s->out_frames - s->out_pos) * (size_t)s->channels
+               >= (size_t)RMP3_MAX_SAMPLES_PER_FRAME)
+         dst = s->f32_mode
+            ? (void*)(s->outf + s->out_pos * (size_t)s->channels)
+            : (void*)(s->out  + s->out_pos * (size_t)s->channels);
+      ps = (int16_t*)dst;
+      pf = (float*)dst;
+
       memset(&info, 0, sizeof(info));
       samples = rmp3dec_decode_frame(&s->dec, src, (int)avail,
-            parse_only ? NULL : (void*)&s->pcm, &info,
-            (int)s->f32_mode);
+            dst, &info, (int)s->f32_mode);
 
       if (!samples && !info.frame_bytes)
       {
+         /* A window read in place leaves what it holds in the hold, as
+          * reading it through the hold would have */
+         if (direct_in)
+         {
+            memcpy(s->hold, src, avail);
+            s->hold_len  = avail;
+            s->in_pos   += avail;
+            s->in_total += avail;
+         }
          /* A full hold with no frame in it is a stream this cannot
           * make progress on; short of that, more input is wanted. */
          ret = (s->eof_in && s->hold_len < RMP3_STREAM_HOLD)
@@ -3194,10 +3373,18 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
       if (info.frame_bytes > 0)
       {
          size_t used = (size_t)info.frame_bytes;
-         if (used > s->hold_len)
-            used = s->hold_len;
-         memmove(s->hold, s->hold + used, s->hold_len - used);
-         s->hold_len -= used;
+         if (used > avail)
+            used = avail;
+         if (direct_in)
+         {
+            s->in_pos   += used;
+            s->in_total += used;
+         }
+         else
+         {
+            memmove(s->hold, s->hold + used, s->hold_len - used);
+            s->hold_len -= used;
+         }
       }
 
       if (samples > 0)
@@ -3225,12 +3412,10 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
                int i = samples;
                if (s->f32_mode)
                   while (i-- > 0)
-                     s->pcm.f32[2*i] = s->pcm.f32[2*i + 1]
-                                     = s->pcm.f32[i];
+                     pf[2*i] = pf[2*i + 1] = pf[i];
                else
                   while (i-- > 0)
-                     s->pcm.s16[2*i] = s->pcm.s16[2*i + 1]
-                                     = s->pcm.s16[i];
+                     ps[2*i] = ps[2*i + 1] = ps[i];
             }
             else
             {
@@ -3240,12 +3425,11 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
                int i;
                if (s->f32_mode)
                   for (i = 0; i < samples; i++)
-                     s->pcm.f32[i] = (s->pcm.f32[2*i]
-                           + s->pcm.f32[2*i + 1]) * 0.5f;
+                     pf[i] = (pf[2*i] + pf[2*i + 1]) * 0.5f;
                else
                   for (i = 0; i < samples; i++)
-                     s->pcm.s16[i] = (int16_t)(((int32_t)s->pcm.s16[2*i]
-                           + (int32_t)s->pcm.s16[2*i + 1]) >> 1);
+                     ps[i] = (int16_t)(((int32_t)ps[2*i]
+                           + (int32_t)ps[2*i + 1]) >> 1);
             }
          }
 
@@ -3260,8 +3444,13 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
             ret = RMP3_STREAM_OK;
             break;
          }
-         s->pending = (unsigned)samples;
-         s->drained = 0;
+         if (dst != (void*)&s->pcm)
+            s->out_pos += (size_t)samples;   /* already in place */
+         else
+         {
+            s->pending = (unsigned)samples;
+            s->drained = 0;
+         }
       }
    }
 
@@ -3277,14 +3466,59 @@ void rmp3dec_init(rmp3dec *dec)
    memset(dec, 0, sizeof(*dec));
 }
 
+/* The frame finder wants the frame after this one in view, and when it
+ * is not, takes the bytes it scanned for junk and forgets the stream.
+ * A caller framing the stream itself hands over a frame and whatever
+ * part of the next it has, so the frame is located here: its header,
+ * whole, and followed by a matching header when one is in view. Free
+ * format, which has no length in its header, is left to the finder. */
+static int rmp3dec_decode_one(rmp3dec *dec, const uint8_t *mp3,
+      int mp3_bytes, void *pcm, rmp3dec_frame_info *info, int f32)
+{
+   int i;
+   memset(info, 0, sizeof(*info));
+   if (!dec || !mp3 || mp3_bytes <= 0 || !pcm)
+      return 0;
+   for (i = 0; i + RMP3_HDR_SIZE <= mp3_bytes; i++)
+   {
+      const uint8_t *h = mp3 + i;
+      int size, n;
+      if (!rmp3_hdr_valid(h))
+         continue;
+      size = rmp3_hdr_frame_bytes(h,
+            (dec->header[0] == 0xff && rmp3_hdr_compare(dec->header, h))
+            ? dec->free_format_bytes : 0);
+      if (!size)
+         return rmp3dec_decode_frame(dec, mp3, mp3_bytes, pcm, info, f32);
+      size += rmp3_hdr_padding(h);
+      if (i + size > mp3_bytes)
+         break;
+      if (     i + size + RMP3_HDR_SIZE <= mp3_bytes
+            && !rmp3_hdr_compare(h, h + size))
+         continue;
+      n = rmp3dec_decode_frame(dec, h, size, pcm, info, f32);
+      if (info->frame_bytes)
+         info->frame_bytes += i;
+      return n;
+   }
+   /* junk before a frame not all here yet, or before the tail that
+    * could still hold the head of one */
+   info->frame_bytes = i;
+   return 0;
+}
+
 int rmp3dec_decode_s16(rmp3dec *dec, const uint8_t *mp3, int mp3_bytes,
       int16_t *pcm, rmp3dec_frame_info *info)
 {
-   if (!dec || !mp3 || mp3_bytes <= 0 || !pcm || !info)
-   {
-      if (info)
-         memset(info, 0, sizeof(*info));
+   if (!info)
       return 0;
-   }
-   return rmp3dec_decode_frame(dec, mp3, mp3_bytes, pcm, info, 0);
+   return rmp3dec_decode_one(dec, mp3, mp3_bytes, pcm, info, 0);
+}
+
+int rmp3dec_decode_f32(rmp3dec *dec, const uint8_t *mp3, int mp3_bytes,
+      float *pcm, rmp3dec_frame_info *info)
+{
+   if (!info)
+      return 0;
+   return rmp3dec_decode_one(dec, mp3, mp3_bytes, pcm, info, 1);
 }

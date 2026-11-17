@@ -215,6 +215,16 @@ bool retro_eventcount_init(retro_eventcount_t *ec);
 void retro_eventcount_free(retro_eventcount_t *ec);
 
 /**
+ * retro_eventcount_thread_cleanup:
+ *
+ * Releases this thread's cached backend event, timer or semaphore after its
+ * last wait returns. Call before an owning thread exits or its module unloads.
+ * Safe before init and on repeated calls; later waits may recreate the cache.
+ * Other threads' caches and eventcount objects are unchanged.
+ */
+void retro_eventcount_thread_cleanup(void);
+
+/**
  * retro_eventcount_notify:
  * @ec : object to signal.
  *
@@ -281,7 +291,7 @@ bool retro_eventcount_commit_wait_timeout(retro_eventcount_t *ec,
 /**
  * retro_eventcount_spin_iters:
  *
- * @return how many times a waiter spins on its flag word before it
+ * @return how many times a waiter polls eventcount state before it
  * commits to the kernel, as this build resolved it.  Zero on a
  * uniprocessor, where the spin is skipped.  For logs and benchmarks;
  * on Windows it is only meaningful after the first

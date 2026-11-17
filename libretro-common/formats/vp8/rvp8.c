@@ -2015,7 +2015,7 @@ int rvp8_begin(const uint8_t *data, size_t len, rvp8_dec *s)
       if (data[3]!=0x9D || data[4]!=0x01 || data[5]!=0x2A) return -1;
       w = (data[6]|(data[7]<<8)) & 0x3FFF;
       h = (data[8]|(data[9]<<8)) & 0x3FFF;
-      if (!w || !h || w > 16384 || h > 16384) return -1;
+      if (!w || !h) return -1;
       p0 = data + 10;
    }
    else
@@ -2293,9 +2293,11 @@ tp_ok:
     * present and this is an inter frame, allocate it here. */
    if (s->is_inter && !s->mb_info)
       s->mb_info = calloc((size_t)mbw * mbh, sizeof(rvp8_mbinfo));
-   memset(s->yb, 127, s->ys * mbh * 16);
-   memset(s->ub, 127, s->uvs * mbh * 8);
-   memset(s->vb, 127, s->uvs * mbh * 8);
+   /* The planes are not pre-filled: every macroblock writes its whole
+    * 16x16 (8x8 chroma) area, the 127 / 129 edges intra prediction
+    * reads beyond the frame are supplied per macroblock, and motion
+    * compensation clamps to the reference - so a fill was 3 MB of
+    * writes a 1080p frame, all overwritten. */
    return 0;
 }
 
@@ -3793,6 +3795,14 @@ struct rvp8_video
    uint8_t *arena[4];
    uint8_t *ry[4], *ru[4], *rv[4];
    size_t arena_len[4];
+   /* The per-macroblock info inter frames build their motion vectors
+    * from, kept for the decoder's life and grown only when a key frame
+    * brings more macroblocks.  A key frame used to free it and the
+    * next inter frame calloc it again, so every key frame cost a
+    * free and an allocation mid-stream; now the first inter frame
+    * after one clears it, which is what the calloc gave it. */
+   rvp8_mbinfo *mbi;
+   size_t   mbi_cap;     /* entries */
    unsigned refs[3];
    int w, h, mbw, mbh, ys, uvs;
    int have_refs;
@@ -3809,7 +3819,9 @@ void rvp8_video_close(rvp8_video *v)
    if (!v) return;
    for (i = 0; i < 4; i++)
       free(v->arena[i]);
-   free(v->s.mb_info);
+   if (v->s.mb_info != v->mbi)
+      free(v->s.mb_info);
+   free(v->mbi);
    free(v);
 }
 
@@ -3817,7 +3829,11 @@ void rvp8_video_close(rvp8_video *v)
  * next picture without overwriting any reference still used to decode it. */
 int rvp8_video_decode(rvp8_video *v, const uint8_t *data, size_t len)
 {
-   void *mb_info;
+   /* The entropy context a frame starts from, for a frame whose
+    * refresh_entropy_probs is 0: its updates hold for it alone. */
+   uint8_t sv_cprob[4][8][3][11], sv_mvc[sizeof(v->s.mvc)];
+   uint8_t sv_ym[sizeof(v->s.ymode_prob)];
+   uint8_t sv_uvm[sizeof(v->s.uvmode_prob)];
    unsigned work, i;
    int kf, ret;
    if (len < 3) return -1;
@@ -3833,12 +3849,26 @@ int rvp8_video_decode(rvp8_video *v, const uint8_t *data, size_t len)
    if (kf)
    {
       v->s.is_inter = 0;
-      free(v->s.mb_info);
-      v->s.mb_info = NULL;
+      v->s.mb_info  = NULL;
    }
    else
    {
       v->s.is_inter = 1;
+      if (!v->s.mb_info)
+      {
+         size_t n = (size_t)v->mbw * (size_t)v->mbh;
+         if (n > v->mbi_cap)
+         {
+            free(v->mbi);
+            v->mbi_cap = 0;
+            if (!(v->mbi = (rvp8_mbinfo*)calloc(n, sizeof(rvp8_mbinfo))))
+               return -1;
+            v->mbi_cap = n;
+         }
+         else
+            memset(v->mbi, 0, n * sizeof(rvp8_mbinfo));
+         v->s.mb_info = v->mbi;
+      }
       v->s.w = v->w; v->s.h = v->h;
       for (i = 0; i < 3; i++)
       {
@@ -3862,23 +3892,48 @@ int rvp8_video_decode(rvp8_video *v, const uint8_t *data, size_t len)
          memcpy(v->s.uvmode_prob, du, 3);
       }
    }
+   /* What the next frame starts from when this one's updates are its
+    * own: what this one inherits, before it reads its updates, or for
+    * a key frame the defaults (the mode and MV sets are refilled with
+    * theirs when found cleared). */
+   if (kf)
+   {
+      vp8_init_default_cprob(sv_cprob);
+      memset(sv_mvc, 0, sizeof(sv_mvc));
+      memset(sv_ym, 0, sizeof(sv_ym));
+      memset(sv_uvm, 0, sizeof(sv_uvm));
+   }
+   else
+   {
+      memcpy(sv_cprob, v->s.cprob, sizeof(sv_cprob));
+      memcpy(sv_mvc, v->s.mvc, sizeof(sv_mvc));
+      memcpy(sv_ym, v->s.ymode_prob, sizeof(sv_ym));
+      memcpy(sv_uvm, v->s.uvmode_prob, sizeof(sv_uvm));
+   }
    v->s.arena = v->arena[work];
    v->s.arena_len = v->arena_len[work];
-   mb_info = v->s.mb_info;
    ret = rvp8_begin(data, len, &v->s);
    v->arena[work] = v->s.arena;
    v->arena_len[work] = v->s.arena_len;
    if (ret != 0)
-   {
-      if (!v->s.mb_info) free(mb_info);
-      return -1;
-   }
+      return -1;   /* the abort cleared s.mb_info; v->mbi keeps it */
    v->ry[work] = v->s.yb;
    v->ru[work] = v->s.ub;
    v->rv[work] = v->s.vb;
    while (rvp8_rows(&v->s, v->s.mbh) > 0)
       ;
    rvp8_filter_rows(&v->s, 0, v->s.mbh);
+
+   /* refresh_entropy_probs 0 (error-resilient streams send it on every
+    * frame): the probability updates this frame read applied to it
+    * alone, and the next frame starts from what was saved above. */
+   if (!v->s.refresh_entropy)
+   {
+      memcpy(v->s.cprob, sv_cprob, sizeof(sv_cprob));
+      memcpy(v->s.mvc, sv_mvc, sizeof(sv_mvc));
+      memcpy(v->s.ymode_prob, sv_ym, sizeof(sv_ym));
+      memcpy(v->s.uvmode_prob, sv_uvm, sizeof(sv_uvm));
+   }
 
    if (kf)
    {
