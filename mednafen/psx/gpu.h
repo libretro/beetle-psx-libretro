@@ -272,6 +272,14 @@ struct PS_GPU
     * addressing); direct sites index [y][value][x]. */
    uint8_t DitherLUT[4][512][4];
 
+   /* Texture cache tags as emulated GPU timing sees them at an upscale:
+    * the polygon timing walk and sprites fill them at native resolution,
+    * so DrawTimeAvail does not depend on the internal resolution. At 1x
+    * the TexCache tags serve timing and these are unused. */
+   uint32_t TexCacheTimingTag[256];
+   /* The line of the last timing fetch: its tag is known to match */
+   uint32_t last_timing_line;
+
    /*
    VRAM has to be a ptr type or else we have to rely on smartcode void* shenanigans to
    wrestle a variable-sized struct.

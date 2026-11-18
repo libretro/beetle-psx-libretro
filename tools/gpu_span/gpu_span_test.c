@@ -12,7 +12,9 @@
  * After FRAMES frames the host hashes native VRAM (the savestate's GPURAM
  * entry) and the last video frame, and compares them with values pinned
  * from the scalar renderer. A vector path that drifts from the scalar
- * one by a single pixel changes the hash.
+ * one by a single pixel changes the hash. It also hashes main RAM, where
+ * the probe counts how long it waited for the GPU each frame: that hash is
+ * the same at every resolution, as emulated GPU timing must be.
  *
  * usage: gpu_span_test <core> <1x|2x|4x>
  * Runs in the current directory: it writes the probe EXE and an all-zero
@@ -72,14 +74,18 @@ struct pinned
    uint32_t    video;
 };
 
-/* From the scalar renderer (master before the textured span vector
- * path), FRAMES frames. */
+/* From the scalar renderer (an ARMv7 build without NEON), FRAMES frames. */
 static const struct pinned pins[] =
 {
    { "1x", 0x3f9b89b2u, 0x699cb235u },
-   { "2x", 0x4485d6f5u, 0xc4449bc5u },
-   { "4x", 0xebc62c6cu, 0x31dccd1du }
+   { "2x", 0xb957beabu, 0x669e695du },
+   { "4x", 0x69ab585fu, 0xc1bb0055u }
 };
+
+/* Main RAM after FRAMES frames, the same at every internal resolution:
+ * the probe counts its waits for the GPU's DMA into RAM, and emulated GPU
+ * timing does not depend on the resolution. */
+#define PINNED_RAM 0x90ee9471u
 
 static const char *resolution = "1x";
 static uint32_t    video_hash;
@@ -314,6 +320,8 @@ static int write_probe(void)
    }
    n = emit_li(code, n, 0x07654B21u);
    n = emit(code, n, 0xAD0910F0u);                        /* DPCR: DMA2 on */
+   n = emit(code, n, 0x3C11800Fu);                        /* lui s1,0x800F */
+   n = emit(code, n, 0x24100000u);                        /* li s0,0 */
    frame = n;
    n = emit_li(code, n, LIST_ADDR & 0xFFFFFFu);
    n = emit(code, n, 0xAD0910A0u);                        /* D2_MADR */
@@ -321,12 +329,15 @@ static int write_probe(void)
    n = emit_li(code, n, 0x01000401u);
    n = emit(code, n, 0xAD0910A8u);                        /* D2_CHCR: list */
    wait = n;
+   n = emit(code, n, 0x26100001u);                        /* addiu s0,s0,1 */
    n = emit(code, n, 0x8D0910A8u);                        /* lw t1,CHCR */
    n = emit(code, n, 0x00000000u);
    n = emit(code, n, 0x3C0A0100u);                        /* lui t2,0x0100 */
    n = emit(code, n, 0x012A4824u);                        /* and t1,t1,t2 */
    n = emit(code, n, 0x15200000u | ((uint32_t)(wait - n - 1) & 0xFFFFu)); /* bnez t1 */
    n = emit(code, n, 0x00000000u);
+   /* the DMA wait count, which follows the GPU's emulated busy time */
+   n = emit(code, n, 0xAE300000u);                        /* sw s0,0(s1) */
    n = emit_li(code, n, 0xFFFFFFFEu);
    n = emit(code, n, 0xAD091070u);                        /* ack VBLANK */
    vb = n;
@@ -485,12 +496,13 @@ int main(int argc, char **argv)
    void   (*run)(void);
    size_t (*serialize_size)(void);
    bool   (*serialize)(void *, size_t);
+   void  *(*memory_data)(unsigned);
    static const char key[] = "\015&GPURAM[0][0]";
    struct retro_game_info info;
    const struct pinned *pin = NULL;
    unsigned char *state;
    size_t size, i, klen = sizeof(key) - 1;
-   uint32_t vram_hash = 0;
+   uint32_t vram_hash = 0, ram_hash = 0, waits = 0;
    unsigned f;
    int found = 0, fail = 0;
 
@@ -525,7 +537,8 @@ int main(int argc, char **argv)
       || !core_sym(core, "retro_unload_game",            &unload_game,    sizeof(unload_game))
       || !core_sym(core, "retro_run",                    &run,            sizeof(run))
       || !core_sym(core, "retro_serialize_size",         &serialize_size, sizeof(serialize_size))
-      || !core_sym(core, "retro_serialize",              &serialize,      sizeof(serialize)))
+      || !core_sym(core, "retro_serialize",              &serialize,      sizeof(serialize))
+      || !core_sym(core, "retro_get_memory_data",        &memory_data,    sizeof(memory_data)))
       return 2;
 
    set_env(env_cb);
@@ -544,6 +557,16 @@ int main(int argc, char **argv)
    }
    for (f = 0; f < FRAMES; f++)
       run();
+   {
+      const unsigned char *ram = (const unsigned char *)memory_data(RETRO_MEMORY_SYSTEM_RAM);
+      if (!ram)
+      {
+         fprintf(stderr, "[gpu_span] no system RAM\n");
+         return 2;
+      }
+      ram_hash = fnv(ram, 2048 * 1024, 2166136261u);
+      memcpy(&waits, ram + 0xF0000, 4);
+   }
 
    size = serialize_size();
    if (!(state = (unsigned char *)malloc(size)) || !serialize(state, size))
@@ -570,10 +593,14 @@ int main(int argc, char **argv)
       fprintf(stderr, "[gpu_span] no GPURAM entry in the state\n");
       return 2;
    }
-   if (vram_hash != pin->vram || video_hash != pin->video)
+   if (vram_hash != pin->vram || video_hash != pin->video || ram_hash != PINNED_RAM)
       fail = 1;
-   fprintf(stderr, "[gpu_span] %s vram %08lx (want %08lx) video %08lx (want %08lx) %s\n",
+   fprintf(stderr, "[gpu_span] %s vram %08lx (want %08lx) video %08lx (want %08lx) ram %08lx waits %lu %s\n",
          resolution, (unsigned long)vram_hash, (unsigned long)pin->vram,
-         (unsigned long)video_hash, (unsigned long)pin->video, fail ? "FAIL" : "OK");
+         (unsigned long)video_hash, (unsigned long)pin->video,
+         (unsigned long)ram_hash, (unsigned long)waits, fail ? "FAIL" : "OK");
+   if (ram_hash != PINNED_RAM)
+      fprintf(stderr, "[gpu_span] %s: RAM %08lx, want %08lx: GPU timing differs from 1x\n",
+            resolution, (unsigned long)ram_hash, (unsigned long)PINNED_RAM);
    return fail;
 }

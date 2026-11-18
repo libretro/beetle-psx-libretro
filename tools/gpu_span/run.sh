@@ -1,7 +1,8 @@
 #!/bin/sh
 # Software rasterizer span lane: a fixed GP0 stream covering every textured
 # span variant hashes to the scalar renderer's VRAM and frame at 1x, 2x and
-# 4x (see gpu_span_test.c).  Runs against an already built core; for an ARM
+# 4x, with the same emulated GPU timing at each (see gpu_span_test.c).  Runs
+# against an already built core; for an ARM
 # build, CC=aarch64-linux-gnu-gcc RUN="qemu-aarch64 -L /usr/aarch64-linux-gnu".
 #
 # usage: tools/gpu_span/run.sh [core]

@@ -273,7 +273,12 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
          { \
             if (T_LIT) \
             { \
-               uint16_t fbw = GetTexel_TM##MO_LIT(gpu, u_r, v); \
+               uint16_t fbw; \
+               /* sprites draw at native resolution; at an upscale their \
+                * fetches charge through the native timing tags */ \
+               if (gpu->upscale_shift) \
+                  TimingTexel_TM##MO_LIT(gpu, u_r, v); \
+               fbw = GetTexel_TM##MO_LIT(gpu, u_r, v); \
                if (fbw) \
                { \
                   if (TM_LIT) \

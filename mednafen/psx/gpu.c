@@ -138,6 +138,10 @@ MDFN_ALIGN(64) PS_GPU GPU;
  * and the GPU_Rescale path. File-scope, no external use. */
 static uint32_t  TexCache_Tag[256];
 static uint16_t  TexCache_Data[256][4];
+static uint32_t  TexCache_TimingTag[256];
+/* Not a tag the cache can hold (tags are 4-aligned or ~0): marks timing
+ * tags a state did not carry */
+#define TIMING_TAG_ABSENT 0xFFFFFFFEu
 static uint16_t *vram_new = NULL;
 /* 1x savestate staging for upscaled VRAM; kept across states so runahead
  * and rewind do not allocate 1 MiB per frame. */
@@ -288,12 +292,16 @@ static INLINE void InvalidateTexCache(PS_GPU *gpu)
 {
    unsigned i;
    for (i = 0; i < 256; i++)
-      gpu->TexCache[i].Tag = ~0U;
+   {
+      gpu->TexCache[i].Tag     = ~0U;
+      gpu->TexCacheTimingTag[i] = ~0U;
+   }
    /* The same-cache-line shortcut caches a resolved TexCache pointer across
     * consecutive pixels; drop it whenever the cache is invalidated so it can
     * never serve a stale line. */
    gpu->last_tex_line = ~0U;
    gpu->last_tex_c    = NULL;
+   gpu->last_timing_line = ~0U;
 }
 
 static INLINE void InvalidateCache(PS_GPU *gpu)
@@ -326,6 +334,12 @@ static void texel_put(uint32_t x, uint32_t y, uint16_t v)
  * reason as texel_put above. */
 static void GPU_set_upscale_shift(uint8_t factor)
 {
+   unsigned i;
+   /* Leaving 1x, timing takes over the tags the texture cache had */
+   if (factor && !GPU.upscale_shift)
+      for (i = 0; i < 256; i++)
+         GPU.TexCacheTimingTag[i] = GPU.TexCache[i].Tag;
+   GPU.last_timing_line = ~0U;
    GPU.upscale_shift = factor;
 }
 
@@ -1381,6 +1395,8 @@ void GPU_Power(void)
    GPU.CLUT_Cache_VB = ~0U;
 
    memset(GPU.TexCache, 0xFF, sizeof(GPU.TexCache));
+   memset(GPU.TexCacheTimingTag, 0xFF, sizeof(GPU.TexCacheTimingTag));
+   GPU.last_timing_line = ~0U;
 
    GPU.DMAControl    = 0;
    GPU.ClipX0        = 0;
@@ -3121,6 +3137,8 @@ void GPU_RestoreStateP1(bool load, bool sizing)
    {
       unsigned j;
       TexCache_Tag[i] = GPU.TexCache[i].Tag;
+      /* at 1x the cache's own tags are the timing tags */
+      TexCache_TimingTag[i] = GPU.upscale_shift ? GPU.TexCacheTimingTag[i] : GPU.TexCache[i].Tag;
 
       for(j = 0; j < 4; j++)
          TexCache_Data[i][j] = GPU.TexCache[i].Data[j];
@@ -3261,6 +3279,9 @@ static void gpu_restore_state_p3(bool upload_all)
    {
       unsigned j;
       GPU.TexCache[i].Tag = TexCache_Tag[i];
+      /* a state from before the timing tags starts them from the cache's */
+      GPU.TexCacheTimingTag[i] = TexCache_TimingTag[0] == TIMING_TAG_ABSENT
+         ? TexCache_Tag[i] : TexCache_TimingTag[i];
 
       for(j = 0; j < 4; j++)
          GPU.TexCache[i].Data[j] = TexCache_Data[i][j];
@@ -3269,6 +3290,7 @@ static void gpu_restore_state_p3(bool upload_all)
     * cannot reference a pre-restore line. */
    GPU.last_tex_line = ~0U;
    GPU.last_tex_c    = NULL;
+   GPU.last_timing_line = ~0U;
    RecalcTexWindowStuff(&GPU);
    rhi_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
    /* The retained CLUT in the hardware renderers cannot be restored with
@@ -3347,6 +3369,7 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
    {
       GPU.CLUT_Cache_VB = ~0U;
       memset(TexCache_Tag, 0xFF, sizeof(TexCache_Tag));
+      TexCache_TimingTag[0] = TIMING_TAG_ABSENT;
    }
 
    /* The table takes GPU.vram and its size as GPU_RestoreStateP1 left
@@ -3504,6 +3527,7 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFARRAY16N(GPU.CLUT_Cache, 256, "CLUT_Cache"),
       SFVARN(GPU.CLUT_Cache_VB, "CLUT_Cache_VB"),
       SFARRAY32N(TexCache_Tag, 256, "TexCache_Tag"),
+      SFARRAY32N(TexCache_TimingTag, 256, "TexCache_TimingTag"),
       SFARRAY16N(&TexCache_Data[0][0], 256 * 4, "TexCache_Data"),
 
       SFEND

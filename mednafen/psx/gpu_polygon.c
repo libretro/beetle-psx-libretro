@@ -1092,7 +1092,61 @@ static INLINE void PCT_UVBatch(int n, float bias,
 #undef PCT_UV_SIMD
 #endif
 
-#define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+/* Upscale as a span or triangle instance sees it: the timing walk
+ * (COST_LIT) runs at native resolution. */
+#define POLY_US(gpu, COST_LIT) ((COST_LIT) ? 0u : (unsigned)(gpu)->upscale_shift)
+
+/* Texture coordinates of the span's current pixel, perspective-correct or
+ * affine, shared by the drawing loop and the timing walk so the two read
+ * the same texels. Uses the DrawSpan locals ig, idl, pct, w and the pct
+ * block state. */
+#define DRAWSPAN_TEX_UV() \
+         if (pct) \
+         { \
+            /* Pull the perspective-correct UV from the SIMD-precomputed \
+             * block, refilling it when exhausted.  PCT_UVBatch advances \
+             * ig.pct_* by exactly the per-pixel scalar chain and encodes \
+             * the per-pixel inv_w > eps decision in its output: a -1 \
+             * entry means that pixel's inv_w was <= eps, so fall through \
+             * to the affine path for it (matching the old scalar guard \
+             * `pct && ig.pct_inv_w > 1e-6f`).  Because the batch consumes \
+             * ig.pct_*, the per-pixel advance at the loop bottom is \
+             * skipped for the pct path. */ \
+            int32_t pu, pv; \
+            if (pct_idx == 0) \
+            { \
+               int remain = (int)w; \
+               int blk    = (remain < PCT_UV_BLOCK) ? remain : PCT_UV_BLOCK; \
+               float bias = idl->pct_bias; \
+               PCT_UVBatch(blk, bias, &ig.pct_inv_w, &ig.pct_u_over_w, \
+                     &ig.pct_v_over_w, idl->d_inv_w_dx, idl->d_u_over_w_dx, \
+                     idl->d_v_over_w_dx, idl->min_u, idl->max_u, \
+                     idl->min_v, idl->max_v, pct_u_buf, pct_v_buf); \
+               pct_idx = blk; \
+               pct_pos = 0; \
+            } \
+            pu = pct_u_buf[pct_pos]; \
+            pv = pct_v_buf[pct_pos]; \
+            pct_pos++; \
+            pct_idx--; \
+            if (pu >= 0) \
+            { \
+               tex_u = pu; \
+               tex_v = pv; \
+            } \
+            else \
+            { \
+               tex_u = ig.u >> (COORD_FBS + COORD_POST_PADDING); \
+               tex_v = ig.v >> (COORD_FBS + COORD_POST_PADDING); \
+            } \
+         } \
+         else \
+         { \
+            tex_u = ig.u >> (COORD_FBS + COORD_POST_PADDING); \
+            tex_v = ig.v >> (COORD_FBS + COORD_POST_PADDING); \
+         }
+
+#define DEFINE_DrawSpanX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, COST_LIT) \
 static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas *idl, const bool pct) \
 { \
    int32_t clipx0; \
@@ -1109,14 +1163,14 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
    int32_t pct_v_buf[PCT_UV_BLOCK]; \
    int     pct_idx = 0; \
    int     pct_pos = 0; \
-   if (LineSkipTest(gpu, y >> gpu->upscale_shift)) \
+   if (LineSkipTest(gpu, y >> POLY_US(gpu, COST_LIT))) \
       return; \
-   clipx0 = gpu->ClipX0 << gpu->upscale_shift; \
-   clipx1 = gpu->ClipX1 << gpu->upscale_shift; \
+   clipx0 = gpu->ClipX0 << POLY_US(gpu, COST_LIT); \
+   clipx1 = gpu->ClipX1 << POLY_US(gpu, COST_LIT); \
    x_ig_adjust = x_start; \
    w = x_bound - x_start; \
    /*int32 x = x_start;*/ \
-   x = sign_x_to_s32(11 + gpu->upscale_shift, x_start); \
+   x = sign_x_to_s32(11 + POLY_US(gpu, COST_LIT), x_start); \
    /* The 'bool dither = DitherEnabled(gpu)' from the original was \
     * never read - all uses fall through to direct DitherEnabled() \
     * calls.  Dropped to silence -Wunused-but-set-variable. */ \
@@ -1152,14 +1206,32 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
    /* want the rasteriser budget consumption to match real-PSX behaviour, */ \
    /* otherwise complex 480i scenes drop polygons when DrawTimeAvail */ \
    /* hits zero halfway through the frame. */ \
-   if ((y & ((1UL << gpu->upscale_shift) - 1)) == 0 \
-         && !DfeWouldSkip(gpu, y >> gpu->upscale_shift)) { \
+   /* Drawing at an upscale leaves timing to the native walk (COST_LIT). */ \
+   if (((COST_LIT) || !gpu->upscale_shift) \
+         && (y & ((1UL << POLY_US(gpu, COST_LIT)) - 1)) == 0 \
+         && !DfeWouldSkip(gpu, y >> POLY_US(gpu, COST_LIT))) { \
       if ((GOURAUD_LIT) || (TEXTURED_LIT)) \
-         gpu->DrawTimeAvail -= (w * 2) >> gpu->upscale_shift; \
+         gpu->DrawTimeAvail -= (w * 2) >> POLY_US(gpu, COST_LIT); \
       else if (((BM_VAL) >= 0) || (ME_LIT)) \
-         gpu->DrawTimeAvail -= (w + ((w + 1) >> 1)) >> gpu->upscale_shift; \
+         gpu->DrawTimeAvail -= (w + ((w + 1) >> 1)) >> POLY_US(gpu, COST_LIT); \
       else \
-         gpu->DrawTimeAvail -= w >> gpu->upscale_shift; \
+         gpu->DrawTimeAvail -= w >> POLY_US(gpu, COST_LIT); \
+   } \
+   /* The native timing walk: span charges above, then the texture \
+    * cache's timing tags for every textured pixel, nothing drawn. */ \
+   if (COST_LIT) \
+   { \
+      if (TEXTURED_LIT) \
+      { \
+         do \
+         { \
+            int32_t tex_u, tex_v; \
+            DRAWSPAN_TEX_UV(); \
+            TimingTexel_TM##MO_LIT(gpu, tex_u, tex_v); \
+            AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, 1); \
+         } while (--w > 0); \
+      } \
+      return; \
    } \
    /* Native-res, non-textured fast path: vectorise the contiguous run \
     * (the span lies within [ClipX0,ClipX1] in [0,1023], so it never \
@@ -1237,50 +1309,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
           *     int cast = 0..max, AND = same; for negative inputs \
           *     pre-clamp, the clamp brings them to 0 anyway). \
           * The bias matches the affine seed (gpu_uv_seed). */ \
-         if (pct) \
-         { \
-            /* Pull the perspective-correct UV from the SIMD-precomputed \
-             * block, refilling it when exhausted.  PCT_UVBatch advances \
-             * ig.pct_* by exactly the per-pixel scalar chain and encodes \
-             * the per-pixel inv_w > eps decision in its output: a -1 \
-             * entry means that pixel's inv_w was <= eps, so fall through \
-             * to the affine path for it (matching the old scalar guard \
-             * `pct && ig.pct_inv_w > 1e-6f`).  Because the batch consumes \
-             * ig.pct_*, the per-pixel advance at the loop bottom is \
-             * skipped for the pct path. */ \
-            int32_t pu, pv; \
-            if (pct_idx == 0) \
-            { \
-               int remain = (int)w; \
-               int blk    = (remain < PCT_UV_BLOCK) ? remain : PCT_UV_BLOCK; \
-               float bias = idl->pct_bias; \
-               PCT_UVBatch(blk, bias, &ig.pct_inv_w, &ig.pct_u_over_w, \
-                     &ig.pct_v_over_w, idl->d_inv_w_dx, idl->d_u_over_w_dx, \
-                     idl->d_v_over_w_dx, idl->min_u, idl->max_u, \
-                     idl->min_v, idl->max_v, pct_u_buf, pct_v_buf); \
-               pct_idx = blk; \
-               pct_pos = 0; \
-            } \
-            pu = pct_u_buf[pct_pos]; \
-            pv = pct_v_buf[pct_pos]; \
-            pct_pos++; \
-            pct_idx--; \
-            if (pu >= 0) \
-            { \
-               tex_u = pu; \
-               tex_v = pv; \
-            } \
-            else \
-            { \
-               tex_u = ig.u >> (COORD_FBS + COORD_POST_PADDING); \
-               tex_v = ig.v >> (COORD_FBS + COORD_POST_PADDING); \
-            } \
-         } \
-         else \
-         { \
-            tex_u = ig.u >> (COORD_FBS + COORD_POST_PADDING); \
-            tex_v = ig.v >> (COORD_FBS + COORD_POST_PADDING); \
-         } \
+         DRAWSPAN_TEX_UV(); \
          fbw = GetTexel_TM##MO_LIT(gpu, tex_u, tex_v); \
          if (fbw) \
          { \
@@ -1320,6 +1349,9 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
       /* ig.pct_* are advanced by PCT_UVBatch, not here. */ \
    } while (MDFN_LIKELY(--w > 0)); \
 }
+
+#define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+   DEFINE_DrawSpanX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0)
 
 /* DRAWSPAN_T0_BMGROUP and DRAWSPAN_T1_BMGROUP emit the 10
  * (BlendMode * MaskEval) specs for given outer parameters.
@@ -1367,6 +1399,19 @@ DRAWSPAN_T1_BMGROUP(1, 1, 0)
 DRAWSPAN_T1_BMGROUP(1, 1, 1)
 DRAWSPAN_T1_BMGROUP(1, 1, 2)
 
+/* The native timing walk's spans: one per combination that changes what
+ * DrawTimeAvail is charged (textured or not, texture mode, Gouraud, and
+ * for flat untextured spans whether blending or the mask test applies). */
+DEFINE_DrawSpanX(cost_t0_g0_o,   0, 0, -1, BMopaque, 0, 0, 0, 1)
+DEFINE_DrawSpanX(cost_t0_g0_b,   0, 0,  0, BMavg,    0, 0, 0, 1)
+DEFINE_DrawSpanX(cost_t0_g1,     1, 0, -1, BMopaque, 0, 0, 0, 1)
+DEFINE_DrawSpanX(cost_t1_g0_mo0, 0, 1, -1, BMopaque, 0, 0, 0, 1)
+DEFINE_DrawSpanX(cost_t1_g0_mo1, 0, 1, -1, BMopaque, 0, 1, 0, 1)
+DEFINE_DrawSpanX(cost_t1_g0_mo2, 0, 1, -1, BMopaque, 0, 2, 0, 1)
+DEFINE_DrawSpanX(cost_t1_g1_mo0, 1, 1, -1, BMopaque, 0, 0, 0, 1)
+DEFINE_DrawSpanX(cost_t1_g1_mo1, 1, 1, -1, BMopaque, 0, 1, 0, 1)
+DEFINE_DrawSpanX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1)
+
 /*
  * DrawTriangle - rasterise one triangle.
  *
@@ -1381,13 +1426,13 @@ DRAWSPAN_T1_BMGROUP(1, 1, 2)
  * where the rasterisation order of the three triangle vertices
  * is observable in some games' rendering.
  */
-#define DEFINE_DrawTriangle(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+#define DEFINE_DrawTriangleX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, COST_LIT) \
 static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, const bool pct) \
 { \
    i_deltas idl; \
    unsigned core_vertex; \
-   int32_t clipy0 = gpu->ClipY0 << gpu->upscale_shift; \
-   int32_t clipy1 = gpu->ClipY1 << gpu->upscale_shift; \
+   int32_t clipy0 = gpu->ClipY0 << POLY_US(gpu, COST_LIT); \
+   int32_t clipy1 = gpu->ClipY1 << POLY_US(gpu, COST_LIT); \
    int64_t base_coord; \
    int64_t base_step; \
    int64_t bound_coord_us; \
@@ -1440,7 +1485,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    /* 0-height, abort out. */ \
    if (vertices[0].y == vertices[2].y) \
       return; \
-   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2], gpu->upscale_shift)) \
+   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2], POLY_US(gpu, COST_LIT))) \
       return; \
    /* Perspective-correct UV deltas - only when the caller said this \
     * primitive is eligible (textured + PGXP-on + texture-correction \
@@ -1456,11 +1501,11 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    /* [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex. */ \
    if (TEXTURED_LIT) \
    { \
-      ig.u = gpu_uv_seed(vertices[core_vertex].u, gpu->upscale_shift, \
+      ig.u = gpu_uv_seed(vertices[core_vertex].u, POLY_US(gpu, COST_LIT), \
             gpu->may_be_2d, gpu->off_u != 0); \
-      ig.v = gpu_uv_seed(vertices[core_vertex].v, gpu->upscale_shift, \
+      ig.v = gpu_uv_seed(vertices[core_vertex].v, POLY_US(gpu, COST_LIT), \
             gpu->may_be_2d, gpu->off_v != 0); \
-      idl.pct_bias = gpu_uv_pct_bias(gpu->upscale_shift, gpu->may_be_2d); \
+      idl.pct_bias = gpu_uv_pct_bias(POLY_US(gpu, COST_LIT), gpu->may_be_2d); \
       if (pct_local) \
       { \
          /* Seed the perspective interpolants at the core vertex (origin \
@@ -1550,30 +1595,32 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
             yi--; \
             lc -= ls; \
             rc -= rs; \
-            y = sign_x_to_s32(11 + gpu->upscale_shift, yi); \
+            y = sign_x_to_s32(11 + POLY_US(gpu, COST_LIT), yi); \
             if (y < clipy0) \
                break; \
             if (y > clipy1) \
             { \
-               gpu->DrawTimeAvail -= 2; \
+               if ((COST_LIT) || !gpu->upscale_shift) \
+                  gpu->DrawTimeAvail -= 2; \
                continue; \
             } \
-            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl, pct_local); \
+            DrawSpan_##SUFFIX(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl, pct_local); \
          } \
       } \
       else \
       { \
          while (MDFN_LIKELY(yi < yb)) \
          { \
-            int32_t y = sign_x_to_s32(11 + gpu->upscale_shift, yi); \
+            int32_t y = sign_x_to_s32(11 + POLY_US(gpu, COST_LIT), yi); \
             if (y > clipy1) \
                break; \
             if (y < clipy0) \
             { \
-               gpu->DrawTimeAvail -= 2; \
+               if ((COST_LIT) || !gpu->upscale_shift) \
+                  gpu->DrawTimeAvail -= 2; \
                goto skipit_##SUFFIX; \
             } \
-            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl, pct_local); \
+            DrawSpan_##SUFFIX(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl, pct_local); \
             skipit_##SUFFIX: ; \
             yi++; \
             lc += ls; \
@@ -1582,6 +1629,9 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
       } \
    } \
 }
+
+#define DEFINE_DrawTriangle(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+   DEFINE_DrawTriangleX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0)
 
 #define DRAWTRI_T0_BMGROUP(G) \
    DEFINE_DrawTriangle(g##G##_t0_BMopaque_TM0_MO0_ME0, G, 0, -1, BMopaque, 0, 0, 0) \
@@ -1622,6 +1672,45 @@ DRAWTRI_T1_BMGROUP(1, 0, 2)
 DRAWTRI_T1_BMGROUP(1, 1, 0)
 DRAWTRI_T1_BMGROUP(1, 1, 1)
 DRAWTRI_T1_BMGROUP(1, 1, 2)
+
+DEFINE_DrawTriangleX(cost_t0_g0_o,   0, 0, -1, BMopaque, 0, 0, 0, 1)
+DEFINE_DrawTriangleX(cost_t0_g0_b,   0, 0,  0, BMavg,    0, 0, 0, 1)
+DEFINE_DrawTriangleX(cost_t0_g1,     1, 0, -1, BMopaque, 0, 0, 0, 1)
+DEFINE_DrawTriangleX(cost_t1_g0_mo0, 0, 1, -1, BMopaque, 0, 0, 0, 1)
+DEFINE_DrawTriangleX(cost_t1_g0_mo1, 0, 1, -1, BMopaque, 0, 1, 0, 1)
+DEFINE_DrawTriangleX(cost_t1_g0_mo2, 0, 1, -1, BMopaque, 0, 2, 0, 1)
+DEFINE_DrawTriangleX(cost_t1_g1_mo0, 1, 1, -1, BMopaque, 0, 0, 0, 1)
+DEFINE_DrawTriangleX(cost_t1_g1_mo1, 1, 1, -1, BMopaque, 0, 1, 0, 1)
+DEFINE_DrawTriangleX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1)
+
+/* Emulated GPU timing at an upscale: the triangle walked at native
+ * resolution through the cost instance matching the primitive, on a copy
+ * of its vertices scaled back down, so DrawTimeAvail is charged what the
+ * same primitive costs at 1x. */
+#define POLY_TIMING_WALK(gpu, vertices, pct, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, MO_LIT, ME_LIT) \
+   do \
+   { \
+      tri_vertex     nv[3]; \
+      unsigned       k; \
+      const unsigned us  = (gpu)->upscale_shift; \
+      const float    inv = 1.0f / (float)(1u << us); \
+      memcpy(nv, (vertices), sizeof(nv)); \
+      for (k = 0; k < 3; k++) \
+      { \
+         nv[k].x >>= us; \
+         nv[k].y >>= us; \
+         nv[k].precise[0] *= inv; \
+         nv[k].precise[1] *= inv; \
+      } \
+      if (TEXTURED_LIT) \
+         DrawTriangle_cost_t1_g##GOURAUD_LIT##_mo##MO_LIT((gpu), nv, (pct)); \
+      else if (GOURAUD_LIT) \
+         DrawTriangle_cost_t0_g1((gpu), nv, (pct)); \
+      else if ((BM_VAL) >= 0 || (ME_LIT)) \
+         DrawTriangle_cost_t0_g0_b((gpu), nv, (pct)); \
+      else \
+         DrawTriangle_cost_t0_g0_o((gpu), nv, (pct)); \
+   } while (0)
 
 /* Forward declarations for the helper functions defined in
  * gpu_polygon_sub.c.  Since gpu_polygon.c is now itself plain C
@@ -2081,6 +2170,8 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          bool pct = (PGXP_LIT) && (TEXTURED_LIT) \
                     && !invalidW \
                     && PGXP_texture_correction_enabled(); \
+         if (gpu->upscale_shift) \
+            POLY_TIMING_WALK(gpu, vertices, pct, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, MO_LIT, ME_LIT); \
          DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct); \
       } \
       /* Line Render: Overwrite vertices with those of the second triangle */ \

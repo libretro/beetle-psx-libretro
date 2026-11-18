@@ -411,7 +411,10 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
       if (MDFN_UNLIKELY(c->Tag != gro_line)) \
       { \
          uint32_t cache_x = fbtex_x & ~3; \
-         g->DrawTimeAvail -= 4; \
+         /* at an upscale the native timing tags charge instead \
+          * (TimingTexel) */ \
+         if (!g->upscale_shift) \
+            g->DrawTimeAvail -= 4; \
          c->Data[0] = texel_fetch(g, cache_x + 0, fbtex_y); \
          c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y); \
          c->Data[2] = texel_fetch(g, cache_x + 2, fbtex_y); \
@@ -432,6 +435,35 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
    } \
    return fbw; \
 }
+
+/* The texture cache's timing at an upscale: the same tag and index as
+ * GetTexel, against TexCacheTimingTag, charging DrawTimeAvail on a miss.
+ * Called at native resolution by the polygon timing walk and by sprites,
+ * so emulated GPU timing is the same at every internal resolution. */
+#define DEFINE_TimingTexel(SUFFIX, TM_VAL) \
+static INLINE void TimingTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg) \
+{ \
+   uint32_t u_ext   = ((u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD); \
+   uint32_t fbtex_x = ((u_ext >> (2 - (TM_VAL)))) & 1023; \
+   uint32_t fbtex_y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD; \
+   uint32_t gro_line = (fbtex_y * 1024U + fbtex_x) & ~0x3U; \
+   uint32_t idx; \
+   if (g->last_timing_line == gro_line) \
+      return; \
+   g->last_timing_line = gro_line; \
+   idx = ((TM_VAL) == 0) \
+      ? (((gro_line >> 2) & 0x3) | ((gro_line >> 8) & 0xFC)) \
+      : (((gro_line >> 2) & 0x7) | ((gro_line >> 7) & 0xF8)); \
+   if (g->TexCacheTimingTag[idx] != gro_line) \
+   { \
+      g->DrawTimeAvail -= 4; \
+      g->TexCacheTimingTag[idx] = gro_line; \
+   } \
+}
+
+DEFINE_TimingTexel(TM0, 0)
+DEFINE_TimingTexel(TM1, 1)
+DEFINE_TimingTexel(TM2, 2)
 
 /* PS_GPU_TexCache_t aliases the nested TexCache_t struct from
  * PS_GPU.  The nested struct is hoisted to file scope in C, so we
