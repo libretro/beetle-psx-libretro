@@ -57,3 +57,5 @@ ever edited in this core.
   buffer, built with the mapping on.
 - `sh tools/ttio/run.sh` and `sh tools/tt_replace/run.sh` - texture
   replacement I/O.
+- `sh tools/gte_state/run.sh` - every GTE data register comes back from a
+  loaded state, in each CPU mode. Needs a built core.

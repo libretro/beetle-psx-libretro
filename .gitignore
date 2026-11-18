@@ -44,6 +44,10 @@ tools/deinterlace/deint_test.exe
 tools/crop_window/crop_window_test
 tools/crop_window/crop_window_test.exe
 
+# GTE savestate lane build output (tools/gte_state)
+tools/gte_state/gte_state_test
+tools/gte_state/gte_state_test.exe
+
 # Python bytecode from the VCD authoring script (tools/vcd)
 __pycache__/
 *.pyc
