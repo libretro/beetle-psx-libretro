@@ -531,8 +531,11 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
          if (BM_VAL == BLEND_MODE_AVERAGE)
          {
             __m128i bgo = _mm_or_si128(bg, v8000);
-            __m128i xr  = _mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x0421));
-            pix = _mm_srli_epi16(_mm_sub_epi16(_mm_add_epi16(pix, bgo), xr), 1);
+            /* Per-channel floor average without a 17-bit sum:
+             * a + b = 2 (a & b) + (a ^ b), with each channel's low bit and
+             * bit 15 cleared before the shift so no bit crosses a channel. */
+            __m128i hx  = _mm_srli_epi16(_mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x7BDE)), 1);
+            pix = _mm_add_epi16(_mm_and_si128(pix, bgo), hx);
          }
          else if (BM_VAL == BLEND_MODE_ADD)
          {
@@ -616,8 +619,9 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
          if (BM_VAL == BLEND_MODE_AVERAGE)
          {
             uint16x8_t bgo = vorrq_u16(bg, v8000);
-            uint16x8_t xr  = vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x0421));
-            pix = vshrq_n_u16(vsubq_u16(vaddq_u16(pix, bgo), xr), 1);
+            /* carry-free per-channel average: see the SSE2 arm */
+            uint16x8_t hx  = vshrq_n_u16(vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x7BDE)), 1);
+            pix = vaddq_u16(vandq_u16(pix, bgo), hx);
          }
          else if (BM_VAL == BLEND_MODE_ADD)
          {
@@ -810,11 +814,10 @@ static INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
             if (BM_VAL == BLEND_MODE_AVERAGE)
             {
                __m128i bgo = _mm_or_si128(bg, v8000);
-               __m128i xr  = _mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x0421));
-               /* pix + bgo carries out of the 16-bit lane; the bit it
-                * would shift down is bit 15 of the scalar result, always
-                * set for a semi-transparent pixel */
-               bl = _mm_or_si128(_mm_srli_epi16(_mm_sub_epi16(_mm_add_epi16(pix, bgo), xr), 1), v8000);
+               /* carry-free per-channel average, as in DrawSpanVec_NT; bit 15
+                * comes out as pix & bgo, set for a semi-transparent pixel */
+               __m128i hx  = _mm_srli_epi16(_mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x7BDE)), 1);
+               bl = _mm_add_epi16(_mm_and_si128(pix, bgo), hx);
             }
             else if (BM_VAL == BLEND_MODE_ADD || BM_VAL == BLEND_MODE_ADD_FOURTH)
             {
@@ -888,9 +891,9 @@ static INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
             if (BM_VAL == BLEND_MODE_AVERAGE)
             {
                uint16x8_t bgo = vorrq_u16(bg, v8000);
-               uint16x8_t xr  = vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x0421));
-               /* bit 15 of the scalar result: see the SSE2 arm */
-               bl = vorrq_u16(vshrq_n_u16(vsubq_u16(vaddq_u16(pix, bgo), xr), 1), v8000);
+               /* carry-free per-channel average: see the SSE2 arm */
+               uint16x8_t hx  = vshrq_n_u16(vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x7BDE)), 1);
+               bl = vaddq_u16(vandq_u16(pix, bgo), hx);
             }
             else if (BM_VAL == BLEND_MODE_ADD || BM_VAL == BLEND_MODE_ADD_FOURTH)
             {

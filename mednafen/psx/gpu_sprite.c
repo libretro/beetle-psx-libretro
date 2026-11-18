@@ -70,8 +70,9 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
       if (BM_VAL == BLEND_MODE_AVERAGE)
       {
          __m128i bgo = _mm_or_si128(bg, v8000);
-         __m128i xr  = _mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x0421));
-         pix = _mm_srli_epi16(_mm_sub_epi16(_mm_add_epi16(pix, bgo), xr), 1);
+         /* carry-free per-channel average, as in DrawSpanVec_NT */
+         __m128i hx  = _mm_srli_epi16(_mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x7BDE)), 1);
+         pix = _mm_add_epi16(_mm_and_si128(pix, bgo), hx);
       }
       else if (BM_VAL == BLEND_MODE_ADD)
       {
@@ -129,8 +130,9 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
       if (BM_VAL == BLEND_MODE_AVERAGE)
       {
          uint16x8_t bgo = vorrq_u16(bg, v8000);
-         uint16x8_t xr  = vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x0421));
-         pix = vshrq_n_u16(vsubq_u16(vaddq_u16(pix, bgo), xr), 1);
+         /* carry-free per-channel average, as in DrawSpanVec_NT */
+         uint16x8_t hx  = vshrq_n_u16(vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x7BDE)), 1);
+         pix = vaddq_u16(vandq_u16(pix, bgo), hx);
       }
       else if (BM_VAL == BLEND_MODE_ADD)
       {
