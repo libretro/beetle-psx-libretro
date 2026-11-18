@@ -3,7 +3,8 @@
  * The probe EXE first reads every GTE data register it checks into RAM
  * (the power-on values), then loads one set of distinct values into the
  * registers the state code carries through local copies (OTZ, SZ0-3,
- * RES1, LZCS and the LZCR computed from it, with IR0 alongside), reads
+ * RES1, LZCS and the LZCR computed from it, with IR0 and SXY2 alongside,
+ * and SXYP read as its mirror), reads
  * them back into RAM in a loop, and after a countdown overwrites them with
  * a second set.  Cases:
  *
@@ -12,8 +13,9 @@
  *           the load matches the first byte for byte.
  *   reset   reset with the first set live: the restarted probe reads the
  *           power-on values.
- *   toggle  start on the dynarec, switch to the interpreter, let the
- *           second set go in, switch back: the second set stays.
+ *   toggle  start on the dynarec, switch to the interpreter: the first
+ *           set stays; let the second set go in, switch back: the second
+ *           set stays.
  *   reload  unload, deinit, init and load again in the same process: the
  *           second run starts clean.
  *
@@ -84,6 +86,9 @@ static const struct gte_reg regs[] =
 {
    { "OTZ",  7,  { 0x00001234u, 0x00005678u }, { 0x00001234u, 0x00005678u } },
    { "IR0",  8,  { 0x00000777u, 0x00000333u }, { 0x00000777u, 0x00000333u } },
+   { "SXY2", 14, { 0x00110022u, 0x00330044u }, { 0x00110022u, 0x00330044u } },
+   /* Not written (a write pushes the FIFO): reads as SXY2 */
+   { "SXYP", 15, { 0, 0 },                    { 0x00110022u, 0x00330044u } },
    { "SZ0",  16, { 0x00001111u, 0x00005555u }, { 0x00001111u, 0x00005555u } },
    { "SZ1",  17, { 0x00002222u, 0x00006666u }, { 0x00002222u, 0x00006666u } },
    { "SZ2",  18, { 0x00003333u, 0x00007777u }, { 0x00003333u, 0x00007777u } },
@@ -113,7 +118,7 @@ static size_t emit_set(uint32_t *code, size_t n, unsigned set)
    for (i = 0; i < N_REGS; i++)
    {
       uint32_t v = regs[i].write[set];
-      if (regs[i].index == 31)                        /* read-only */
+      if (regs[i].index == 15 || regs[i].index == 31)
          continue;
       n = emit(code, n, 0x3C090000u | (v >> 16));
       n = emit(code, n, 0x35290000u | (v & 0xFFFFu));
@@ -441,7 +446,10 @@ static int case_toggle(void)
       return 1;
    cpu_mode   = "disabled";
    vars_dirty = true;
-   run_frames(END_FRAME - SAVE_FRAME);
+   run_frames(1);
+   if (check_regs(ram, READBACK, 0, "switched to the interpreter"))
+      return 1;
+   run_frames(END_FRAME - SAVE_FRAME - 1);
    if (check_regs(ram, READBACK, 1, "on the interpreter"))
       return 1;
    cpu_mode   = "execute";

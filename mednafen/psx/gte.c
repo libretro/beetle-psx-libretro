@@ -716,7 +716,9 @@ uint32_t GTE_ReadDR(unsigned int which)
          break;
 
       case 15:
-         ret = (uint16_t)XY_FIFO_X(3) | ((uint16_t)XY_FIFO_Y(3) << 16);
+         /* SXYP reads as SXY2: lightrec keeps only 12-14, so DR[15]
+          * is not current after a switch from the dynarec */
+         ret = XY_FIFO(2);
          break;
 
       case 16:
