@@ -1,19 +1,23 @@
-/* GTE savestate lane.
+/* GTE register lane.
  *
- * The probe EXE loads one set of distinct values into the GTE data
- * registers that the state code carries through local copies (OTZ, SZ0-3,
+ * The probe EXE first reads every GTE data register it checks into RAM
+ * (the power-on values), then loads one set of distinct values into the
+ * registers the state code carries through local copies (OTZ, SZ0-3,
  * RES1, LZCS and the LZCR computed from it, with IR0 alongside), reads
- * every one of them back into RAM in a loop, and after a countdown
- * overwrites them with a second set.  The host saves a state while the
- * first set is live, runs on until the second set is in, loads the state
- * and runs one more frame:
+ * them back into RAM in a loop, and after a countdown overwrites them with
+ * a second set.  Cases:
  *
- *   - the read-back in RAM must hold the first set again, so a register
- *     the load path does not write back fails the lane by name;
- *   - saving straight after the load must give the same bytes as the
- *     first save.
+ *   load    save while the first set is live, run until the second set is
+ *           in, load: the first set reads back, and a save straight after
+ *           the load matches the first byte for byte.
+ *   reset   reset with the first set live: the restarted probe reads the
+ *           power-on values.
+ *   toggle  start on the dynarec, switch to the interpreter, let the
+ *           second set go in, switch back: the second set stays.
+ *   reload  unload, deinit, init and load again in the same process: the
+ *           second run starts clean.
  *
- * usage: gte_state_test <core> [cpu_dynarec mode]
+ * usage: gte_state_test <core> <case> [cpu_dynarec mode]
  * Runs in the current directory: it writes the probe EXE and an all-zero
  * BIOS image there. */
 #include <stdio.h>
@@ -32,6 +36,8 @@
 /* An all-zero kernel: the CPU runs straight to the EXE loader's patch */
 #define BIOS_PATH   "scph5501.bin"
 #define READBACK    0xF0000
+#define POWERON     0xF0100
+#define MARKER      0x600DF00Du
 /* Loop passes before the second set goes in: tens of frames in every
  * CPU mode, so the save lands well before it and the end well after */
 #define COUNTDOWN   0x00080000u
@@ -90,6 +96,7 @@ static const struct gte_reg regs[] =
 #define N_REGS (sizeof(regs) / sizeof(regs[0]))
 
 static const char *cpu_mode = "disabled";
+static bool        vars_dirty;
 
 /* --- probe EXE ------------------------------------------------------ */
 
@@ -127,6 +134,16 @@ static int write_probe(void)
    n = emit(code, n, 0x40886000u);                    /* mtc0 t0,SR: COP2 on */
    n = emit(code, n, 0x00000000u);
    n = emit(code, n, 0x00000000u);
+   n = emit(code, n, 0x3C11800Fu);                    /* lui s1,0x800F */
+   for (i = 0; i < N_REGS; i++)
+   {
+      n = emit(code, n, 0x48090000u | (regs[i].index << 11));    /* mfc2 t1 */
+      n = emit(code, n, 0x00000000u);
+      n = emit(code, n, 0xAE290000u | (uint32_t)(0x100 + i * 4));/* sw t1,(s1) */
+   }
+   n = emit(code, n, 0x3C090000u | (MARKER >> 16));          /* lui t1 */
+   n = emit(code, n, 0x35290000u | (MARKER & 0xFFFFu));      /* ori t1 */
+   n = emit(code, n, 0xAE290000u | (uint32_t)(0x100 + N_REGS * 4));
    n = emit_set(code, n, 0);
    n = emit(code, n, 0x3C11800Fu);                    /* lui s1,0x800F */
    n = emit(code, n, 0x3C100000u | (COUNTDOWN >> 16));     /* lui s0 */
@@ -228,7 +245,8 @@ static bool env_cb(unsigned cmd, void *data)
          return var->value != NULL;
       }
       case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
-         *(bool *)data = false;
+         *(bool *)data = vars_dirty;
+         vars_dirty    = false;
          return true;
       default:
          return false;
@@ -258,28 +276,28 @@ static uint32_t ram32(const uint8_t *ram, size_t off)
         | ((uint32_t)ram[off + 2] << 16) | ((uint32_t)ram[off + 3] << 24);
 }
 
-/* 0 when every register reads back as the given set */
-static int check_readback(const uint8_t *ram, unsigned set, const char *when)
+/* 0 when every register reads back as the given set; set 2 is power-on */
+static int check_regs(const uint8_t *ram, size_t base, unsigned set, const char *when)
 {
    size_t i;
    int    bad = 0;
    for (i = 0; i < N_REGS; i++)
    {
-      uint32_t got = ram32(ram, READBACK + i * 4);
-      if (got != regs[i].read[set])
+      uint32_t got  = ram32(ram, base + i * 4);
+      uint32_t want = set < 2 ? regs[i].read[set] : 0;
+      if (got != want)
       {
          fprintf(stderr, "[gte_state] %s: %s (r%u) = 0x%08lX, want 0x%08lX\n",
                when, regs[i].name, regs[i].index,
-               (unsigned long)got, (unsigned long)regs[i].read[set]);
+               (unsigned long)got, (unsigned long)want);
          bad = 1;
       }
    }
    return bad;
 }
 
-int main(int argc, char **argv)
+static struct
 {
-   core_handle core;
    void   (*set_env)(retro_environment_t);
    void   (*set_video)(retro_video_refresh_t);
    void   (*set_poll)(retro_input_poll_t);
@@ -291,99 +309,94 @@ int main(int argc, char **argv)
    bool   (*load_game)(const struct retro_game_info *);
    void   (*unload_game)(void);
    void   (*run)(void);
+   void   (*reset)(void);
    size_t (*serialize_size)(void);
    bool   (*serialize)(void *, size_t);
    bool   (*unserialize)(const void *, size_t);
    void  *(*memory_data)(unsigned);
+} c;
+static uint8_t *ram;
+
+static int bind_core(core_handle core)
+{
+   return core_sym(core, "retro_set_environment",        &c.set_env,        sizeof(c.set_env))
+       && core_sym(core, "retro_set_video_refresh",      &c.set_video,      sizeof(c.set_video))
+       && core_sym(core, "retro_set_input_poll",         &c.set_poll,       sizeof(c.set_poll))
+       && core_sym(core, "retro_set_input_state",        &c.set_state,      sizeof(c.set_state))
+       && core_sym(core, "retro_set_audio_sample",       &c.set_audio,      sizeof(c.set_audio))
+       && core_sym(core, "retro_set_audio_sample_batch", &c.set_batch,      sizeof(c.set_batch))
+       && core_sym(core, "retro_init",                   &c.init,           sizeof(c.init))
+       && core_sym(core, "retro_deinit",                 &c.deinit,         sizeof(c.deinit))
+       && core_sym(core, "retro_load_game",              &c.load_game,      sizeof(c.load_game))
+       && core_sym(core, "retro_unload_game",            &c.unload_game,    sizeof(c.unload_game))
+       && core_sym(core, "retro_run",                    &c.run,            sizeof(c.run))
+       && core_sym(core, "retro_reset",                  &c.reset,          sizeof(c.reset))
+       && core_sym(core, "retro_serialize_size",         &c.serialize_size, sizeof(c.serialize_size))
+       && core_sym(core, "retro_serialize",              &c.serialize,      sizeof(c.serialize))
+       && core_sym(core, "retro_unserialize",            &c.unserialize,    sizeof(c.unserialize))
+       && core_sym(core, "retro_get_memory_data",        &c.memory_data,    sizeof(c.memory_data));
+}
+
+static int start(void)
+{
    struct retro_game_info info;
-   const uint8_t *ram;
-   unsigned char *first = NULL, *second = NULL;
-   size_t size, i, diff = 0, first_diff = 0;
-   unsigned f;
-   int fail = 0;
-
-   if (argc < 2)
-   {
-      fprintf(stderr, "usage: %s <core> [cpu_dynarec mode]\n", argv[0]);
-      return 2;
-   }
-   if (argc > 2)
-      cpu_mode = argv[2];
-   if (!write_probe())
-   {
-      fprintf(stderr, "cannot write the probe\n");
-      return 2;
-   }
-   if (!(core = CORE_OPEN(argv[1])))
-   {
-      fprintf(stderr, "cannot open %s\n", argv[1]);
-      return 2;
-   }
-   if (  !core_sym(core, "retro_set_environment",        &set_env,        sizeof(set_env))
-      || !core_sym(core, "retro_set_video_refresh",      &set_video,      sizeof(set_video))
-      || !core_sym(core, "retro_set_input_poll",         &set_poll,       sizeof(set_poll))
-      || !core_sym(core, "retro_set_input_state",        &set_state,      sizeof(set_state))
-      || !core_sym(core, "retro_set_audio_sample",       &set_audio,      sizeof(set_audio))
-      || !core_sym(core, "retro_set_audio_sample_batch", &set_batch,      sizeof(set_batch))
-      || !core_sym(core, "retro_init",                   &init,           sizeof(init))
-      || !core_sym(core, "retro_deinit",                 &deinit,         sizeof(deinit))
-      || !core_sym(core, "retro_load_game",              &load_game,      sizeof(load_game))
-      || !core_sym(core, "retro_unload_game",            &unload_game,    sizeof(unload_game))
-      || !core_sym(core, "retro_run",                    &run,            sizeof(run))
-      || !core_sym(core, "retro_serialize_size",         &serialize_size, sizeof(serialize_size))
-      || !core_sym(core, "retro_serialize",              &serialize,      sizeof(serialize))
-      || !core_sym(core, "retro_unserialize",            &unserialize,    sizeof(unserialize))
-      || !core_sym(core, "retro_get_memory_data",        &memory_data,    sizeof(memory_data)))
-      return 2;
-
-   set_env(env_cb);
-   init();
-   set_video(video_cb);
-   set_poll(input_poll_cb);
-   set_state(input_state_cb);
-   set_audio(audio_cb);
-   set_batch(audio_batch_cb);
-
+   c.set_env(env_cb);
+   c.init();
+   c.set_video(video_cb);
+   c.set_poll(input_poll_cb);
+   c.set_state(input_state_cb);
+   c.set_audio(audio_cb);
+   c.set_batch(audio_batch_cb);
    memset(&info, 0, sizeof(info));
    info.path = PROBE_PATH;
-   if (!load_game(&info))
+   if (!c.load_game(&info))
    {
       fprintf(stderr, "[gte_state] retro_load_game failed\n");
-      return 2;
+      return 0;
    }
-   if (!(ram = (const uint8_t *)memory_data(RETRO_MEMORY_SYSTEM_RAM)))
+   if (!(ram = (uint8_t *)c.memory_data(RETRO_MEMORY_SYSTEM_RAM)))
    {
       fprintf(stderr, "[gte_state] no system RAM\n");
-      return 2;
+      return 0;
    }
+   return 1;
+}
 
-   for (f = 0; f < SAVE_FRAME; f++)
-      run();
-   if (check_readback(ram, 0, "at save"))
-   {
-      fprintf(stderr, "[gte_state] FAIL: the probe is not in its first set\n");
+static void stop(void)
+{
+   c.unload_game();
+   c.deinit();
+}
+
+static void run_frames(unsigned n)
+{
+   while (n--)
+      c.run();
+}
+
+/* Returns 0 pass, 1 fail, 2 harness error */
+static int case_load(void)
+{
+   unsigned char *first, *second;
+   size_t size, i, diff = 0, first_diff = 0;
+   int fail = 0;
+
+   run_frames(SAVE_FRAME);
+   if (check_regs(ram, READBACK, 0, "at save"))
       return 1;
-   }
-
-   size   = serialize_size();
+   size   = c.serialize_size();
    first  = (unsigned char *)malloc(size);
    second = (unsigned char *)calloc(1, size);
-   if (!first || !second || !serialize(first, size))
+   if (!first || !second || !c.serialize(first, size))
    {
       fprintf(stderr, "[gte_state] retro_serialize failed\n");
       return 2;
    }
-
-   for (; f < END_FRAME; f++)
-      run();
-   if (check_readback(ram, 1, "before load"))
-   {
-      fprintf(stderr, "[gte_state] FAIL: the probe did not reach its second set\n");
+   run_frames(END_FRAME - SAVE_FRAME);
+   if (check_regs(ram, READBACK, 1, "before load"))
       return 1;
-   }
-
    /* Only the state can bring the first set back */
-   if (!unserialize(first, size) || !serialize(second, size))
+   if (!c.unserialize(first, size) || !c.serialize(second, size))
    {
       fprintf(stderr, "[gte_state] state round trip failed\n");
       return 2;
@@ -397,19 +410,108 @@ int main(int argc, char **argv)
             (unsigned long)diff, (unsigned long)first_diff);
       fail = 1;
    }
-
-   run();
-   if (check_readback(ram, 0, "after load"))
+   run_frames(1);
+   if (check_regs(ram, READBACK, 0, "after load"))
       fail = 1;
-
-   unload_game();
-   deinit();
-   CORE_CLOSE(core);
    free(first);
    free(second);
+   return fail;
+}
+
+static int case_reset(void)
+{
+   run_frames(SAVE_FRAME);
+   if (check_regs(ram, READBACK, 0, "before reset"))
+      return 1;
+   memset(ram + POWERON, 0xA5, (N_REGS + 1) * 4);
+   c.reset();
+   run_frames(SAVE_FRAME);
+   if (ram32(ram, POWERON + N_REGS * 4) != MARKER)
+   {
+      fprintf(stderr, "[gte_state] the probe did not restart\n");
+      return 2;
+   }
+   return check_regs(ram, POWERON, 2, "after reset");
+}
+
+static int case_toggle(void)
+{
+   run_frames(SAVE_FRAME);
+   if (check_regs(ram, READBACK, 0, "on the dynarec"))
+      return 1;
+   cpu_mode   = "disabled";
+   vars_dirty = true;
+   run_frames(END_FRAME - SAVE_FRAME);
+   if (check_regs(ram, READBACK, 1, "on the interpreter"))
+      return 1;
+   cpu_mode   = "execute";
+   vars_dirty = true;
+   run_frames(2);
+   return check_regs(ram, READBACK, 1, "back on the dynarec");
+}
+
+static int case_reload(void)
+{
+   run_frames(SAVE_FRAME);
+   if (check_regs(ram, READBACK, 0, "first run"))
+      return 1;
+   stop();
+   if (!start())
+      return 2;
+   run_frames(SAVE_FRAME);
+   if (check_regs(ram, POWERON, 2, "second run, power-on"))
+      return 1;
+   return check_regs(ram, READBACK, 0, "second run");
+}
+
+int main(int argc, char **argv)
+{
+   core_handle core;
+   const char *name;
+   int ret;
+
+   if (argc < 3)
+   {
+      fprintf(stderr, "usage: %s <core> <load|reset|toggle|reload> [cpu_dynarec mode]\n", argv[0]);
+      return 2;
+   }
+   name = argv[2];
+   if (argc > 3)
+      cpu_mode = argv[3];
+   if (!strcmp(name, "toggle"))
+      cpu_mode = "execute";
+   if (!write_probe())
+   {
+      fprintf(stderr, "cannot write the probe\n");
+      return 2;
+   }
+   if (!(core = CORE_OPEN(argv[1])))
+   {
+      fprintf(stderr, "cannot open %s\n", argv[1]);
+      return 2;
+   }
+   if (!bind_core(core) || !start())
+      return 2;
+
+   if (!strcmp(name, "load"))
+      ret = case_load();
+   else if (!strcmp(name, "reset"))
+      ret = case_reset();
+   else if (!strcmp(name, "toggle"))
+      ret = case_toggle();
+   else if (!strcmp(name, "reload"))
+      ret = case_reload();
+   else
+   {
+      fprintf(stderr, "unknown case %s\n", name);
+      ret = 2;
+   }
+
+   stop();
+   CORE_CLOSE(core);
    remove(PROBE_PATH);
    remove(BIOS_PATH);
-
-   fprintf(stderr, "[gte_state] cpu_dynarec=%s %s\n", cpu_mode, fail ? "FAIL" : "OK");
-   return fail;
+   fprintf(stderr, "[gte_state] %s cpu_dynarec=%s %s\n", name,
+         argc > 3 ? argv[3] : "disabled", ret ? "FAIL" : "OK");
+   return ret;
 }

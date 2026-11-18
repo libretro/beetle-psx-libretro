@@ -1,8 +1,10 @@
 #!/bin/sh
-# GTE savestate lane: every GTE data register comes back from a loaded
-# state, and saving straight after a load gives the same bytes (see
-# gte_state_test.c).  Runs against an already built software core, with
-# the interpreter and, where the core has lightrec, both dynarec modes.
+# GTE register lane: every GTE data register comes back from a loaded
+# state, survives switching between the interpreter and the dynarec, and
+# starts from its power-on value after a reset or a second load in the same
+# process (see gte_state_test.c).  Runs against an already built software
+# core, with the interpreter and, where the core has lightrec, both dynarec
+# modes.
 #
 # usage: tools/gte_state/run.sh [core]
 #   core defaults to the core in the tree root (MSYS2: the .dll)
@@ -37,8 +39,11 @@ trap 'rm -rf "$WORK"' EXIT
 HOST="$(pwd)/$HOST"
 
 fail=0
-for mode in disabled execute run_interpreter; do
-   (cd "$WORK" && "$HOST" "$CORE" "$mode") || fail=1
+for case in load reset reload; do
+   for mode in disabled execute run_interpreter; do
+      (cd "$WORK" && "$HOST" "$CORE" "$case" "$mode") || fail=1
+   done
 done
+(cd "$WORK" && "$HOST" "$CORE" toggle execute) || fail=1
 rm -f "$HOST"
 exit $fail

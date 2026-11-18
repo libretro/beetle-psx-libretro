@@ -3861,7 +3861,11 @@ void CPU_LightrecClear_method(PS_CPU *self, uint32_t addr, uint32_t size)
 
 static void lightrec_plugin_shutdown(void)
 {
+   /* The GTE runs on lightrec's register bank: take it back first */
+   GTE_SwitchRegisters(false, lightrec_regs->cp2d);
    lightrec_destroy(lightrec_state);
+   lightrec_state = NULL;
+   lightrec_regs  = NULL;
 }
 
 #endif
