@@ -48,6 +48,10 @@ tools/crop_window/crop_window_test.exe
 tools/gte_state/gte_state_test
 tools/gte_state/gte_state_test.exe
 
+# software rasterizer span lane build output (tools/gpu_span)
+tools/gpu_span/gpu_span_test
+tools/gpu_span/gpu_span_test.exe
+
 # Python bytecode from the VCD authoring script (tools/vcd)
 __pycache__/
 *.pyc

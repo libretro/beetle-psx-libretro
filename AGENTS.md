@@ -59,3 +59,6 @@ ever edited in this core.
   replacement I/O.
 - `sh tools/gte_state/run.sh` - the GTE data registers across state loads,
   resets, CPU mode switches and reloads. Needs a built core.
+- `sh tools/gpu_span/run.sh` - the software rasterizer's textured spans
+  against VRAM and frame hashes pinned from the scalar renderer, at 1x, 2x
+  and 4x. Needs a built core; runs an ARM build under qemu too.

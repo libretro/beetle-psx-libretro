@@ -681,6 +681,268 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
 }
 #endif /* SSE2 || NEON */
 
+#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+/*
+ * Vectorised inner loop for the *textured*, affine (not perspective-
+ * corrected) span, at every upscale factor.  Returns the pixels consumed;
+ * the macro's scalar loop finishes the rest, or runs the whole span when
+ * this returns 0.
+ *
+ * Texels are fetched one at a time, in pixel order, through GetTexel, so
+ * the emulated texture cache and its DrawTimeAvail charges see exactly
+ * the scalar sequence.  Eight fetched texels are then modulated, dithered,
+ * blended, mask-tested and written in place in the VRAM row:
+ *   - modulation: ((texel channel * colour) >> 4 + dither) >> 3, clamped
+ *     to 0..31, which is what DitherLUT[y][v][x] tabulates (with the
+ *     dither offset 0 when dithering is off: DitherLUT[2][v][3]);
+ *   - transparent texels (0x0000) are not written;
+ *   - blending applies only where the shaded pixel has bit 15 set, as
+ *     PlotPixel's `fore_pix & 0x8000` test, with the same packed
+ *     formulas DrawSpanVec_NT uses for its always-0x8000 pixels;
+ *   - the source mask bit is kept and MaskSetOR is ORed in.
+ *
+ * The scalar loop writes pixel i before it fetches texel i + 1; fetching
+ * a block first is the same only when no fetch can read a pixel this span
+ * writes.  A span whose destination row and columns can fall inside the
+ * texture window's VRAM rectangle therefore goes to the scalar loop.
+ *
+ * GOURAUD_LIT/TM_LIT/MO_LIT/DITHER_ON/BM_VAL/ME_LIT are literal ints from
+ * the macro, so this specialises per call site.
+ */
+static INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
+      const i_group *igp, const i_deltas *idl,
+      const int GOURAUD_LIT, const int TM_LIT, const int MO_LIT,
+      const int DITHER_ON, const int BM_VAL, const int ME_LIT)
+{
+   const uint32_t us   = gpu->upscale_shift;
+   const uint32_t dus  = gpu->dither_upscale_shift;
+   uint16_t *row       = &gpu->vram[(uint32_t)(y & ((512 << us) - 1)) << (10 + us)];
+   const uint16_t mso  = gpu->MaskSetOR;
+   uint32_t cu         = igp->u;
+   uint32_t cv         = igp->v;
+   uint32_t cr         = igp->r;
+   uint32_t cg         = igp->g;
+   uint32_t cb         = igp->b;
+   const uint32_t du   = idl->du_dx;
+   const uint32_t dv   = idl->dv_dx;
+   const uint32_t dr   = GOURAUD_LIT ? idl->dr_dx : 0;
+   const uint32_t dg   = GOURAUD_LIT ? idl->dg_dx : 0;
+   const uint32_t db   = GOURAUD_LIT ? idl->db_dx : 0;
+   const int8_t  *dither_row = dither_table[(y >> dus) & 3];
+   int32_t        done = 0;
+   uint16_t       tex[8];
+   int16_t        doff[8];
+   uint16_t       cr8[8], cg8[8], cb8[8];
+   int            l;
+
+   if (w < 8)
+      return 0;
+
+   /* Texture window rectangle in native VRAM halfwords: rows
+    * TWY_ADD .. TWY_ADD + 255, columns (TWX_ADD .. TWX_ADD + 255) >> (2 - MO)
+    * wrapped at 1024.  Conservative: the window masks are ignored. */
+   {
+      const uint32_t nrow  = ((uint32_t)y >> us) & 511;
+      const uint32_t ty0   = gpu->SUCV.TWY_ADD;
+      if (nrow - ty0 <= 255)
+      {
+         /* whole 4-halfword cache lines: a miss fills from fbtex_x & ~3 */
+         const uint32_t tx0 = ((gpu->SUCV.TWX_ADD >> (2 - MO_LIT)) & ~3u) & 1023;
+         const uint32_t tw  = (256u >> (2 - MO_LIT)) + 8;
+         const uint32_t dx0 = (uint32_t)x >> us;
+         const uint32_t dx1 = (uint32_t)(x + w - 1) >> us;
+         /* dx0 <= dx1 < 1024: the span never wraps.  The window may. */
+         if (((dx0 - tx0) & 1023) < tw || ((tx0 - dx0) & 1023) <= dx1 - dx0)
+            return 0;
+      }
+   }
+
+   for (; done + 8 <= w; done += 8)
+   {
+      const int32_t bx = x + done;
+      for (l = 0; l < 8; l++)
+      {
+         int32_t tex_u = (int32_t)(cu >> (COORD_FBS + COORD_POST_PADDING));
+         int32_t tex_v = (int32_t)(cv >> (COORD_FBS + COORD_POST_PADDING));
+         if (MO_LIT == 0)
+            tex[l] = GetTexel_TM0(gpu, tex_u, tex_v);
+         else if (MO_LIT == 1)
+            tex[l] = GetTexel_TM1(gpu, tex_u, tex_v);
+         else
+            tex[l] = GetTexel_TM2(gpu, tex_u, tex_v);
+         cu += du;
+         cv += dv;
+         if (TM_LIT)
+         {
+            cr8[l] = (uint16_t)((cr + dr * (uint32_t)l) >> (COORD_FBS + COORD_POST_PADDING));
+            cg8[l] = (uint16_t)((cg + dg * (uint32_t)l) >> (COORD_FBS + COORD_POST_PADDING));
+            cb8[l] = (uint16_t)((cb + db * (uint32_t)l) >> (COORD_FBS + COORD_POST_PADDING));
+            doff[l] = DITHER_ON ? dither_row[((bx + l) >> dus) & 3] : 0;
+         }
+      }
+#if defined(__SSE2__)
+      {
+         const __m128i v8000 = _mm_set1_epi16((short)0x8000);
+         const __m128i zero  = _mm_setzero_si128();
+         __m128i t   = _mm_loadu_si128((const __m128i*)tex);
+         __m128i bg  = _mm_loadu_si128((const __m128i*)&row[bx]);
+         __m128i pix = t;
+         __m128i wr  = _mm_andnot_si128(_mm_cmpeq_epi16(t, zero), _mm_set1_epi16(-1));
+         if (TM_LIT)
+         {
+            const __m128i m1F = _mm_set1_epi16(0x1F);
+            const __m128i d   = _mm_loadu_si128((const __m128i*)doff);
+            __m128i ir = _mm_srli_epi16(_mm_mullo_epi16(_mm_and_si128(t, m1F),
+                     _mm_loadu_si128((const __m128i*)cr8)), 4);
+            __m128i ig = _mm_srli_epi16(_mm_mullo_epi16(_mm_and_si128(_mm_srli_epi16(t, 5), m1F),
+                     _mm_loadu_si128((const __m128i*)cg8)), 4);
+            __m128i ib = _mm_srli_epi16(_mm_mullo_epi16(_mm_and_si128(_mm_srli_epi16(t, 10), m1F),
+                     _mm_loadu_si128((const __m128i*)cb8)), 4);
+            ir = _mm_min_epi16(_mm_max_epi16(_mm_srai_epi16(_mm_add_epi16(ir, d), 3), zero), m1F);
+            ig = _mm_min_epi16(_mm_max_epi16(_mm_srai_epi16(_mm_add_epi16(ig, d), 3), zero), m1F);
+            ib = _mm_min_epi16(_mm_max_epi16(_mm_srai_epi16(_mm_add_epi16(ib, d), 3), zero), m1F);
+            pix = _mm_or_si128(_mm_and_si128(t, v8000),
+                  _mm_or_si128(ir, _mm_or_si128(_mm_slli_epi16(ig, 5), _mm_slli_epi16(ib, 10))));
+         }
+         if (BM_VAL >= 0)
+         {
+            __m128i bl;
+            if (BM_VAL == BLEND_MODE_AVERAGE)
+            {
+               __m128i bgo = _mm_or_si128(bg, v8000);
+               __m128i xr  = _mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x0421));
+               /* pix + bgo carries out of the 16-bit lane; the bit it
+                * would shift down is bit 15 of the scalar result, always
+                * set for a semi-transparent pixel */
+               bl = _mm_or_si128(_mm_srli_epi16(_mm_sub_epi16(_mm_add_epi16(pix, bgo), xr), 1), v8000);
+            }
+            else if (BM_VAL == BLEND_MODE_ADD || BM_VAL == BLEND_MODE_ADD_FOURTH)
+            {
+               __m128i b2  = _mm_andnot_si128(v8000, bg);
+               __m128i fp  = (BM_VAL == BLEND_MODE_ADD) ? pix
+                  : _mm_or_si128(_mm_and_si128(_mm_srli_epi16(pix, 2), _mm_set1_epi16(0x1CE7)), v8000);
+               __m128i sum = _mm_add_epi16(fp, b2);
+               __m128i car = _mm_and_si128(_mm_sub_epi16(sum, _mm_and_si128(_mm_xor_si128(fp, b2),
+                           _mm_set1_epi16((short)0x8421))), _mm_set1_epi16((short)0x8420));
+               bl = _mm_or_si128(_mm_sub_epi16(sum, car), _mm_sub_epi16(car, _mm_srli_epi16(car, 5)));
+            }
+            else
+            {
+               /* 32-bit lanes for the 0x108420 borrow chain, both halves,
+                * truncated back to 16 bits with the packus bias trick. */
+               const __m128i m84 = _mm_set1_epi32(0x108420), m80 = _mm_set1_epi32(0x8000);
+               const __m128i mFF = _mm_set1_epi32(0xFFFF);
+               __m128i res[2];
+               int h;
+               for (h = 0; h < 2; h++)
+               {
+                  __m128i fp32 = h ? _mm_unpackhi_epi16(pix, zero) : _mm_unpacklo_epi16(pix, zero);
+                  __m128i bg32 = h ? _mm_unpackhi_epi16(bg, zero)  : _mm_unpacklo_epi16(bg, zero);
+                  __m128i bgo  = _mm_or_si128(bg32, m80);
+                  __m128i fpc  = _mm_andnot_si128(m80, fp32);
+                  __m128i diff = _mm_add_epi32(_mm_sub_epi32(bgo, fpc), m84);
+                  __m128i xr   = _mm_and_si128(_mm_xor_si128(bgo, fpc), m84);
+                  __m128i bor  = _mm_and_si128(_mm_sub_epi32(diff, xr), m84);
+                  res[h] = _mm_and_si128(_mm_and_si128(_mm_sub_epi32(diff, bor),
+                           _mm_sub_epi32(bor, _mm_srli_epi32(bor, 5))), mFF);
+                  res[h] = _mm_sub_epi32(res[h], m80);
+               }
+               bl = _mm_add_epi16(_mm_packs_epi32(res[0], res[1]), v8000);
+            }
+            /* blend where the shaded pixel carries the semi-transparency bit */
+            {
+               __m128i semi = _mm_srai_epi16(pix, 15);
+               pix = _mm_or_si128(_mm_and_si128(semi, bl), _mm_andnot_si128(semi, pix));
+            }
+         }
+         pix = _mm_or_si128(pix, _mm_set1_epi16((short)mso));
+         if (ME_LIT)
+            wr = _mm_andnot_si128(_mm_srai_epi16(bg, 15), wr);
+         _mm_storeu_si128((__m128i*)&row[bx],
+               _mm_or_si128(_mm_and_si128(wr, pix), _mm_andnot_si128(wr, bg)));
+      }
+#else /* GPU_HAVE_NEON */
+      {
+         const uint16x8_t v8000 = vdupq_n_u16(0x8000);
+         uint16x8_t t   = vld1q_u16(tex);
+         uint16x8_t bg  = vld1q_u16(&row[bx]);
+         uint16x8_t pix = t;
+         uint16x8_t wr  = vtstq_u16(t, t); /* 0xFFFF where the texel is non-zero */
+         if (TM_LIT)
+         {
+            const uint16x8_t m1F = vdupq_n_u16(0x1F);
+            const int16x8_t  z   = vdupq_n_s16(0), s1F = vdupq_n_s16(0x1F);
+            const int16x8_t  d   = vld1q_s16(doff);
+            uint16x8_t ir = vshrq_n_u16(vmulq_u16(vandq_u16(t, m1F), vld1q_u16(cr8)), 4);
+            uint16x8_t ig = vshrq_n_u16(vmulq_u16(vandq_u16(vshrq_n_u16(t, 5), m1F), vld1q_u16(cg8)), 4);
+            uint16x8_t ib = vshrq_n_u16(vmulq_u16(vandq_u16(vshrq_n_u16(t, 10), m1F), vld1q_u16(cb8)), 4);
+            ir = vreinterpretq_u16_s16(vminq_s16(vmaxq_s16(vshrq_n_s16(vaddq_s16(vreinterpretq_s16_u16(ir), d), 3), z), s1F));
+            ig = vreinterpretq_u16_s16(vminq_s16(vmaxq_s16(vshrq_n_s16(vaddq_s16(vreinterpretq_s16_u16(ig), d), 3), z), s1F));
+            ib = vreinterpretq_u16_s16(vminq_s16(vmaxq_s16(vshrq_n_s16(vaddq_s16(vreinterpretq_s16_u16(ib), d), 3), z), s1F));
+            pix = vorrq_u16(vandq_u16(t, v8000),
+                  vorrq_u16(ir, vorrq_u16(vshlq_n_u16(ig, 5), vshlq_n_u16(ib, 10))));
+         }
+         if (BM_VAL >= 0)
+         {
+            uint16x8_t bl;
+            if (BM_VAL == BLEND_MODE_AVERAGE)
+            {
+               uint16x8_t bgo = vorrq_u16(bg, v8000);
+               uint16x8_t xr  = vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x0421));
+               /* bit 15 of the scalar result: see the SSE2 arm */
+               bl = vorrq_u16(vshrq_n_u16(vsubq_u16(vaddq_u16(pix, bgo), xr), 1), v8000);
+            }
+            else if (BM_VAL == BLEND_MODE_ADD || BM_VAL == BLEND_MODE_ADD_FOURTH)
+            {
+               uint16x8_t b2  = vbicq_u16(bg, v8000);
+               uint16x8_t fp  = (BM_VAL == BLEND_MODE_ADD) ? pix
+                  : vorrq_u16(vandq_u16(vshrq_n_u16(pix, 2), vdupq_n_u16(0x1CE7)), v8000);
+               uint16x8_t sum = vaddq_u16(fp, b2);
+               uint16x8_t car = vandq_u16(vsubq_u16(sum, vandq_u16(veorq_u16(fp, b2), vdupq_n_u16(0x8421))), vdupq_n_u16(0x8420));
+               bl = vorrq_u16(vsubq_u16(sum, car), vsubq_u16(car, vshrq_n_u16(car, 5)));
+            }
+            else
+            {
+               const uint32x4_t m84 = vdupq_n_u32(0x108420), m80 = vdupq_n_u32(0x8000);
+               uint16x4_t res[2];
+               int h;
+               for (h = 0; h < 2; h++)
+               {
+                  uint32x4_t fp32 = vmovl_u16(h ? vget_high_u16(pix) : vget_low_u16(pix));
+                  uint32x4_t bg32 = vmovl_u16(h ? vget_high_u16(bg)  : vget_low_u16(bg));
+                  uint32x4_t bgo  = vorrq_u32(bg32, m80);
+                  uint32x4_t fpc  = vbicq_u32(fp32, m80);
+                  uint32x4_t diff = vaddq_u32(vsubq_u32(bgo, fpc), m84);
+                  uint32x4_t xr   = vandq_u32(veorq_u32(bgo, fpc), m84);
+                  uint32x4_t bor  = vandq_u32(vsubq_u32(diff, xr), m84);
+                  res[h] = vmovn_u32(vandq_u32(vsubq_u32(diff, bor), vsubq_u32(bor, vshrq_n_u32(bor, 5))));
+               }
+               bl = vcombine_u16(res[0], res[1]);
+            }
+            pix = vbslq_u16(vcgeq_u16(pix, v8000), bl, pix);
+         }
+         pix = vorrq_u16(pix, vdupq_n_u16(mso));
+         if (ME_LIT)
+            wr = vbicq_u16(wr, vcgeq_u16(bg, v8000));
+         vst1q_u16(&row[bx], vbslq_u16(wr, pix, bg));
+      }
+#endif
+      cr += dr * 8u;
+      cg += dg * 8u;
+      cb += db * 8u;
+   }
+   return done;
+}
+#else /* SSE2 || NEON */
+static INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
+      const i_group *igp, const i_deltas *idl,
+      const int GOURAUD_LIT, const int TM_LIT, const int MO_LIT,
+      const int DITHER_ON, const int BM_VAL, const int ME_LIT)
+{
+   return 0;
+}
+#endif /* SSE2 || NEON */
+
 /* The vectorised UV recovery needs a true IEEE single-precision divide so the
  * recovered coordinates are bit-identical to the scalar 1.0f / inv_w.  SSE2 has
  * _mm_div_ps and AArch64 NEON has vdivq_f32; 32-bit ARMv7 NEON has no vector
@@ -916,6 +1178,22 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
          } \
          x += _vn; \
          w -= _vn; \
+         if (w <= 0) \
+            return; \
+      } \
+   } \
+   /* Affine textured spans: texels fetched in order, the rest of the \
+    * pixel pipeline in SIMD (DrawSpanVec_T).  The perspective-correct \
+    * path and the remainder stay in the scalar loop below. */ \
+   if ((TEXTURED_LIT) && !pct) \
+   { \
+      int32_t _vt = DrawSpanVec_T(gpu, y, x, w, &ig, idl, (GOURAUD_LIT), \
+            (TM_LIT), (MO_LIT), DitherEnabled(gpu), (BM_VAL), (ME_LIT)); \
+      if (_vt > 0) \
+      { \
+         AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, (uint32_t)_vt); \
+         x += _vt; \
+         w -= _vt; \
          if (w <= 0) \
             return; \
       } \
