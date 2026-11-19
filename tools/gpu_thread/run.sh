@@ -1,6 +1,7 @@
 #!/bin/sh
 # GPU thread lane: the software renderer's VRAM, pictures, VRAM read back
-# through GPUREAD and emulated GPU timing are the same with the GPU thread
+# through GPUREAD and emulated GPU timing, to the clock at every frame's
+# end, are the same with the GPU thread
 # off, on, switched on and off mid-run, and with 2, 3 and 4 band lanes, at
 # 1x, 2x and 4x, with PGXP
 # off and on, with the 480i "Off" deinterlacer, and with light guns and
@@ -51,15 +52,16 @@ for cfg in "1x nopgxp" "2x nopgxp" "4x nopgxp" "1x pgxp" "2x pgxp" \
    ref="$(cd "$WORK" && ${RUN:-} "$HOST" "$CORE" "$1" off $2 $3 $4)" || { fail=1; continue; }
    # the waits for the GPU: with PGXP or another Line Render mode as
    # without PGXP in the default mode
+   waits="$(echo "$ref" | cut -d' ' -f4)"
    if [ "$2 $3" = "nopgxp " ]; then
-      eval "waits_$1=\${ref##* }"
+      eval "waits_$1=\$waits"
    elif [ "$2 $3" = "pgxp " ] \
         || { [ "$2" = nopgxp ] && [ "$3" = noline -o "$3" = aggline ]; }; then
       eval "base=\$waits_$1"
-      if [ "${ref##* }" = "$base" ]; then
-         echo "[gpu_thread] $cfg timing: ${ref##* } OK"
+      if [ "$waits" = "$base" ]; then
+         echo "[gpu_thread] $cfg timing: $waits OK"
       else
-         echo "[gpu_thread] $cfg timing: ${ref##* }, $1 nopgxp $base FAIL"
+         echo "[gpu_thread] $cfg timing: $waits, $1 nopgxp $base FAIL"
          fail=1
       fi
    fi

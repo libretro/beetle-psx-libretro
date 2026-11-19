@@ -9,20 +9,31 @@
  * test, a GPU interrupt, and changes of draw area, offset, texture window
  * and mask bits between them.  Some textured triangles have vertices the
  * GTE projects every frame and stores into the list, so with PGXP on they
- * carry sub-pixel positions and depths, drawn perspective-correct.
+ * carry sub-pixel positions and depths, drawn perspective-correct; one
+ * of them is a sliver a line tall, which the renderer's sprite fix-up
+ * treats otherwise when PGXP sees its depths.
  * Around the list the probe changes the
  * display every frame (interlaced and progressive, with line skipping, and
  * the display start), resets the command buffer, fully resets the GPU
  * every eighth frame, and reads a rectangle of VRAM back through GPUREAD,
  * folding it into a checksum in RAM.  It counts its waits for the GPU's
- * DMA into RAM too, which follows the GPU's emulated busy time.
+ * DMA into RAM too, which follows the GPU's emulated busy time.  At the
+ * end of every frame it writes commands to GP0 itself and changes what
+ * the GPU reads from outside GP0 while they wait in the FIFO: GP1(09)
+ * lets a waiting GP0(E1) disable textures, which drops the texture cache,
+ * and GP1(05) moves the display start a line under 480 interlaced lines,
+ * which changes the rows line skipping drops.  A copy of all of VRAM
+ * keeps the GPU busy past the end of the frame.
  *
  * The host runs FRAMES frames, saving a state part way and loading it back
  * later, then hashes native VRAM (the savestate's GPURAM entry), the last
- * video frame and main RAM.  With "gun", a GunCon and a Justifier aim at
+ * video frame and main RAM, and the whole state after every frame, which
+ * holds the GPU's emulated busy time (DrawTimeAvail) to the clock at each
+ * frame's end.  With "gun", a GunCon and a Justifier aim at
  * the middle of the picture: they sample the lines around it as they are
  * scanned out and draw their crosshairs on them, which the video frame
- * holds; the host hashes the whole state too.  run.sh runs it with the GPU thread off, on,
+ * holds.  It prints the four hashes and the DMA waits: VRAM, picture, RAM,
+ * waits, state.  run.sh runs it with the GPU thread off, on,
  * switched on and off every few frames, and with 2, 3 and 4 lanes drawing
  * bands, and checks they all agree.
  *
@@ -55,6 +66,8 @@
 /* Triangles whose vertices the GTE projects each frame, written into the
  * list with SWC2, so PGXP has sub-pixel positions and depths for them */
 #define GTE_TRIS    24
+/* and one more, a textured sliver one line tall at three depths */
+#define GTE_ALL     (GTE_TRIS + 1)
 #define TABLE_ADDR  0x80018000u
 
 #ifdef _WIN32
@@ -108,7 +121,7 @@ static uint32_t list[LIST_MAX];
 static size_t   list_len;
 static size_t   last_node;
 /* GTE vertices: VXY0, VZ0, and the list address its projection goes to */
-static uint32_t table[GTE_TRIS * 9];
+static uint32_t table[GTE_ALL * 9];
 
 /* One linked-list node per command; the header is patched to point to
  * the next node when that one starts. */
@@ -198,6 +211,30 @@ static void build_list(void)
          table[i * 9 + v * 3 + 0] = (((vy - 120) & 0xFFFFu) << 16) | ((vx - 160) & 0xFFFFu);
          table[i * 9 + v * 3 + 1] = vz;
          table[i * 9 + v * 3 + 2] = LIST_ADDR + (uint32_t)(last_node + 2 + v * 2) * 4;
+      }
+   }
+
+   /* The sliver: (100, 140), (200, 140) and (150, 141) on screen, with
+    * the same v along its rows.  The software renderer's sprite fix-up
+    * moves its texels a row up, but leaves a triangle PGXP sees at
+    * several depths alone; the GPU is timed for the texels the hardware
+    * gets either way. */
+   {
+      static const int32_t sv[3][3] = {
+         { -120, 40, 400 }, { 160, 80, 800 }, { -10, 21, 200 } };
+      unsigned v;
+      w[0] = 0x24808080u;
+      w[1] = 0; w[2] = (500u << 22) | (64u << 8) | 0u;
+      w[3] = 0; w[4] = (((640u >> 6) | (1u << 7) | (1u << 9)) << 16) | (64u << 8) | 100u;
+      w[5] = 0; w[6] = (56u << 8) | 50u;
+      node(w, 7);
+      for (v = 0; v < 3; v++)
+      {
+         table[GTE_TRIS * 9 + v * 3 + 0] =
+            (((uint32_t)sv[v][1] & 0xFFFFu) << 16) | ((uint32_t)sv[v][0] & 0xFFFFu);
+         table[GTE_TRIS * 9 + v * 3 + 1] = (uint32_t)sv[v][2];
+         table[GTE_TRIS * 9 + v * 3 + 2] =
+            LIST_ADDR + (uint32_t)(last_node + 2 + v * 2) * 4;
       }
    }
 
@@ -520,6 +557,26 @@ static void emit_branch(unsigned op, unsigned rs, unsigned rt, size_t target)
 #define BEQ 0x04
 #define BNE 0x05
 
+/* GPUSTAT bit (T0 holds 0x1F800000) */
+static void emit_gpustat_wait(uint32_t bit)
+{
+   const size_t loop = ncode;
+   emit(LW(T1, 0x1814, T0));
+   emit(NOP);
+   emit(LUI(T2, bit >> 16));
+   emit(AND(T1, T1, T2));
+   emit_branch(BEQ, T1, 0, loop);
+}
+static void emit_gp0(uint32_t w) { emit_li(T1, w); emit(SW(T1, 0x1810, T0)); }
+static void emit_gp1(uint32_t w) { emit_li(T1, w); emit(SW(T1, 0x1814, T0)); }
+static void emit_gp0_list(const uint32_t *w, unsigned n)
+{
+   unsigned i;
+   for (i = 0; i < n; i++)
+      emit_gp0(w[i]);
+}
+#define GPUSTAT_IDLE  0x04000000u   /* bit 26: idle, the FIFO empty */
+
 static int write_probe(void)
 {
    /* Display set-up, sent every frame after the optional reset */
@@ -597,7 +654,7 @@ static int write_probe(void)
 
    /* project the GTE triangles' vertices into the list */
    emit_li(T6, TABLE_ADDR);
-   emit(ADDIU(T4, 0, GTE_TRIS * 3));
+   emit(ADDIU(T4, 0, GTE_ALL * 3));
    gte = ncode;
    emit(LW(T1, 0, T6));
    emit(LW(T2, 4, T6));
@@ -666,6 +723,77 @@ static int write_probe(void)
    emit(SW(S0, 0, S1));                     /* DMA waits */
    emit(ADDIU(S2, S2, 1));
 
+   /* What the GPU reads from outside GP0 changing while commands wait in
+    * the FIFO, then a copy that keeps the GPU busy past the end of the
+    * frame, so the state the host hashes holds DrawTimeAvail as these
+    * commands left it.  The CPU writes these commands itself. */
+   {
+      /* 8-bit page at x = 640, texture disable off and on; lines not
+       * drawn to the display are skipped */
+      const uint32_t e1 = 0xE1000000u | (640u >> 6) | (1u << 7);
+      uint32_t setup[5], tex[7], rows[12];
+      unsigned i;
+
+      setup[0] = 0xE2000000u;
+      setup[1] = 0xE3000000u;
+      setup[2] = 0xE4000000u | (511u << 10) | 1023u;
+      setup[3] = 0xE5000000u;
+      setup[4] = 0xE6000000u;
+      /* A textured triangle over the page, twice, asking for texture
+       * disable itself too */
+      tex[0]  = 0x24808080u;
+      tex[1]  = xy(0, 0);
+      tex[2]  = 500u << 22;
+      tex[3]  = xy(255, 0);
+      tex[4]  = (((e1 & 0x7FFu) | (1u << 11)) << 16) | 255u;
+      tex[5]  = xy(0, 255);
+      tex[6]  = 255u << 8;
+      /* A long flat triangle, then two two rows tall, narrow in one row
+       * and wide in the other */
+      rows[0]  = 0x20406080u;
+      rows[1]  = xy(0, 260);
+      rows[2]  = xy(500, 260);
+      rows[3]  = xy(0, 480);
+      rows[4]  = 0x20804060u;
+      rows[5]  = xy(100, 300);
+      rows[6]  = xy(102, 300);
+      rows[7]  = xy(600, 302);
+      rows[8]  = 0x20608040u;
+      rows[9]  = xy(100, 310);
+      rows[10] = xy(102, 310);
+      rows[11] = xy(600, 312);
+
+      emit_gpustat_wait(GPUSTAT_IDLE);
+      emit_gp1(0x08000025u);                /* 480 interlaced lines */
+      emit_gp0_list(setup, 5);
+      emit_gp1(0x09000001u);
+      emit_gp0(e1);
+      emit_gpustat_wait(GPUSTAT_IDLE);
+      emit_gp1(0x09000000u);
+      /* GP1(09) lets the waiting GP0(E1) disable textures, which drops
+       * the texture cache before the second triangle */
+      emit_gp0_list(tex, 7);
+      emit_gp0(e1 | (1u << 11));
+      emit_gp0_list(tex, 7);
+      emit_gp1(0x09000001u);
+      emit_gpustat_wait(GPUSTAT_IDLE);
+      emit_gp0(e1);
+      emit_gp1(0x09000000u);
+      emit_gpustat_wait(GPUSTAT_IDLE);
+      /* The display start moves a line while the two-row triangles wait,
+       * so line skipping drops their other row */
+      emit_gp0_list(rows, 12);
+      emit(ANDI(T1, S2, 3));
+      emit(SLL(T1, T1, 13));
+      emit(ORI(T1, T1, 1u << 10));
+      emit(LUI(T2, 0x0500));
+      emit(OR(T1, T1, T2));
+      emit(SW(T1, 0x1814, T0));
+      /* VRAM onto itself, behind them: the FIFO holds all its words */
+      for (i = 0; i < 4; i++)
+         emit_gp0(i ? 0 : 0x80000000u);
+   }
+
    emit_li(T1, 0xFFFFFFFEu);
    emit(SW(T1, 0x1070, T0));                /* ack VBLANK */
    vb = ncode;
@@ -729,6 +857,19 @@ static uint32_t fnv(const unsigned char *p, size_t n, uint32_t h)
       h *= 16777619u;
    }
    return h;
+}
+
+/* fnv a word at a time, for the state after every frame */
+static uint32_t fnv_words(const unsigned char *p, size_t n, uint32_t h)
+{
+   size_t i;
+   for (i = 0; i + 4 <= n; i += 4)
+   {
+      uint32_t w;
+      memcpy(&w, p + i, 4);
+      h = (h ^ w) * 16777619u;
+   }
+   return fnv(p + i, n - i, h);
 }
 
 static void log_cb(enum retro_log_level level, const char *fmt, ...)
@@ -945,6 +1086,10 @@ int main(int argc, char **argv)
       if (f == LOAD_AT && !unserialize(saved, size))
          return 2;
       run();
+      /* the whole state after every frame: emulated timing exactly */
+      if (!serialize(state, size))
+         return 2;
+      state_hash = fnv_words(state, size, state_hash ^ (uint32_t)f);
    }
    {
       const unsigned char *ram = (const unsigned char *)memory_data(RETRO_MEMORY_SYSTEM_RAM);
@@ -953,9 +1098,6 @@ int main(int argc, char **argv)
       ram_hash = fnv(ram, 2048 * 1024, 2166136261u);
       memcpy(&waits, ram + 0xF0000, 4);
    }
-   if (!serialize(state, size))
-      return 2;
-   state_hash = fnv(state, size, 2166136261u);
    for (i = 0; i + klen + 4 + 1024 * 512 * 2 <= size; i++)
       if (!memcmp(state + i, key, klen))
       {
@@ -975,10 +1117,8 @@ int main(int argc, char **argv)
       fprintf(stderr, "[gpu_thread] no GPURAM entry in the state\n");
       return 2;
    }
-   printf("%08lx %08lx %08lx %lu", (unsigned long)vram_hash,
-         (unsigned long)video_hash, (unsigned long)ram_hash, (unsigned long)waits);
-   if (gun)
-      printf(" %08lx", (unsigned long)state_hash);
-   printf("\n");
+   printf("%08lx %08lx %08lx %lu %08lx\n", (unsigned long)vram_hash,
+         (unsigned long)video_hash, (unsigned long)ram_hash, (unsigned long)waits,
+         (unsigned long)state_hash);
    return 0;
 }
