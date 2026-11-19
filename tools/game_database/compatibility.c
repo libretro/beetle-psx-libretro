@@ -136,6 +136,28 @@ static void check_invalid_normalization(const char *source)
    }
 }
 
+static void check_ctr_culling(void)
+{
+   static const char *const serials[] = {
+      "PCPX-96183", "SCPS-10118", "SCPS-45470", "SCPS-91230",
+      "SCPS-91328", "SCES-02105", "SCUS-94426", "SCUS-94459"
+   };
+   size_t i;
+
+   for (i = 0; i < sizeof(serials) / sizeof(serials[0]); i++)
+   {
+      const struct beetle_game_database_entry *entry =
+         beetle_game_database_lookup(serials[i]);
+
+      if (!entry || entry->settings != PSX_COMPAT_PGXP_CULLING_ON)
+      {
+         fprintf(stderr, "FAIL %s CTR culling compatibility flags\n",
+               serials[i]);
+         failures++;
+      }
+   }
+}
+
 int main(void)
 {
    const uint32_t vertex_cache_settings =
@@ -185,6 +207,7 @@ int main(void)
    check_invalid_normalization("TEST_1A2.34");
 
    check_database_structure();
+   check_ctr_culling();
 
    if (beetle_game_database_lookup(NULL) ||
        beetle_game_database_lookup(""))
