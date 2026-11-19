@@ -7939,17 +7939,18 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
     * viewer), and only against a frame presented at the frontend's
     * current resolution with nothing changing in it: the display state a
     * change sets is drawn a frame later, so the frame after a change is
-    * drawn too. Draws above still resolve into VRAM. */
+    * drawn too. Draws above still resolve into VRAM. A frame the frontend
+    * throws away is not drawn either. */
    display_changed = GPU_get_display_change_count()
       || GPU_get_display_possibly_dirty();
-   if (     psx_frame_duping
+   if (psx_frame_hidden || (psx_frame_duping
          && !display_changed
          && !renderer->config.is_480i
          && !renderer->display_vram
          && psx_video_cable == GL_CABLE_NONE
          && renderer->presented_resolution
          && renderer->presented_resolution
-            == gl_packed_frontend_resolution(renderer))
+            == gl_packed_frontend_resolution(renderer)))
    {
       glDisable(GL_SCISSOR_TEST);
       glDisable(GL_DEPTH_TEST);

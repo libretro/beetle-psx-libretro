@@ -23970,14 +23970,14 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
     * has. Not where the picture moves on its own (interlaced fields, the
     * cable chain's subcarrier, the VRAM viewer), and only once a frame
     * has been presented. Visual core option changes wait for the next
-    * frame drawn. */
-   if (     psx_frame_duping
+    * frame drawn. A frame the frontend throws away is not drawn either. */
+   if (psx_frame_hidden || (psx_frame_duping
          && vk_dupe_ready
          && !GPU_get_display_change_count()
          && !GPU_get_display_possibly_dirty()
          && !renderer->render_state.is_480i
          && !show_vram
-         && psx_video_cable == RHI_CABLE_NONE)
+         && psx_video_cable == RHI_CABLE_NONE))
    {
       renderer_flush(renderer);
       video_refresh_cb(NULL, prev_frame_width, prev_frame_height, 0);

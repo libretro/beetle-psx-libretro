@@ -134,6 +134,7 @@ static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
 static bool display_notifications = true;
 bool psx_frame_duping = false;
+bool psx_frame_hidden = false;
 static unsigned image_offset = 0;
 static unsigned image_crop = 0;
 static bool enable_memcard1 = false;
@@ -4584,6 +4585,16 @@ static bool frame_retained(void)
       || phase == RETRO_EXECUTION_PHASE_RETAINED;
 }
 
+/* Whether the frontend shows this frame's picture: Run-Ahead's kept
+ * frames and Preemptive Frames' replays are run with video off. A
+ * frontend that cannot say shows every frame */
+static bool frame_shown(void)
+{
+   int flags = 0;
+   return !environ_cb(RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE, &flags)
+      || (flags & RETRO_AV_ENABLE_VIDEO);
+}
+
 static bool state_managed(void)
 {
    int context = RETRO_SAVESTATE_CONTEXT_NORMAL;
@@ -6944,6 +6955,8 @@ void retro_run(void)
    if (!PSX_CPU || !PSX_FIO || !PSX_CDC)
       return;
 
+   psx_frame_hidden = !frame_shown();
+
    /* Keep the HDR encode in sync with the frontend's live HDR controls.
     * RetroArch's paper-white and Colour Boost sliders change at runtime and
     * do NOT fire the core's variable-update path, so re-query them each frame
@@ -7438,7 +7451,11 @@ void retro_run(void)
       audio_batch_cb(&IntermediateBuffer[0][0], spec.SoundBufSize);
    }
 
-   if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0))
+   /* A change to the display is shown once: a hidden frame leaves it to
+    * the next frame shown, which would otherwise repeat the picture the
+    * frontend has from before it */
+   if (     !psx_frame_hidden
+         && (GPU_get_display_possibly_dirty() || GPU_get_display_change_count() != 0))
    {
       internal_frame_count++;
       GPU_set_display_change_count(0);
@@ -7542,6 +7559,7 @@ void retro_deinit(void)
    display_internal_framerate = false;
    display_notifications      = true;
    psx_frame_duping         = false;
+   psx_frame_hidden         = false;
    reset_hdr_output_state();
 
    /* Capability flags re-detected by retro_init. */

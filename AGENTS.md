@@ -71,6 +71,13 @@ ever edited in this core.
   Frames a card the game writes reaches its file during play, two seconds
   of kept frames after the write, and is not written again unchanged.
   Needs a built core.
+- `sh tools/hidden_frames/run.sh` - with Frame Duping on, a change to the
+  display made in a frame the frontend hides (Run-Ahead, Preemptive
+  Frames) still reaches the screen. Needs a built core.
+- `sh tools/vkhost/runahead_lanes.sh` - Run-Ahead on the Vulkan renderer:
+  frames run with video off draw no picture, and the frames shown are
+  those of a frontend that reports video on throughout. Needs a HAVE_HW=1
+  build and a Vulkan device (lavapipe works).
 - `sh tools/vkhost/lifetime_lanes.sh` - managed savestates on the Vulkan
   renderer: a rollback every frame with the frontend's lifetime callbacks
   gives the frames of a run without one, at 1x to 4x, with the Software

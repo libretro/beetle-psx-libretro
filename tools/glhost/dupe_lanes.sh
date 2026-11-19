@@ -15,7 +15,11 @@
 #     without duping shows;
 #   - through the composite cable, whose subcarrier moves every field,
 #     no frame is sent as NULL and every one matches the run without
-#     duping.
+#     duping;
+#   - with video reported off throughout (GET_AUDIO_VIDEO_ENABLE, as
+#     RetroArch runs Run-Ahead's kept frames), every frame is sent as
+#     NULL, through the composite cable too, and VRAM is drawn all the
+#     same.
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/glhost/dupe_lanes.sh [core.so]
@@ -36,8 +40,8 @@ python3 tools/glhost/gen_dupe_exe.py "$OUT/dupe.exe"
 
 run()
 {
-   # $1 name, $2 GLHOST_VARS
-   GLHOST_RAM_OUT="$OUT/$1.bin:100000:100000" \
+   # $1 name, $2 GLHOST_VARS, $3 extra environment
+   env $3 GLHOST_RAM_OUT="$OUT/$1.bin:100000:100000" \
    GLHOST_VARS="${P}_renderer=hardware_gl;${P}_renderer_software_fb=disabled;$2" \
       tools/glhost/glhost "$CORE" "$OUT/dupe.exe" - "$FRAMES" "$OUT/$1" \
       > "$OUT/$1.log" 2>&1 || { tail -20 "$OUT/$1.log"; exit 1; }
@@ -46,6 +50,8 @@ run on       "${P}_frame_duping=enabled"
 run off      "${P}_frame_duping=disabled"
 run comp_on  "${P}_frame_duping=enabled;${P}_video_cable=composite"
 run comp_off "${P}_frame_duping=disabled;${P}_video_cable=composite"
+run hidden      "${P}_frame_duping=disabled" "GLHOST_AVFLAGS=2"
+run comp_hidden "${P}_frame_duping=disabled;${P}_video_cable=composite" "GLHOST_AVFLAGS=2"
 
 python3 - "$OUT" "$FRAMES" <<'PY'
 import re, struct, sys
@@ -78,6 +84,14 @@ for run in ('off', 'on', 'comp_off', 'comp_on'):
              'as' if same else 'NOT as'))
     ok &= dupe_ok and bad == 0 and same
     ok &= run.startswith('comp') or white > grey > last == 0
+for run in ('hidden', 'comp_hidden'):
+    log = open('%s/%s.log' % (out, run)).read()
+    duped = int(re.search(r'duped: (\d+) frames', log).group(1))
+    vram = struct.unpack('<%dH' % (1024 * 512), open('%s/%s.bin' % (out, run), 'rb').read()[:2 * 1024 * 512])
+    ref = struct.unpack('<%dH' % (1024 * 512), open('%s/%s.bin' % (out, run.replace('hidden', 'off')), 'rb').read()[:2 * 1024 * 512])
+    print('%s: %d of %d frames sent as NULL; VRAM %s the run with video on'
+          % (run, duped, frames, 'as' if vram == ref else 'NOT as'))
+    ok &= duped == frames and vram == ref
 print('dupe_lanes: %s' % ('PASS' if ok else 'FAIL'))
 sys.exit(0 if ok else 1)
 PY
