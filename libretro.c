@@ -4564,6 +4564,25 @@ static void fallback_log(enum retro_log_level level, const char *fmt, ...)
 
 static bool state_lifetime;
 
+/* A load by the frontend's own rollback (Run-Ahead, Preemptive Frames)
+ * brings back what this instance already had */
+static bool state_same_instance(void)
+{
+   int context = RETRO_SAVESTATE_CONTEXT_NORMAL;
+   return environ_cb(RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT, &context)
+      && (context == RETRO_SAVESTATE_CONTEXT_RUNAHEAD_SAME_INSTANCE
+       || context == RETRO_SAVESTATE_CONTEXT_SAME_INSTANCE_MANAGED);
+}
+
+/* Whether the frame being run is kept and run for the first time: a
+ * frontend that cannot say runs every frame so */
+static bool frame_retained(void)
+{
+   enum retro_execution_phase phase = RETRO_EXECUTION_PHASE_RETAINED;
+   return !environ_cb(RETRO_ENVIRONMENT_GET_EXECUTION_PHASE, &phase)
+      || phase == RETRO_EXECUTION_PHASE_RETAINED;
+}
+
 static bool state_managed(void)
 {
    int context = RETRO_SAVESTATE_CONTEXT_NORMAL;
@@ -7159,7 +7178,10 @@ void retro_run(void)
 
    RebaseTS(timestamp);
 
-   // Save memcards if dirty.
+   /* Save memcards if dirty. Only the frames a frontend keeps and runs
+    * for the first time count: a replayed frame's time was counted once,
+    * and a speculative frame's card writes are thrown away with it */
+   if (frame_retained())
    {
       unsigned players = input_get_player_count();
       int i;
@@ -7760,7 +7782,9 @@ bool retro_unserialize(const void *data, size_t size)
    st.sizing         = false;
 
    FastSaveStates = UsingFastSavestates();
+   FrontIO_SetStateLoadMarksMemcardsDirty(!state_same_instance());
    okay           = MDFNSS_LoadSM(&st, 0, 0);
+   FrontIO_SetStateLoadMarksMemcardsDirty(true);
    FastSaveStates = false;
    GPU_SetStateSnapshot(false, 0, 0);
    return okay;

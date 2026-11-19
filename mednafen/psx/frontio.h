@@ -134,6 +134,8 @@ void     FrontIO_SetCrosshairsColor (FrontIO *fio, unsigned port, uint32_t color
 
 InputDevice *FrontIO_GetMemcardDevice(FrontIO *fio, unsigned which);
 uint64_t     FrontIO_GetMemcardDirtyCount(FrontIO *fio, unsigned which);
+/* Whether a state load counts as a write to every card it fills in */
+void         FrontIO_SetStateLoadMarksMemcardsDirty(bool on);
 
 /* the (which) form picks up the path from the saved
  * mc_filenames[] cache and is implemented as a thin wrapper. */

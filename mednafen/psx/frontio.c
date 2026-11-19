@@ -1256,6 +1256,13 @@ void FrontIO_SetInput(FrontIO *self_, unsigned int port, const char *type, void 
    FrontIO_MapDevicesToPorts(self_);
 }
 
+static bool memcard_load_marks_dirty = true;
+
+void FrontIO_SetStateLoadMarksMemcardsDirty(bool on)
+{
+   memcard_load_marks_dirty = on;
+}
+
 uint64_t FrontIO_GetMemcardDirtyCount(FrontIO *self_, unsigned int which)
 {
    FrontIO *self = self_;
@@ -5325,7 +5332,10 @@ static int InputDevice_Memcard_StateAction(InputDevice *self_, StateMem* sm, int
          ret &= MDFNSS_StateAction(sm, load, data_only, CD_StateRegs, tmp_name);
       }
 
-      if(load)
+      /* A loaded state may hold another card's data: write it out. One
+       * the same instance made in a rollback holds what the card already
+       * had, its writes counted when they were made */
+      if(load && memcard_load_marks_dirty)
       {
          if(self->data_used)
             self->dirty_count++;
