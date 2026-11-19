@@ -4572,33 +4572,37 @@ static bool state_managed(void)
       && context == RETRO_SAVESTATE_CONTEXT_SAME_INSTANCE_MANAGED;
 }
 
-/* magic, slot, generation, whether there is a snapshot */
-static void state_token_write(uint8_t *end, bool have, uint32_t slot, uint32_t gen)
+/* magic, slot, generation, flags */
+#define STATE_TOKEN_SNAPSHOT 1u /* names a snapshot */
+#define STATE_TOKEN_VRAM_OLD 2u /* VRAM before the token not brought up to date */
+
+static void state_token_write(uint8_t *end, uint32_t flags, uint32_t slot, uint32_t gen)
 {
    uint32_t t[4];
    t[0] = STATE_TOKEN_MAGIC;
    t[1] = slot;
    t[2] = gen;
-   t[3] = have ? 1 : 0;
+   t[3] = flags;
    memcpy(end - STATE_TOKEN_SIZE, t, STATE_TOKEN_SIZE);
 }
 
-static bool state_token_read(const uint8_t *end, uint32_t *slot, uint32_t *gen)
+/* The token's flags, 0 when it names no snapshot */
+static uint32_t state_token_read(const uint8_t *end, uint32_t *slot, uint32_t *gen)
 {
    uint32_t t[4];
    memcpy(t, end - STATE_TOKEN_SIZE, STATE_TOKEN_SIZE);
-   if (t[0] != STATE_TOKEN_MAGIC || t[3] != 1)
-      return false;
+   if (t[0] != STATE_TOKEN_MAGIC || !(t[3] & STATE_TOKEN_SNAPSHOT))
+      return 0;
    *slot = t[1];
    *gen  = t[2];
-   return true;
+   return t[3];
 }
 
 static void RETRO_CALLCONV state_release(const void *data, size_t size)
 {
    uint32_t slot, gen;
    if (data && size >= STATE_TOKEN_SIZE
-         && state_token_read((const uint8_t*)data + size, &slot, &gen))
+         && state_token_read((const uint8_t*)data + size, &slot, &gen) != 0)
       rhi_intf_snapshot_release(slot, gen);
 }
 
@@ -7655,6 +7659,7 @@ bool retro_serialize(void *data, size_t size)
    StateMem st;
    bool     ret;
    bool     managed = state_managed();
+   uint32_t flags   = 0, slot = 0, gen = 0;
 
    if (!data || size == 0)
       return false;
@@ -7678,15 +7683,28 @@ bool retro_serialize(void *data, size_t size)
    st.fixed          = true;
    st.sizing         = false;
 
+   /* The snapshot first: the GPU's VRAM is then in it, and the state need
+    * not fetch it back */
+   if (managed && rhi_intf_snapshot_save(&slot, &gen))
+   {
+      flags = STATE_TOKEN_SNAPSHOT;
+      if (!rhi_intf_has_software_renderer())
+         flags |= STATE_TOKEN_VRAM_OLD;
+      GPU_SetStateSnapshotSaved(true);
+   }
+
    FastSaveStates = UsingFastSavestates();
    ret            = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
    FastSaveStates = false;
+   GPU_SetStateSnapshotSaved(false);
 
-   if (ret && managed)
+   if (managed)
    {
-      uint32_t slot = 0, gen = 0;
-      bool     have = rhi_intf_snapshot_save(&slot, &gen);
-      state_token_write((uint8_t*)data + size + STATE_TOKEN_SIZE, have, slot, gen);
+      /* A refused save is never released: its slot goes back now */
+      if (!ret && flags)
+         rhi_intf_snapshot_release(slot, gen);
+      else if (ret)
+         state_token_write((uint8_t*)data + size + STATE_TOKEN_SIZE, flags, slot, gen);
    }
 
    if (!ret)
@@ -7715,11 +7733,21 @@ bool retro_unserialize(const void *data, size_t size)
 
    if (state_managed())
    {
-      uint32_t slot, gen;
+      uint32_t slot, gen, flags;
       if (size <= STATE_TOKEN_SIZE)
          return false;
-      if (state_token_read((const uint8_t*)data + size, &slot, &gen))
-         GPU_SetStateSnapshot(true, slot, gen);
+      flags = state_token_read((const uint8_t*)data + size, &slot, &gen);
+      if (flags)
+      {
+         /* Without its snapshot, a state that left VRAM behind is no state */
+         if (!rhi_intf_snapshot_valid(slot, gen))
+         {
+            if (flags & STATE_TOKEN_VRAM_OLD)
+               return false;
+         }
+         else
+            GPU_SetStateSnapshot(true, slot, gen);
+      }
       size -= STATE_TOKEN_SIZE;
    }
 

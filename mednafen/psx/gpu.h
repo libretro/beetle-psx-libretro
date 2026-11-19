@@ -354,6 +354,7 @@ void     GPU_RestoreStateP1(bool load, bool sizing);
 void     GPU_RestoreStateP2(bool load);
 void     GPU_RestoreStateP3(void);
 void     GPU_SetStateSnapshot(bool on, uint32_t slot, uint32_t gen);
+void     GPU_SetStateSnapshotSaved(bool on);
 
 void GPU_set_dither_upscale_shift(uint8_t factor);
 

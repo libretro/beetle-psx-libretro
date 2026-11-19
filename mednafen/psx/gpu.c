@@ -3234,6 +3234,11 @@ void GPU_FlushDeferredScanout(MDFN_Surface *target)
 
 /* sizing: the state is only being measured (retro_serialize_size), its
  * bytes never read, so nothing has to be brought up to date for it. */
+/* A managed state's snapshot of VRAM as the hardware renderer held it,
+ * put back in place of uploading the state's 1x VRAM. */
+static bool     gpu_snapshot_on, gpu_snapshot_restoring, gpu_snapshot_saved;
+static uint32_t gpu_snapshot_slot, gpu_snapshot_gen;
+
 void GPU_RestoreStateP1(bool load, bool sizing)
 {
    unsigned i;
@@ -3246,7 +3251,10 @@ void GPU_RestoreStateP1(bool load, bool sizing)
       PSX_EventVirtual(PSX_EVENT_GPU, false);
    }
 
-   if (!load && !sizing && !rhi_intf_has_software_renderer())
+   /* A managed state that took a snapshot carries the GPU's VRAM there:
+    * the readback below would only fetch what the snapshot holds. */
+   if (!load && !sizing && !rhi_intf_has_software_renderer()
+         && !gpu_snapshot_saved)
    {
       /* Pure hardware renderer: the composited framebuffer lives only on the
        * GPU. CPU-side GPU.vram is coherent solely where the game issued an
@@ -3360,16 +3368,19 @@ void GPU_RestoreStateP3(void)
    gpu_restore_state_p3(true);
 }
 
-/* A managed state's snapshot of VRAM as the hardware renderer held it,
- * put back in place of uploading the state's 1x VRAM. */
-static bool     gpu_snapshot_on, gpu_snapshot_restoring;
-static uint32_t gpu_snapshot_slot, gpu_snapshot_gen;
 
 static void gpu_restore_state_snapshot(void)
 {
    gpu_snapshot_restoring = true;
    gpu_restore_state_p3(false);
    gpu_snapshot_restoring = false;
+}
+
+/* The state being saved has its VRAM in a snapshot: GPU.vram is saved as
+ * it is, without bringing it up to date from the GPU first. */
+void GPU_SetStateSnapshotSaved(bool on)
+{
+   gpu_snapshot_saved = on;
 }
 
 void GPU_SetStateSnapshot(bool on, uint32_t slot, uint32_t gen)

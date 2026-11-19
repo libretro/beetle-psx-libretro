@@ -13,6 +13,12 @@
 #     rollback: an ordinary state reloads 1x VRAM, which is what the
 #     snapshots are for, and the content shows it;
 #   - every managed save is released, by teardown at the latest;
+#   - with the Software Framebuffer off, a managed save that got a snapshot
+#     reads no VRAM back from the GPU (an ordinary one reads it all, less
+#     what the coherence map skips), and with BEETLE_RHI_COHERENCE_CHECK no
+#     read of VRAM the core does make finds a stale pixel;
+#   - a state released before it is loaded is refused when it left VRAM on
+#     the GPU, and loads when it carries VRAM;
 #   - the second half of each run makes no Vulkan objects: the snapshots'
 #     images are made once;
 #   - the validation layer reports nothing.
@@ -86,12 +92,44 @@ hdr|${P}_internal_resolution=2x;${P}_color_format=30bit_hdr;${P}_renderer_softwa
 LANES
 
 # The control: the same rollback with ordinary states loses the 2x picture
-run 2x_ordinary "VKHOST_PREEMPT=1" "${P}_internal_resolution=2x;${P}_renderer_software_fb=disabled"
+run 2x_ordinary "VKHOST_PREEMPT=1 BEETLE_RHI_COHERENCE_CHECK=1" "${P}_internal_resolution=2x;${P}_renderer_software_fb=disabled"
 if same 2x_ordinary 2x_plain; then
    echo "2x: rollback with ordinary states matches the plain run; the content does not show what snapshots fix" >&2
    fail=1
 else
    echo "2x_ordinary rollback frames differ from the plain run, as they should"
 fi
+
+# Readbacks: the managed run against the ordinary one, every read checked
+run 2x_coherence "VKHOST_PREEMPT=1 VKHOST_LIFETIME=1 BEETLE_RHI_COHERENCE_CHECK=1" "${P}_internal_resolution=2x;${P}_renderer_software_fb=disabled"
+for r in 2x_ordinary 2x_coherence; do
+   whole=$(grep -c "\[rhi_coherence\] read (0,0 1024x512)" "$OUT/$r.log" || true)
+   stale=$(grep -c "\[rhi_coherence\] stale" "$OUT/$r.log" || true)
+   printf '%-12s %s whole-VRAM reads, %s stale\n' "$r" "$whole" "$stale"
+   if [ "$stale" != 0 ]; then
+      grep "\[rhi_coherence\] stale" "$OUT/$r.log" | head -5
+      fail=1
+   fi
+   case $r in
+      2x_ordinary)  [ "$whole" -ge $((FRAMES - 2)) ] || { echo "$r: the ordinary saves did not read VRAM back" >&2; fail=1; } ;;
+      2x_coherence) [ "$whole" = 0 ] || { echo "$r: managed saves read VRAM back" >&2; fail=1; } ;;
+   esac
+done
+if ! same 2x_coherence 2x_plain; then
+   echo "2x_coherence: frames differ from the plain run" >&2
+   fail=1
+fi
+
+# A frontend that releases a state before loading it: with the Software
+# Framebuffer off the state left VRAM on the GPU, so the core must refuse
+# the load; with it on the state carries VRAM and the load goes ahead
+for r in "early_hw|disabled|1" "early_swfb|enabled|0"; do
+   name=${r%%|*}; rest=${r#*|}; swfb=${rest%%|*}; want=${rest#*|}
+   run "$name" "VKHOST_PREEMPT=1 VKHOST_LIFETIME=1 VKHOST_LIFETIME_EARLY_RELEASE=60" \
+      "${P}_internal_resolution=2x;${P}_renderer_software_fb=$swfb"
+   got=$(sed -n 's/.*releases, \([0-9]*\) refused loads.*/\1/p' "$OUT/$name.log")
+   printf '%-12s %s refused loads\n' "$name" "$got"
+   [ "$got" = "$want" ] || { echo "$name: expected $want refused loads" >&2; fail=1; }
+done
 [ "$fail" = 0 ] || exit 1
 echo "vkhost: lifetime lanes passed"

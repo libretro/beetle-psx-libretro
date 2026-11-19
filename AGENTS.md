@@ -70,5 +70,7 @@ ever edited in this core.
 - `sh tools/vkhost/lifetime_lanes.sh` - managed savestates on the Vulkan
   renderer: a rollback every frame with the frontend's lifetime callbacks
   gives the frames of a run without one, at 1x to 4x, with the Software
-  Framebuffer, adaptive smoothing and HDR. Needs a HAVE_HW=1 build and a
+  Framebuffer, adaptive smoothing and HDR; managed saves read no VRAM back
+  with the Software Framebuffer off, and a state released before its load
+  is refused when it needs its snapshot. Needs a HAVE_HW=1 build and a
   Vulkan device (lavapipe works).

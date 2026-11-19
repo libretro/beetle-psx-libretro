@@ -22,7 +22,11 @@
  *     managed context, a buffer's state is released before another is saved
  *     into it, every one is released before context_destroy, and
  *     GET_EXECUTION_PHASE reports the replay as REPLAY. Ends with how many
- *     managed saves and releases there were.
+ *     managed saves, releases and refused loads there were.
+ *   VKHOST_LIFETIME_EARLY_RELEASE=N: with VKHOST_LIFETIME, release the state
+ *     about to be loaded on frame N before loading it, as a frontend that
+ *     breaks the contract would; the core should refuse that load when the
+ *     state needs what the release dropped.
  *   VKHOST_VARS_AT: semicolon list of frame:key=value option changes, each
  *     applied before that frame's retro_run and reported through
  *     GET_VARIABLE_UPDATE, as a frontend does when the user edits an option
@@ -770,7 +774,8 @@ static struct retro_savestate_lifetime lt_iface;
 static void  *lt_buf[2];
 static size_t lt_size;
 static int    lt_owned[2];
-static long   lt_saves, lt_releases;
+static long   lt_saves, lt_releases, lt_refused;
+static int    lt_early_release = -1;
 
 static void lt_release(int i)
 {
@@ -1302,6 +1307,8 @@ int main(int argc, char **argv)
    if (getenv("VKHOST_NEGOTIATION"))
       negotiation_offer = (unsigned)atoi(getenv("VKHOST_NEGOTIATION"));
    lt_on = getenv("VKHOST_LIFETIME") != NULL;
+   if (getenv("VKHOST_LIFETIME_EARLY_RELEASE"))
+      lt_early_release = atoi(getenv("VKHOST_LIFETIME_EARLY_RELEASE"));
 
    if (argc < 3)
    { fprintf(stderr, "usage: %s core content [state] [frames] [outdir]\n", argv[0]); return 2; }
@@ -1501,9 +1508,14 @@ run_frames_sw:
             {
                if (have_prev)
                {
+                  if (i == lt_early_release)
+                     lt_release(0);
                   lt_managed_ctx = 1;
                   if (!unser(lt_buf[0], lt_size))
+                  {
+                     lt_refused++;
                      fprintf(stderr, "[vkhost] rollback unser FAILED frame %d\n", i);
+                  }
                   lt_managed_ctx = 0;
                   lt_phase = RETRO_EXECUTION_PHASE_REPLAY;
                   retro_run_fn();   /* replay the previous frame */
@@ -1724,8 +1736,8 @@ run_frames_sw:
      }
    }
    if (lt_on)
-      fprintf(stderr, "[vkhost] lifetime: %ld managed saves, %ld releases\n",
-            lt_saves, lt_releases);
+      fprintf(stderr, "[vkhost] lifetime: %ld managed saves, %ld releases, %ld refused loads\n",
+            lt_saves, lt_releases, lt_refused);
    { void (*f)(void) = dlsym(core, "retro_unload_game"); if (f) f(); }
    { void (*f)(void) = dlsym(core, "retro_deinit"); if (f) f(); }
    if (next_content && !(validation_errors || queue_violations || queue_waits_locked))
