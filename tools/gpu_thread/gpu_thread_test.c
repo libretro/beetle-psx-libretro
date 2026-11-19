@@ -27,6 +27,7 @@
  * bands, and checks they all agree.
  *
  * usage: gpu_thread_test <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint] [gun]
+ *                        [noline|aggline]
  * Runs in the current directory: it writes the probe EXE and an all-zero
  * BIOS image there.  "gpu_thread_test probe" only writes the probe EXE and
  * keeps it, for the hardware renderers' hosts (tools/glhost/timing_lanes.sh). */
@@ -88,6 +89,7 @@ static const char *resolution = "1x";
 static const char *thread_mode = "off";
 static const char *pgxp_mode = "disabled";
 static const char *deint_mode = "weave";
+static const char *line_mode  = "default";
 static unsigned    frame_no;
 static uint32_t    video_hash;
 
@@ -438,6 +440,24 @@ static void build_list(void)
       }
    }
 
+   /* One-pixel-wide axis-aligned textured triangles, as games draw lines
+    * with: Line Render adds the triangle that completes each line */
+   w[0] = 0xE1000000u | (640u >> 6) | (2u << 7); node(w, 1);
+   for (i = 0; i < 64; i++)
+   {
+      const int      lx  = 40 + (int)(i & 7) * 60, ly = 290 + (int)(i >> 3) * 24;
+      const uint32_t uv0 = (uint32_t)((i & 7) * 16) | ((uint32_t)(i >> 3) * 8 << 8);
+      const uint32_t pg  = ((640u >> 6) | (2u << 7)) << 16;
+      w[0] = 0x24808080u; w[1] = xy(lx, ly);       w[2] = uv0;
+      w[3] = xy(lx, ly + 1);                      w[4] = pg | uv0;
+      w[5] = xy(lx + 100, ly);                    w[6] = uv0 + 100;
+      node(w, 7);
+      w[0] = 0x24808080u; w[1] = xy(lx, ly + 40);  w[2] = uv0;
+      w[3] = xy(lx + 1, ly + 40);                 w[4] = pg | uv0;
+      w[5] = xy(lx, ly + 120);                    w[6] = uv0 + (80u << 8);
+      node(w, 7);
+   }
+
    w[0] = 0xE6000000u; node(w, 1);
    /* Dithering on at the end, so what a GP1 reset clears shows next frame */
    w[0] = 0xE1000000u | (1u << 9); node(w, 1);
@@ -752,6 +772,8 @@ static const char *get_var(const char *key)
       return "enabled";
    if (!strcmp(key, "beetle_psx_deinterlacer"))
       return deint_mode;
+   if (!strcmp(key, "beetle_psx_line_render"))
+      return line_mode;
    return NULL;
 }
 
@@ -842,7 +864,7 @@ int main(int argc, char **argv)
       return write_probe() ? 0 : 2;
    if (argc < 5)
    {
-      fprintf(stderr, "usage: %s <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint] [gun]\n",
+      fprintf(stderr, "usage: %s <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint] [gun] [noline|aggline]\n",
             argv[0]);
       return 2;
    }
@@ -855,6 +877,10 @@ int main(int argc, char **argv)
          deint_mode = "off";
       else if (!strcmp(argv[a], "gun"))
          gun = 1;
+      else if (!strcmp(argv[a], "noline"))
+         line_mode = "disabled";
+      else if (!strcmp(argv[a], "aggline"))
+         line_mode = "aggressive";
    }
    if (!write_probe())
    {

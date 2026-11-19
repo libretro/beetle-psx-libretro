@@ -1767,6 +1767,27 @@ DEFINE_DrawTriangleX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1, 0)
          DrawTriangle_cost_t0_g0_o((gpu), nv, (pct)); \
    } while (0)
 
+/* A triangle the Line Render enhancement adds is drawn, but the hardware
+ * never draws it: what it charges and what it leaves in the texture cache
+ * are put back, and timing does not walk it. */
+static NO_INLINE void gpu_line_added_begin(PS_GPU *g, int32_t *time)
+{
+   *time = g->DrawTimeAvail;
+   memcpy(g->TexCache_line, g->TexCache, sizeof(g->TexCache_line));
+   if (g->tc_track)
+      memcpy(g->tc_pos_line, g->tc_pos, sizeof(g->tc_pos_line));
+}
+
+static NO_INLINE void gpu_line_added_end(PS_GPU *g, int32_t time)
+{
+   g->DrawTimeAvail = time;
+   memcpy(g->TexCache, g->TexCache_line, sizeof(g->TexCache));
+   if (g->tc_track)
+      memcpy(g->tc_pos, g->tc_pos_line, sizeof(g->tc_pos));
+   g->last_tex_line = ~0U;
+   g->last_tex_c    = NULL;
+}
+
 /* The native rows and columns a triangle can draw, for the lanes */
 static NO_INLINE void gpu_fp_poly(PS_GPU *g, const tri_vertex *v)
 {
@@ -1849,6 +1870,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    uint16_t       clut_x, clut_y; \
    tri_vertex     lineVertices[3]; \
    bool           lineFound = false; \
+   bool           lineAdded = false; \
    /*uint32_t tpage = 0;*/ \
    vertices[0].x          = 0; \
    vertices[0].y          = 0; \
@@ -2105,6 +2127,12 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       /* The vertices the hardware gets, which timing walks */ \
       tri_vertex  walk_vertices[3]; \
       tri_vertex *walk = vertices; \
+      if (((PGXP_LIT) && rhi_intf_is_type() == RHI_SOFTWARE) \
+            || ((TEXTURED_LIT) && (NV_LIT == 3) && line_render_mode == 2)) \
+      { \
+         memcpy(walk_vertices, vertices, sizeof(walk_vertices)); \
+         walk = walk_vertices; \
+      } \
       if (TEXTURED_LIT) \
       { \
          if (TM_LIT) \
@@ -2225,8 +2253,6 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          if (PGXP_LIT) \
          { \
             uint32_t i; \
-            memcpy(walk_vertices, vertices, sizeof(walk_vertices)); \
-            walk = walk_vertices; \
             for (i = 0; i < 3; ++i) \
             { \
                vertices[i].x = vertices[i].precise[0]; \
@@ -2251,7 +2277,8 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          /* Timing from the native walk, drawing on whichever instance \
           * draws: see GPU_RASTER_CHARGES.  Without a software renderer \
           * nothing draws, and the walk charges what drawing would. */ \
-         if (gpu->role == GPU_ROLE_FRONT || GPU_RASTER_WALKS(gpu) || !sw) \
+         if (!lineAdded \
+               && (gpu->role == GPU_ROLE_FRONT || GPU_RASTER_WALKS(gpu) || !sw)) \
             POLY_TIMING_WALK(gpu, walk, false, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, MO_LIT, ME_LIT); \
          if (sw) \
          { \
@@ -2259,13 +2286,21 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                gpu_fp_poly(gpu, vertices); \
             if (GPU_TOUCHES_VRAM(gpu)) \
             { \
+               int32_t time_before = 0; \
+               if (lineAdded) \
+                  gpu_line_added_begin(gpu, &time_before); \
                GPU_DRAW_TRIANGLE(DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT) \
+               if (lineAdded) \
+                  gpu_line_added_end(gpu, time_before); \
             } \
          } \
       } \
       /* Line Render: Overwrite vertices with those of the second triangle */ \
       if ((lineFound) && (NV_LIT == 3) && (TEXTURED_LIT)) \
+      { \
          memcpy(&vertices[0], &lineVertices[0], 3 * sizeof(tri_vertex)); \
+         lineAdded = true; \
+      } \
    } while (lineFound); \
 }
 

@@ -5,7 +5,8 @@
 # 1x, 2x and 4x, with PGXP
 # off and on, with the 480i "Off" deinterlacer, and with light guns and
 # their crosshairs on both ports (see gpu_thread_test.c); and that PGXP,
-# which draws other vertices and texels, leaves the GPU's timing alone.
+# which draws other vertices and texels, and Line Render, which draws
+# triangles the game did not send, leave the GPU's timing alone.
 # Runs against an already built core; for an ARM build,
 # CC=aarch64-linux-gnu-gcc RUN="qemu-aarch64 -L /usr/aarch64-linux-gnu".
 #
@@ -44,18 +45,21 @@ HOST="$(pwd)/$HOST"
 fail=0
 for cfg in "1x nopgxp" "2x nopgxp" "4x nopgxp" "1x pgxp" "2x pgxp" \
            "4x pgxp" "1x nopgxp deint" "2x nopgxp deint" "1x nopgxp gun" \
-           "2x pgxp gun"; do
+           "2x pgxp gun" "1x nopgxp noline" "2x nopgxp noline" \
+           "2x nopgxp aggline"; do
    set -- $cfg
    ref="$(cd "$WORK" && ${RUN:-} "$HOST" "$CORE" "$1" off $2 $3 $4)" || { fail=1; continue; }
-   # the waits for the GPU, without and with PGXP
+   # the waits for the GPU: with PGXP or another Line Render mode as
+   # without PGXP in the default mode
    if [ "$2 $3" = "nopgxp " ]; then
       eval "waits_$1=\${ref##* }"
-   elif [ "$2 $3" = "pgxp " ]; then
+   elif [ "$2 $3" = "pgxp " ] \
+        || { [ "$2" = nopgxp ] && [ "$3" = noline -o "$3" = aggline ]; }; then
       eval "base=\$waits_$1"
       if [ "${ref##* }" = "$base" ]; then
-         echo "[gpu_thread] $1 timing with PGXP: ${ref##* } OK"
+         echo "[gpu_thread] $cfg timing: ${ref##* } OK"
       else
-         echo "[gpu_thread] $1 timing with PGXP: ${ref##* }, without $base FAIL"
+         echo "[gpu_thread] $cfg timing: ${ref##* }, $1 nopgxp $base FAIL"
          fail=1
       fi
    fi

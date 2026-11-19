@@ -310,6 +310,10 @@ struct PS_GPU
    uint64_t tc_pos[256];
    uint64_t tc_draw;
    uint64_t tc_stamp;
+   /* The texture cache and its stamps before a triangle the Line Render
+    * enhancement adds, put back after it (gpu_polygon.c) */
+   uint64_t tc_pos_line[256];
+   struct TexCache_t TexCache_line[256];
 
    /* The emulation thread's account of the command it last ran, for the
     * lanes' hazards (gpu_thread.c): native rectangles as x | y << 16 and
