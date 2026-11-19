@@ -330,7 +330,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(renderer_software_fb),
       "Software Framebuffer",
       NULL,
-      "Enable accurate emulation of framebuffer effects (e.g. motion blur, FF7 battle swirl) when using hardware renderers by running a copy of the software renderer at native resolution in the background. If disabled, these operations are omitted (OpenGL) or rendered on the GPU (Vulkan). Disabling can improve performance but may cause severe graphical errors. Leave enabled if unsure.",
+      "Keeps a native-resolution copy of VRAM drawn by the software renderer alongside the hardware renderer, on the GPU Thread where it can run. The game's reads of VRAM and savestates then come from that copy, exactly as the hardware would give them. Disabled, they are read back from the GPU, which stalls emulation and, at an upscaled internal resolution, gives the game downscaled pixels that can show as graphical errors. Disabling only saves time where the GPU Thread cannot run: on a single fast core, or with a light gun connected. Leave enabled if unsure.",
       NULL,
       "video",
       {
