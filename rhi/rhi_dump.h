@@ -15,7 +15,6 @@ void rhi_dump_prepare_frame(void);
 void rhi_dump_finalize_frame(void);
 
 void rhi_dump_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy);
-void rhi_dump_set_draw_offset(int16_t x, int16_t y);
 void rhi_dump_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
 void rhi_dump_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart);
 void rhi_dump_set_horizontal_display_range(uint16_t x1, uint16_t x2);

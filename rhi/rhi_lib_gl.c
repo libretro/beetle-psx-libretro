@@ -1023,7 +1023,6 @@ struct gl_draw_config
    uint16_t display_resolution[2];
    bool     display_24bpp;
    bool     display_off;
-   int16_t  draw_offset[2];
    uint16_t draw_area_top_left[2];
    uint16_t draw_area_bot_right[2];
    uint16_t display_area_hrange[2];
@@ -1206,7 +1205,7 @@ struct gl_renderer {
    GLint image_load_loc[5];
    /* The command program's per-flush and per-batch uniforms (GL_CMD_LOC_*),
     * resolved when the program is built. */
-   GLint cmd_loc[12];
+   GLint cmd_loc[11];
    /* Unit quad that rect programs place with their "rect" uniform. */
    GLuint quad_vao;
    GLuint quad_vbo;
@@ -1396,8 +1395,7 @@ static gl_draw_config persistent_config = {
    false,          /* display_24bpp */
    true,           /* display_off */
    {0, 0},         /* draw_area_top_left */
-   {0, 0},         /* draw_area_dimensions */
-   {0, 0},         /* draw_offset */
+   {0, 0},         /* draw_area_bot_right */
    {0x200, 0xC00}, /* display_area_hrange (hardware reset values)*/
    {0x10, 0x100},  /* display_area_vrange (hardware reset values)*/ 
    false,          /* is_pal */
@@ -3210,8 +3208,6 @@ static void gl_primitive_draw_rect(const gl_renderer *renderer,
    {
       float px, py;
       gl_command_vertex_get_xy(v + i, &px, &py);
-      px += renderer->config.draw_offset[0];
-      py += renderer->config.draw_offset[1];
       if (px < min_x)
          min_x = px;
       if (px > max_x)
@@ -3502,8 +3498,7 @@ enum
 
 enum
 {
-   GL_CMD_LOC_OFFSET = 0,
-   GL_CMD_LOC_FEEDBACK_UPSCALING,
+   GL_CMD_LOC_FEEDBACK_UPSCALING = 0,
    GL_CMD_LOC_SEMI,
    GL_CMD_LOC_MASK,
    GL_CMD_LOC_NATIVE,
@@ -3574,8 +3569,6 @@ static void gl_renderer_upload_indices(gl_renderer *renderer)
 
 static void gl_renderer_draw(gl_renderer *renderer)
 {
-   int16_t x;
-   int16_t y;
    size_t bi;
    GLint semi_uniform = -1, mask_uniform = -1, native_uniform = -1;
    GLint color_uniform = -1, hot_uniform = -1;
@@ -3599,9 +3592,6 @@ static void gl_renderer_draw(gl_renderer *renderer)
       return;
    }
 
-   x = renderer->config.draw_offset[0];
-   y = renderer->config.draw_offset[1];
-
    if (renderer->command_buffer->program)
    {
       /* Every batch still writes its values, including after auxiliary
@@ -3612,7 +3602,6 @@ static void gl_renderer_draw(gl_renderer *renderer)
       color_uniform = renderer->cmd_loc[GL_CMD_LOC_COLOR];
       hot_uniform = renderer->cmd_loc[GL_CMD_LOC_HOT];
       glUseProgram(renderer->command_buffer->program->id);
-      glUniform2i(renderer->cmd_loc[GL_CMD_LOC_OFFSET], (GLint)x, (GLint)y);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, renderer->palette_texture.id);
       glUniform1ui(renderer->cmd_loc[GL_CMD_LOC_FEEDBACK_UPSCALING],
@@ -3905,14 +3894,14 @@ static void gl_renderer_draw(gl_renderer *renderer)
 
 static void gl_command_locate(gl_renderer *renderer)
 {
-   static const char *const names[12] = {
-      "offset", "feedback_upscaling", "draw_semi_transparent",
+   static const char *const names[11] = {
+      "feedback_upscaling", "draw_semi_transparent",
       "force_mask_bit", "native_blend", "color_blend", "hdr_hot",
       "hd_enabled", "hd_vram_rect", "hd_texel_rect", "force_zero",
       "force_ceiling"
    };
    unsigned i;
-   for (i = 0; i < 12; i++)
+   for (i = 0; i < 11; i++)
       renderer->cmd_loc[i] = renderer->command_buffer->program
          ? gl_uniform_map_get(&renderer->command_buffer->program->uniforms, names[i])
          : -1;
@@ -6792,8 +6781,8 @@ static bool gl_native_positions(const gl_renderer *renderer,
       return false;
    for (i = 0; i < count; i++)
    {
-      float px = v[i].position[0] + renderer->config.draw_offset[0];
-      float py = v[i].position[1] + renderer->config.draw_offset[1];
+      float px = v[i].position[0];
+      float py = v[i].position[1];
       if (v[i].position[3] != 1.0f ||
           !(px >= -32768.0f && px <= 32767.0f) ||
           !(py >= -32768.0f && py <= 32767.0f))
@@ -7272,10 +7261,6 @@ static void gl_defer_dispatch(void *user, const rhi_defer_op_t *op)
                                op->u.set_tex_window.twh,
                                op->u.set_tex_window.twx,
                                op->u.set_tex_window.twy);
-         break;
-      case RHI_DEFER_SET_DRAW_OFFSET:
-         rhi_gl_set_draw_offset(op->u.set_draw_offset.x,
-                                op->u.set_draw_offset.y);
          break;
       case RHI_DEFER_SET_DRAW_AREA:
          rhi_gl_set_draw_area(op->u.set_draw_area.x0,
@@ -8219,49 +8204,6 @@ void rhi_gl_invalidate_clut_cache(void)
 
    renderer->palette_cache_valid = false;
    renderer->palette_cache_saved = false;
-}
-
-void rhi_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
-{
-   /* No-op for the GL backend.  The PS1 GPU's mask state
-    * (MaskSetOR / MaskEvalAND) is forwarded to the renderer
-    * per-draw via the `mask_test` and `set_mask` parameters on
-    * each push_primitive / rhi_gl_load_image / rhi_gl_copy_rect /
-    * rhi_gl_fill_rect call (see e.g. push_primitive's mask_test
-    * argument).  The GL renderer batches by mask_test value (see
-    * the comparison in gl_renderer_*_finalize) and never reads
-    * any persistent renderer-global mask register, so there's
-    * nothing for this entry point to update.
-    *
-    * The interface exists because the rhi_intf vtable is shared
-    * across SW / GL / Vulkan backends, and at least one backend
-    * (the SW path, kept in sync via the gpu.cpp-side MaskSetOR /
-    * MaskEvalAND fields) does care about the global form of this
-    * state.  For GL the per-draw values are sufficient. */
-   (void)mask_set_or;
-   (void)mask_eval_and;
-}
-
-void rhi_gl_set_draw_offset(int16_t x, int16_t y)
-{
-   gl_renderer *renderer;
-
-   if (static_renderer.state == GL_STATE_INVALID)
-      return;
-
-   renderer = static_renderer.state_data;
-   if (!renderer)
-   {
-      rhi_defer_push_set_draw_offset(&gl_defer_queue, x, y);
-      return;
-   }
-
-   /* Finish drawing anything with the current offset */
-   if (!gl_draw_buffer_is_empty(renderer->command_buffer))
-      gl_renderer_draw(renderer);
-
-   renderer->config.draw_offset[0] = x;
-   renderer->config.draw_offset[1] = y;
 }
 
 void rhi_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)

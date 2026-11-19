@@ -371,7 +371,6 @@ void GPU_WakeVirtual(void);
 
 /* True while the GPU's event is virtual. */
 bool GPU_EventVirtual(void);
-int32_t  GPU_GetScanlineNum(void);
 
 /* Used by rhi_lib_gl.c to access the VRAM contents and
  * to drive state restore points. */

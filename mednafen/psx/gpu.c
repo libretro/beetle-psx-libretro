@@ -905,9 +905,6 @@ static void Command_MaskSetting(PS_GPU* g, const uint32_t *cb)
 {
    g->MaskSetOR   = (*cb & 1) ? 0x8000 : 0x0000;
    g->MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
-
-   if (GPU_ON_EMU_THREAD(g))
-      rhi_intf_set_mask_setting(g->MaskSetOR, g->MaskEvalAND);
 }
 
 
@@ -3855,11 +3852,6 @@ uint16_t *GPU_get_vram(void)
 {
    gpu_thread_drain();
    return GPU.vram;
-}
-
-int32_t GPU_GetScanlineNum(void)
-{
-   return GPU.scanline;
 }
 
 /* Beetle PSX addition, allows runtime configuration of visible scanlines in software renderer */

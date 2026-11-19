@@ -25,7 +25,6 @@ void rhi_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
 
 void rhi_vulkan_invalidate_clut_cache(void);
 
-void rhi_vulkan_set_draw_offset(int16_t x, int16_t y);
 
 void rhi_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
                               uint16_t x1, uint16_t y1);
@@ -98,7 +97,6 @@ void rhi_vulkan_load_image(uint16_t x, uint16_t y,
                            const uint16_t *src, uint32_t stride,
                            bool mask_test, bool set_mask);
 
-bool rhi_vulkan_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram);
 /* Several non-overlapping rects (x, y, w, h), at most 8, in one GPU
  * round trip. */
 bool rhi_vulkan_read_vram_rects(const uint16_t (*rects)[4], unsigned count,

@@ -12,7 +12,7 @@ enum
    RHI_PREPARE_FRAME,
    RHI_FINALIZE_FRAME,
    RHI_TEX_WINDOW,
-   RHI_DRAW_OFFSET,
+   RHI_DRAW_OFFSET,      /* no longer written; holds the numbers after it */
    RHI_DRAW_AREA,
    RHI_VRAM_COORDS,
    RHI_HORIZONTAL_RANGE,
@@ -118,15 +118,6 @@ void rhi_dump_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy)
    write_u32(twh);
    write_u32(twx);
    write_u32(twy);
-}
-
-void rhi_dump_set_draw_offset(int16_t x, int16_t y)
-{
-   if (!file)
-      return;
-   write_u32(RHI_DRAW_OFFSET);
-   write_i32(x);
-   write_i32(y);
 }
 
 void rhi_dump_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)

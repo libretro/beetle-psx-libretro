@@ -130,16 +130,6 @@ void rhi_defer_push_set_tex_window(rhi_defer_queue_t *q,
    op->u.set_tex_window.twy = twy;
 }
 
-void rhi_defer_push_set_draw_offset(rhi_defer_queue_t *q,
-                                    int16_t x, int16_t y)
-{
-   rhi_defer_op_t *op = rhi_defer_alloc_slot(q, RHI_DEFER_SET_DRAW_OFFSET);
-   if (!op)
-      return;
-   op->u.set_draw_offset.x = x;
-   op->u.set_draw_offset.y = y;
-}
-
 void rhi_defer_push_set_draw_area(rhi_defer_queue_t *q,
                                   uint16_t x0, uint16_t y0,
                                   uint16_t x1, uint16_t y1)

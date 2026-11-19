@@ -53,7 +53,6 @@ extern "C" {
 typedef enum
 {
    RHI_DEFER_SET_TEX_WINDOW = 0,
-   RHI_DEFER_SET_DRAW_OFFSET,
    RHI_DEFER_SET_DRAW_AREA,
    RHI_DEFER_SET_VRAM_FRAMEBUFFER_COORDS,
    RHI_DEFER_SET_HORIZONTAL_DISPLAY_RANGE,
@@ -92,12 +91,6 @@ typedef struct
          uint8_t twx;
          uint8_t twy;
       } set_tex_window;
-
-      struct
-      {
-         int16_t x;
-         int16_t y;
-      } set_draw_offset;
 
       struct
       {
@@ -202,9 +195,6 @@ void rhi_defer_drain(rhi_defer_queue_t *q,
 void rhi_defer_push_set_tex_window(rhi_defer_queue_t *q,
                                    uint8_t tww, uint8_t twh,
                                    uint8_t twx, uint8_t twy);
-
-void rhi_defer_push_set_draw_offset(rhi_defer_queue_t *q,
-                                    int16_t x, int16_t y);
 
 void rhi_defer_push_set_draw_area(rhi_defer_queue_t *q,
                                   uint16_t x0, uint16_t y0,

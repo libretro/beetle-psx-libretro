@@ -457,20 +457,6 @@ void rhi_intf_set_tex_window(uint8_t tww, uint8_t twh,
    }
 }
 
-void rhi_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
-{
-   switch (rhi_type)
-   {
-      case RHI_SOFTWARE:
-         break;
-      case RHI_OPENGL:
-         break;
-      case RHI_VULKAN:
-         /* TODO/FIXME */
-         break;
-   }
-}
-
 void rhi_intf_invalidate_clut_cache(void)
 {
    switch (rhi_type)
@@ -486,29 +472,6 @@ void rhi_intf_invalidate_clut_cache(void)
 #endif
          break;
       default:
-         break;
-   }
-}
-
-void rhi_intf_set_draw_offset(int16_t x, int16_t y)
-{
-#ifdef RHI_DUMP
-   rhi_dump_set_draw_offset(x, y);
-#endif
-
-   switch (rhi_type)
-   {
-      case RHI_SOFTWARE:
-         break;
-      case RHI_OPENGL:
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rhi_gl_set_draw_offset(x, y);
-#endif
-         break;
-      case RHI_VULKAN:
-#if defined(HAVE_VULKAN)
-         rhi_vulkan_set_draw_offset(x, y);
-#endif
          break;
    }
 }

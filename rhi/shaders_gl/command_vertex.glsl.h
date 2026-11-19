@@ -26,9 +26,6 @@ in uint palette_cached;
 in uint native_flags;
 in uvec2 native_uv;
 
-// Drawing offset
-uniform ivec2 offset;
-
 out vec3 frag_shading_color;
 flat out uvec2 frag_texture_page;
 out vec2 smooth_texture_coord;
@@ -72,7 +69,7 @@ void main() {
       ivec2 xy = ivec2(int(position.x << 16u) >> 16, int(position.x) >> 16);
       vertex_position = vec4(vec2(xy), uintBitsToFloat(position.z), 1.0);
    }
-   vec2 pos = vertex_position.xy + vec2(offset);
+   vec2 pos = vertex_position.xy;
    // Match the PS1 integer pixel origin only for eligible native geometry.
    if ((native_flags & 12u) != 0u)
       pos += vec2(0.5);

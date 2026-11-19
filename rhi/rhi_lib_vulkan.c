@@ -5686,8 +5686,6 @@ static void renderer_set_interpolant_attribs(CommandBuffer *cmd)
       TextureWindow texture_window;
       TTRect cached_window_rect;
       TTRect draw_rect;
-      int draw_offset_x;
-      int draw_offset_y;
       unsigned palette_offset_x;
       unsigned palette_offset_y;
       unsigned texture_offset_x;
@@ -5751,8 +5749,6 @@ static void render_state_init(struct RenderState *s)
    s->texture_window.or_x = 0; s->texture_window.or_y = 0;
    rect_zero(&s->cached_window_rect);
    rect_zero(&s->draw_rect);
-   s->draw_offset_x = 0;
-   s->draw_offset_y = 0;
    s->palette_offset_x = 0;
    s->palette_offset_y = 0;
    s->texture_offset_x = 0;
@@ -10121,8 +10117,8 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    unsigned min_u = FB_WIDTH;
    unsigned min_v = FB_HEIGHT;
    { unsigned i; for (i = 0; i < count; i++) {
-      float tmp_x = vertices[i].x + self->render_state.draw_offset_x + self->upscaler_jitter_x;
-      float tmp_y = vertices[i].y + self->render_state.draw_offset_y + self->upscaler_jitter_y;
+      float tmp_x = vertices[i].x + self->upscaler_jitter_x;
+      float tmp_y = vertices[i].y + self->upscaler_jitter_y;
       max_x = max_(max_x, tmp_x);
       max_y = max_(max_y, tmp_y);
       min_x = min_(min_x, tmp_x);
@@ -10485,8 +10481,8 @@ static bool renderer_native_line_endpoints(const Renderer *self,
       return false;
    for (i = 0; i < 2; i++)
    {
-      float px = vertices[i].x + self->render_state.draw_offset_x;
-      float py = vertices[i].y + self->render_state.draw_offset_y;
+      float px = vertices[i].x;
+      float py = vertices[i].y;
       if (vertices[i].w != 1.0f ||
           !(px >= -32768.0f && px <= 32767.0f) ||
           !(py >= -32768.0f && py <= 32767.0f))
@@ -10668,8 +10664,8 @@ static void renderer_upscaler_keep(Renderer *self, const Vertex *vertices, unsig
       return;
    for (i = 0; i < count; i++)
    {
-      points[i].x = vertices[i].x + self->render_state.draw_offset_x;
-      points[i].y = vertices[i].y + self->render_state.draw_offset_y;
+      points[i].x = vertices[i].x;
+      points[i].y = vertices[i].y;
       points[i].w = vertices[i].w;
       if (vertices[i].color != vertices[0].color)
          flat = false;
@@ -22810,10 +22806,6 @@ static void vk_defer_dispatch(void *user, const rhi_defer_op_t *op)
                                    op->u.set_tex_window.twx,
                                    op->u.set_tex_window.twy);
          break;
-      case RHI_DEFER_SET_DRAW_OFFSET:
-         rhi_vulkan_set_draw_offset(op->u.set_draw_offset.x,
-                                    op->u.set_draw_offset.y);
-         break;
       case RHI_DEFER_SET_DRAW_AREA:
          rhi_vulkan_set_draw_area(op->u.set_draw_area.x0,
                                   op->u.set_draw_area.y0,
@@ -24156,17 +24148,6 @@ void rhi_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
       rhi_defer_push_set_tex_window(&defer, tww, twh, twx, twy);
 }
 
-void rhi_vulkan_set_draw_offset(int16_t x, int16_t y)
-{
-   if (renderer)
-   {
-      renderer->render_state.draw_offset_x = x;
-      renderer->render_state.draw_offset_y = y;
-   }
-   else
-      rhi_defer_push_set_draw_offset(&defer, x, y);
-}
-
 void rhi_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
                               uint16_t x1, uint16_t y1)
 {
@@ -24499,19 +24480,6 @@ void rhi_vulkan_load_image(
        * rect; the recorded copy keeps its own reference. */
       bh_reset(&handle);
    }
-}
-
-bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
-                          uint16_t w, uint16_t h,
-                          uint16_t *vram)
-{
-   if (!renderer)
-      return false;
-   {
-      TTRect _r = { x, y, w, h };
-      renderer_copy_vram_to_cpu_synchronous(renderer, &_r, vram);
-   }
-   return true;
 }
 
 bool rhi_vulkan_read_vram_rects(const uint16_t (*rects)[4], unsigned count,
