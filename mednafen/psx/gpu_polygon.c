@@ -325,6 +325,16 @@ DEFINE_AddIDeltas_DY(g0_t1, 0, 1)
 DEFINE_AddIDeltas_DY(g1_t0, 1, 0)
 DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
 
+/* The vector span kernels take the specialisation's literals as
+ * arguments: they are only specialised where they are inlined */
+#if defined(_MSC_VER)
+#define GPU_SPAN_INLINE static __forceinline
+#elif defined(__GNUC__)
+#define GPU_SPAN_INLINE static inline __attribute__((always_inline))
+#else
+#define GPU_SPAN_INLINE static INLINE
+#endif
+
 /*
  * DrawSpan - rasterise one horizontal span of a triangle.
  *
@@ -394,7 +404,7 @@ DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
  * GOURAUD_LIT/DITHER_ON/BM_VAL/ME_LIT are passed as literal ints from
  * the macro so this fully specialises and inlines per call site.
  */
-static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
+GPU_SPAN_INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
       const i_group *igp, const i_deltas *idl,
       const int GOURAUD_LIT, const int DITHER_ON,
       const int BM_VAL, const int ME_LIT)
@@ -676,7 +686,7 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
  * caller treats the return value as the number of pixels consumed by
  * the vector path and lets the scalar loop finish the remainder, so
  * returning zero hands the whole span to the scalar loop. */
-static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
+GPU_SPAN_INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
       const i_group *igp, const i_deltas *idl,
       const int GOURAUD_LIT, const int DITHER_ON,
       const int BM_VAL, const int ME_LIT)
@@ -713,7 +723,7 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
  * GOURAUD_LIT/TM_LIT/MO_LIT/DITHER_ON/BM_VAL/ME_LIT are literal ints from
  * the macro, so this specialises per call site.
  */
-static INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
+GPU_SPAN_INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
       const i_group *igp, const i_deltas *idl,
       const int GOURAUD_LIT, const int TM_LIT, const int MO_LIT,
       const int DITHER_ON, const int BM_VAL, const int ME_LIT)
@@ -937,7 +947,7 @@ static INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
    return done;
 }
 #else /* SSE2 || NEON */
-static INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
+GPU_SPAN_INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
       const i_group *igp, const i_deltas *idl,
       const int GOURAUD_LIT, const int TM_LIT, const int MO_LIT,
       const int DITHER_ON, const int BM_VAL, const int ME_LIT)
