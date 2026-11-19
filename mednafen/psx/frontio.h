@@ -130,6 +130,9 @@ void     FrontIO_SetAMCT(FrontIO *fio, bool enabled);
 void     FrontIO_SetCrosshairsCursor(FrontIO *fio, unsigned port, int cursor);
 /* Whether a connected device reads the scanned-out picture. */
 bool     FrontIO_ReadsScanout(const FrontIO *fio);
+/* Whether a connected device reads or draws on the line FrontIO_GPULineHook
+ * is about to be called for; vsync as that call's. */
+bool     FrontIO_LineNeedsPixels(const FrontIO *fio, bool vsync);
 void     FrontIO_SetCrosshairsColor (FrontIO *fio, unsigned port, uint32_t color);
 
 InputDevice *FrontIO_GetMemcardDevice(FrontIO *fio, unsigned which);

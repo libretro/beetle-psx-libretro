@@ -2950,6 +2950,12 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                pix_clock = (GPU.HardwarePALType ? 53203425 : 53693182) / DotClockRatios[dmc];
                pix_clock_div = DotClockRatios[dmc];
 
+               /* A light gun reads this line, or draws its crosshair on it:
+                * the GPU thread scans it out first */
+               if (dest && GPU.role == GPU_ROLE_FRONT
+                     && FrontIO_LineNeedsPixels(PSX_FIO, GPU.scanline == 0))
+                  gpu_thread_drain();
+
                FrontIO_GPULineHook(PSX_FIO,
                                sys_timestamp,
                                sys_timestamp - ((uint64_t)gpu_clocks * 65536) / GPU.GPUClockRatio,

@@ -84,6 +84,7 @@ void FrontIO_GPULineHook(struct FrontIO *fio,
                          const unsigned pix_clock_divider,
                          const unsigned surf_pitchinpix,
                          const unsigned upscale_factor);
+bool FrontIO_LineNeedsPixels(const struct FrontIO *fio, bool vsync);
 
 uint8_t PSX_MemPeek8(uint32_t A);
 void    PSX_MemPoke8(uint32_t A, uint8_t V);

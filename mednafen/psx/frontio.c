@@ -5052,6 +5052,39 @@ static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32
    return(ret);
 }
 
+/* Whether a gun reads or draws on the line its next GPULineHook gets: it
+ * samples rows near its aim (GunCon 8 from it, Justifier one either side)
+ * and draws its crosshair at most 8 rows from it. */
+static bool gun_line_near(bool vsync, bool prev_vsync, int line_counter,
+      int16_t nom_y)
+{
+   const int avs  = 16;
+   const int line = (vsync && !prev_vsync) ? 0 : line_counter;
+   return line >= avs + nom_y - 8 && line <= avs + nom_y + 8;
+}
+
+bool FrontIO_LineNeedsPixels(const FrontIO *self, bool vsync)
+{
+   unsigned i;
+   for (i = 0; i < 8; i++)
+   {
+      const InputDevice *d = self->Devices[i];
+      if (d->vt->GPULineHook == InputDevice_GunCon_GPULineHook)
+      {
+         const InputDevice_GunCon *g = (const InputDevice_GunCon *)d;
+         if (gun_line_near(vsync, g->prev_vsync, g->line_counter, g->nom_y))
+            return true;
+      }
+      else if (d->vt->GPULineHook == InputDevice_Justifier_GPULineHook)
+      {
+         const InputDevice_Justifier *j = (const InputDevice_Justifier *)d;
+         if (gun_line_near(vsync, j->prev_vsync, j->line_counter, j->nom_y))
+            return true;
+      }
+   }
+   return false;
+}
+
 static void InputDevice_Justifier_SetDTR(InputDevice *self_, bool new_dtr)
 {
    InputDevice_Justifier *self = (InputDevice_Justifier *)self_;

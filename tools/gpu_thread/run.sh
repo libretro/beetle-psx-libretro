@@ -3,7 +3,8 @@
 # through GPUREAD and emulated GPU timing are the same with the GPU thread
 # off, on, switched on and off mid-run, and with 2, 3 and 4 band lanes, at
 # 1x, 2x and 4x, with PGXP
-# off and on, and with the 480i "Off" deinterlacer (see gpu_thread_test.c).
+# off and on, with the 480i "Off" deinterlacer, and with light guns and
+# their crosshairs on both ports (see gpu_thread_test.c).
 # Runs against an already built core; for an ARM build,
 # CC=aarch64-linux-gnu-gcc RUN="qemu-aarch64 -L /usr/aarch64-linux-gnu".
 #
@@ -41,11 +42,12 @@ HOST="$(pwd)/$HOST"
 
 fail=0
 for cfg in "1x nopgxp" "2x nopgxp" "4x nopgxp" "1x pgxp" "2x pgxp" \
-           "4x pgxp" "1x nopgxp deint" "2x nopgxp deint"; do
+           "4x pgxp" "1x nopgxp deint" "2x nopgxp deint" "1x nopgxp gun" \
+           "2x pgxp gun"; do
    set -- $cfg
-   ref="$(cd "$WORK" && ${RUN:-} "$HOST" "$CORE" "$1" off $2 $3)" || { fail=1; continue; }
+   ref="$(cd "$WORK" && ${RUN:-} "$HOST" "$CORE" "$1" off $2 $3 $4)" || { fail=1; continue; }
    for mode in on toggle 2 3 4; do
-      got="$(cd "$WORK" && ${RUN:-} "$HOST" "$CORE" "$1" $mode $2 $3)" || got="(failed)"
+      got="$(cd "$WORK" && ${RUN:-} "$HOST" "$CORE" "$1" $mode $2 $3 $4)" || got="(failed)"
       if [ "$got" = "$ref" ]; then
          echo "[gpu_thread] $cfg $mode: $got OK"
       else

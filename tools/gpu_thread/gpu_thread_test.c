@@ -19,11 +19,14 @@
  *
  * The host runs FRAMES frames, saving a state part way and loading it back
  * later, then hashes native VRAM (the savestate's GPURAM entry), the last
- * video frame and main RAM.  run.sh runs it with the GPU thread off, on,
+ * video frame and main RAM.  With "gun", a GunCon and a Justifier aim at
+ * the middle of the picture: they sample the lines around it as they are
+ * scanned out and draw their crosshairs on them, which the video frame
+ * holds; the host hashes the whole state too.  run.sh runs it with the GPU thread off, on,
  * switched on and off every few frames, and with 2, 3 and 4 lanes drawing
  * bands, and checks they all agree.
  *
- * usage: gpu_thread_test <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint]
+ * usage: gpu_thread_test <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint] [gun]
  * Runs in the current directory: it writes the probe EXE and an all-zero
  * BIOS image there.  "gpu_thread_test probe" only writes the probe EXE and
  * keeps it, for the hardware renderers' hosts (tools/glhost/timing_lanes.sh). */
@@ -826,27 +829,33 @@ int main(int argc, char **argv)
    bool   (*serialize)(void *, size_t);
    bool   (*unserialize)(const void *, size_t);
    void  *(*memory_data)(unsigned);
+   void   (*set_port)(unsigned, unsigned);
    static const char key[] = "\015&GPURAM[0][0]";
    struct retro_game_info info;
    unsigned char *state, *saved;
    size_t size, i, klen = sizeof(key) - 1;
-   uint32_t vram_hash = 0, ram_hash = 0, waits = 0;
+   uint32_t vram_hash = 0, ram_hash = 0, waits = 0, state_hash = 0;
    unsigned f;
-   int found = 0;
+   int found = 0, gun = 0, a;
 
    if (argc == 2 && !strcmp(argv[1], "probe"))
       return write_probe() ? 0 : 2;
    if (argc < 5)
    {
-      fprintf(stderr, "usage: %s <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint]\n",
+      fprintf(stderr, "usage: %s <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint] [gun]\n",
             argv[0]);
       return 2;
    }
    resolution  = argv[2];
    thread_mode = argv[3];
    pgxp_mode   = strcmp(argv[4], "pgxp") ? "disabled" : "memory only";
-   if (argc > 5 && !strcmp(argv[5], "deint"))
-      deint_mode = "off";
+   for (a = 5; a < argc; a++)
+   {
+      if (!strcmp(argv[a], "deint"))
+         deint_mode = "off";
+      else if (!strcmp(argv[a], "gun"))
+         gun = 1;
+   }
    if (!write_probe())
    {
       fprintf(stderr, "cannot write the probe\n");
@@ -871,7 +880,8 @@ int main(int argc, char **argv)
       || !core_sym(core, "retro_serialize_size",         &serialize_size, sizeof(serialize_size))
       || !core_sym(core, "retro_serialize",              &serialize,      sizeof(serialize))
       || !core_sym(core, "retro_unserialize",            &unserialize,    sizeof(unserialize))
-      || !core_sym(core, "retro_get_memory_data",        &memory_data,    sizeof(memory_data)))
+      || !core_sym(core, "retro_get_memory_data",        &memory_data,    sizeof(memory_data))
+      || !core_sym(core, "retro_set_controller_port_device", &set_port,   sizeof(set_port)))
       return 2;
 
    set_env(env_cb);
@@ -887,6 +897,12 @@ int main(int argc, char **argv)
    {
       fprintf(stderr, "[gpu_thread] retro_load_game failed\n");
       return 2;
+   }
+   if (gun)
+   {
+      /* Aimed at the middle of the picture, with crosshairs */
+      set_port(0, RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 0));
+      set_port(1, RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 1));
    }
    size  = serialize_size();
    saved = (unsigned char *)malloc(size);
@@ -913,6 +929,7 @@ int main(int argc, char **argv)
    }
    if (!serialize(state, size))
       return 2;
+   state_hash = fnv(state, size, 2166136261u);
    for (i = 0; i + klen + 4 + 1024 * 512 * 2 <= size; i++)
       if (!memcmp(state + i, key, klen))
       {
@@ -932,7 +949,10 @@ int main(int argc, char **argv)
       fprintf(stderr, "[gpu_thread] no GPURAM entry in the state\n");
       return 2;
    }
-   printf("%08lx %08lx %08lx %lu\n", (unsigned long)vram_hash,
+   printf("%08lx %08lx %08lx %lu", (unsigned long)vram_hash,
          (unsigned long)video_hash, (unsigned long)ram_hash, (unsigned long)waits);
+   if (gun)
+      printf(" %08lx", (unsigned long)state_hash);
+   printf("\n");
    return 0;
 }

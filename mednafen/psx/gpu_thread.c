@@ -965,13 +965,13 @@ void GPU_ThreadSelect(int lanes)
 
    /* Without a software renderer or framebuffer there is nothing to draw.
     * Fast physical cores: one for each thread; without the topology (the
-    * consoles) everything stays inline. */
+    * consoles) everything stays inline unless a lane count is chosen. */
    if (cores < 0)
    {
       unsigned fast = 0, slow = 0;
       cores = sthread_get_core_topology(&fast, &slow) ? (int)fast : 1;
    }
-   if (!rhi_intf_has_software_renderer() || cores < 2)
+   if (!rhi_intf_has_software_renderer() || (cores < 2 && lanes < 0))
       lanes = 0;
 
    /* Automatic: a lane for each fast core the emulation thread leaves */
