@@ -144,6 +144,7 @@ static void DrawLine_##SUFFIX(PS_GPU *gpu, line_point *points) \
    int32_t delta_x = abs(points[1].x - points[0].x); \
    int32_t delta_y = abs(points[1].y - points[0].y); \
    int32_t k       = (delta_x > delta_y) ? delta_x : delta_y; \
+   const uint8_t band = gpu->band_lanes; \
    if (points[0].x > points[1].x && k) \
       vertex_swap(line_point, points[1], points[0]); \
    gpu->DrawTimeAvail -= k * 2; \
@@ -154,7 +155,7 @@ static void DrawLine_##SUFFIX(PS_GPU *gpu, line_point *points) \
       /* Sign extension is not necessary here for x and y, due to the maximum values that ClipX1 and ClipY1 can contain. */ \
       int32_t x = (cur_point.x >> LINE_XY_FRACTBITS) & 2047; \
       int32_t y = (cur_point.y >> LINE_XY_FRACTBITS) & 2047; \
-      if (!LineSkipTest(gpu, y)) \
+      if (!LineSkipTest(gpu, y) && (!band || GPU_ROW_MINE(gpu, y))) \
       { \
          uint8_t r, g, b; \
          uint16_t pix; \
@@ -308,7 +309,12 @@ static void Command_DrawLine_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       return; \
    /* A line costs two per step along its longer axis. */ \
    if (gpu->role == GPU_ROLE_FRONT) \
+   { \
+      if (GPU_FP(gpu)) \
+         gpu_fp_write(gpu, MIN(points[0].x, points[1].x), MIN(points[0].y, points[1].y), \
+               MAX(points[0].x, points[1].x), MAX(points[0].y, points[1].y), true); \
       gpu->DrawTimeAvail -= ((delta_x > delta_y) ? delta_x : delta_y) * 2; \
+   } \
    else \
       DrawLine_g##GOURAUD_LIT##_##BM_TAG##_ME##MASKEVAL_LIT(gpu, points); \
 }

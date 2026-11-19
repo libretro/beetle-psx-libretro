@@ -117,6 +117,15 @@ struct PS_GPU
    uint8_t upscale_shift;
    uint8_t dither_upscale_shift;
    uint8_t role;        /* GPU_ROLE_* */
+   /* Band lanes (gpu_thread.c): 0, this instance draws every row; else
+    * the rotation's lane count, of which it draws band_lane's bands of 8
+    * native rows; GPU_BAND_NONE, it draws nothing and only follows the
+    * raster state. */
+   uint8_t band_lanes;
+   uint8_t band_lane;
+   /* Record where each texture cache index was last read (tc_pos), so the
+    * lanes' caches can be merged into the one drawing in order would have */
+   uint8_t tc_track;
    /* GPU_TIMING_*, from role and upscale_shift (gpu_set_role): who
     * charges DrawTimeAvail for what the drawing reads */
    uint8_t timing;
@@ -294,6 +303,23 @@ struct PS_GPU
    /* The line of the last timing fetch: its tag is known to match */
    uint32_t last_timing_line;
 
+   /* Texture cache reads in drawing order while the lanes draw bands: the
+    * stamp of the last read of each index, for the merge.  tc_draw counts
+    * draws in its upper bits; a lane drawing bands stamps each row it
+    * draws with (draw << 16) | row.  Unused, and not kept, otherwise. */
+   uint64_t tc_pos[256];
+   uint64_t tc_draw;
+   uint64_t tc_stamp;
+
+   /* The emulation thread's account of the command it last ran, for the
+    * lanes' hazards (gpu_thread.c): native rectangles as x | y << 16 and
+    * w | h << 16, written, and read from the texture page and CLUT */
+   uint32_t fp_write[2];
+   uint32_t fp_page[2];
+   uint32_t fp_clut[2];
+   bool     fp_textured;
+   bool     tc_invalidated;  /* the texture cache was invalidated */
+
    /*
    VRAM has to be a ptr type or else we have to rely on smartcode void* shenanigans to
    wrestle a variable-sized struct.
@@ -412,9 +438,12 @@ bool GPU_LoanComplete(int32_t lines);
 int GPU_StateAction(StateMem *sm, int load, int data_only);
 
 /* Software drawing on a thread of its own (gpu_thread.c).  Once per frame,
- * before it starts: whether to draw on the GPU thread.  Needs a software
- * renderer or framebuffer, and nothing reading the picture line by line. */
-void     GPU_ThreadSelect(bool want);
+ * before it starts: 0, draw inline; -1, on the GPU thread, with band lanes
+ * for the fast cores the emulation thread leaves, drawing bands when the
+ * picture is upscaled; n, on n lanes always drawing bands.  Needs a
+ * software renderer or framebuffer, and nothing reading the picture line
+ * by line. */
+void     GPU_ThreadSelect(int lanes);
 /* After the frame's emulation: a software-rendered frame waits for its
  * picture; the GPU renderers' frames hand over what is pending. */
 void     GPU_ThreadFrameEnd(void);

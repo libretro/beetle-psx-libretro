@@ -338,6 +338,7 @@ static bool    loan_short;
 static INLINE void InvalidateTexCache(PS_GPU *gpu)
 {
    unsigned i;
+   gpu->tc_invalidated = true;
    for (i = 0; i < 256; i++)
    {
       gpu->TexCache[i].Tag     = ~0U;
@@ -602,6 +603,12 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
 
    gpu->DrawTimeAvail       -= 46; /* Approximate */
 
+   if (GPU_FP(gpu) && width && height)
+   {
+      gpu->fp_write[0] = (uint32_t)destX | ((uint32_t)destY << 16);
+      gpu->fp_write[1] = (uint32_t)width | ((uint32_t)height << 16);
+   }
+
    for(y = 0; y < height; y++)
    {
       const int32_t d_y = (y + destY) & 511;
@@ -618,7 +625,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
        * directly, so dirtying VRAM here would just be a wasted
        * width-many texel_puts (each splatting UPSCALE^2 subpixels)
        * that nothing reads. */
-      if (sw)
+      if (sw && GPU_ROW_MINE(gpu, d_y))
       {
          unsigned x = 0;
 #if defined(__SSE2__) || defined(GPU_HAVE_NEON)
@@ -701,7 +708,8 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
     * back from GPU.vram.  Hardware backends do the copy themselves
     * via rhi_intf_copy_rect below, so the per-pixel software loop
     * would just dirty VRAM that nothing consumes. */
-   if (GPU_HAS_SW(g) && GPU_TOUCHES_VRAM(g))
+   /* A copy reads anywhere, so one instance draws all of it */
+   if (GPU_HAS_SW(g) && GPU_TOUCHES_VRAM(g) && !g->band_lanes)
    {
       unsigned y;
       for(y = 0; y < (unsigned)height; y++)
@@ -775,6 +783,12 @@ static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = INCMD_FBWRITE;
+
+   if (GPU_FP(g))
+   {
+      g->fp_write[0] = g->FBRW_X | (g->FBRW_Y << 16);
+      g->fp_write[1] = g->FBRW_W | (g->FBRW_H << 16);
+   }
 
    if (GPU_ON_EMU_THREAD(g)
          && RectOverlapsDisplay((int32_t)g->FBRW_X, (int32_t)g->FBRW_Y,
@@ -1601,7 +1615,7 @@ static bool gpu_fbwrite_word(PS_GPU *g, uint32_t InData)
 
    for(i = 0; i < 2; i++)
    {
-      if (GPU_TOUCHES_VRAM(g))
+      if (GPU_TOUCHES_VRAM(g) && GPU_ROW_MINE(g, g->FBRW_CurY))
       {
          bool fetch = false;
          if (sw)
@@ -1744,6 +1758,9 @@ static void ProcessFIFO(uint32_t in_count)
    {
       rec = gpu_thread_cmd_begin(command_len);
       CB  = rec + 2;
+      GPU.fp_write[1] = 0;
+      GPU.fp_clut[1]  = 0;
+      GPU.fp_textured = false;
    }
 
    for (i = 0; i < command_len; i++)

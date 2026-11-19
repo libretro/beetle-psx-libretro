@@ -94,8 +94,9 @@ uint8_t widescreen_hack_aspect_ratio_setting;
 uint8_t psx_gpu_upscale_shift;
 uint8_t psx_gpu_upscale_shift_hw;
 bool psx_gpu_rasterize_both_fields = false;
-/* Software drawing on the GPU thread, when the CPU has the cores for it */
-static bool psx_gpu_thread = true;
+/* Software drawing on the GPU thread, when the CPU has the cores for it:
+ * GPU_ThreadSelect's lanes */
+static int psx_gpu_thread = -1;
 bool psx_gpu_bob_scanout = false;
 int line_render_mode;
 int filter_mode;
@@ -4917,10 +4918,14 @@ static void check_variables(bool startup)
    GPU_ThreadSettle();
 
    var.key = BEETLE_OPT(gpu_thread);
+   psx_gpu_thread = -1;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      psx_gpu_thread = strcmp(var.value, "disabled") != 0;
-   else
-      psx_gpu_thread = true;
+   {
+      if (!strcmp(var.value, "disabled"))
+         psx_gpu_thread = 0;
+      else if (var.value[0] >= '1' && var.value[0] <= '8')
+         psx_gpu_thread = var.value[0] - '0';
+   }
 
    /* Read before refreshing either renderer, so an option change cannot
     * rebuild storage using the previous frame's drawing policy. */
@@ -7150,7 +7155,7 @@ void retro_run(void)
 
    FrontIO_UpdateInput(PSX_FIO);
    /* A light gun samples the picture line by line as it is scanned out */
-   GPU_ThreadSelect(psx_gpu_thread && !FrontIO_ReadsScanout(PSX_FIO));
+   GPU_ThreadSelect(FrontIO_ReadsScanout(PSX_FIO) ? 0 : psx_gpu_thread);
    GPU_StartFrame(espec);
 
    Running = -1;

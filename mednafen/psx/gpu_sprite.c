@@ -189,7 +189,19 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
 }
 #endif /* SSE2 || NEON */
 
+/* With the band lanes built, each with the variant they draw with (_tk) */
+#ifdef GPU_HAVE_THREAD
 #define DEFINE_DrawSprite(SUFFIX, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT) \
+   DEFINE_DrawSpriteX(SUFFIX, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT, 0) \
+   DEFINE_DrawSpriteX(SUFFIX##_tk, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT, 1)
+#else
+#define DEFINE_DrawSprite(SUFFIX, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT) \
+   DEFINE_DrawSpriteX(SUFFIX, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT, 0)
+#endif
+
+/* TRACK_LIT: drawn by a lane drawing bands, its rows and its texture
+ * cache reads stamped (gpu.h, tc_pos) */
+#define DEFINE_DrawSpriteX(SUFFIX, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT, TRACK_LIT) \
 static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, \
       uint8_t u_arg, uint8_t v_arg, uint32_t color, uint32_t clut_offset) \
 { \
@@ -247,7 +259,7 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
       int32_t x; \
       if (T_LIT) \
          u_r = u; \
-      if (!LineSkipTest(gpu, y)) \
+      if (!LineSkipTest(gpu, y) && (!(TRACK_LIT) || gpu_band_row(gpu, y))) \
       { \
          if (y_bound > y_start && x_bound > x_start \
                && !DfeWouldSkip(gpu, y)) \
@@ -274,7 +286,7 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
             if (T_LIT) \
             { \
                uint16_t fbw; \
-               fbw = GetTexel_TM##MO_LIT(gpu, u_r, v); \
+               fbw = GPU_GETTEXEL(MO_LIT, TRACK_LIT)(gpu, u_r, v); \
                if (fbw) \
                { \
                   if (TM_LIT) \
@@ -542,42 +554,65 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
  * SPR_DISPATCH_TM1 - used when TM_LIT is 1; both TM0 (mid-grey
  *    shortcut) and TM1 branches are reachable, so emit both.
  */
-#define SPR_DISPATCH_TM0(BM_TAG, MO_LIT, ME_LIT, T_LIT) \
+/* A sprite function's name, or its tracked variant's for TK 1 */
+#define SPR_FN(TK, n)  SPR_FN_##TK(n)
+#define SPR_FN_0(n)    n
+#define SPR_FN_1(n)    n##_tk
+
+#define SPR_DISPATCH_TM0(BM_TAG, MO_LIT, ME_LIT, T_LIT, TK) \
    switch (gpu->SpriteFlip & 0x3000) \
    { \
-      case 0x0000: DrawSprite_T##T_LIT##_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX0_FY0(gpu, x, y, w, h, u, v, color, clut); break; \
-      case 0x1000: DrawSprite_T##T_LIT##_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX1_FY0(gpu, x, y, w, h, u, v, color, clut); break; \
-      case 0x2000: DrawSprite_T##T_LIT##_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX0_FY1(gpu, x, y, w, h, u, v, color, clut); break; \
-      case 0x3000: DrawSprite_T##T_LIT##_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX1_FY1(gpu, x, y, w, h, u, v, color, clut); break; \
+      case 0x0000: SPR_FN(TK, DrawSprite_T##T_LIT##_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX0_FY0)(gpu, x, y, w, h, u, v, color, clut); break; \
+      case 0x1000: SPR_FN(TK, DrawSprite_T##T_LIT##_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX1_FY0)(gpu, x, y, w, h, u, v, color, clut); break; \
+      case 0x2000: SPR_FN(TK, DrawSprite_T##T_LIT##_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX0_FY1)(gpu, x, y, w, h, u, v, color, clut); break; \
+      case 0x3000: SPR_FN(TK, DrawSprite_T##T_LIT##_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX1_FY1)(gpu, x, y, w, h, u, v, color, clut); break; \
    }
 
-#define SPR_DISPATCH_TM1(BM_TAG, MO_LIT, ME_LIT) \
+#define SPR_DISPATCH_TM1(BM_TAG, MO_LIT, ME_LIT, TK) \
    switch (gpu->SpriteFlip & 0x3000) \
    { \
       case 0x0000: \
-         if (color == 0x808080) DrawSprite_T1_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX0_FY0(gpu, x, y, w, h, u, v, color, clut); \
-         else                   DrawSprite_T1_##BM_TAG##_TM1_MO##MO_LIT##_ME##ME_LIT##_FX0_FY0(gpu, x, y, w, h, u, v, color, clut); \
+         if (color == 0x808080) SPR_FN(TK, DrawSprite_T1_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX0_FY0)(gpu, x, y, w, h, u, v, color, clut); \
+         else                   SPR_FN(TK, DrawSprite_T1_##BM_TAG##_TM1_MO##MO_LIT##_ME##ME_LIT##_FX0_FY0)(gpu, x, y, w, h, u, v, color, clut); \
          break; \
       case 0x1000: \
-         if (color == 0x808080) DrawSprite_T1_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX1_FY0(gpu, x, y, w, h, u, v, color, clut); \
-         else                   DrawSprite_T1_##BM_TAG##_TM1_MO##MO_LIT##_ME##ME_LIT##_FX1_FY0(gpu, x, y, w, h, u, v, color, clut); \
+         if (color == 0x808080) SPR_FN(TK, DrawSprite_T1_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX1_FY0)(gpu, x, y, w, h, u, v, color, clut); \
+         else                   SPR_FN(TK, DrawSprite_T1_##BM_TAG##_TM1_MO##MO_LIT##_ME##ME_LIT##_FX1_FY0)(gpu, x, y, w, h, u, v, color, clut); \
          break; \
       case 0x2000: \
-         if (color == 0x808080) DrawSprite_T1_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX0_FY1(gpu, x, y, w, h, u, v, color, clut); \
-         else                   DrawSprite_T1_##BM_TAG##_TM1_MO##MO_LIT##_ME##ME_LIT##_FX0_FY1(gpu, x, y, w, h, u, v, color, clut); \
+         if (color == 0x808080) SPR_FN(TK, DrawSprite_T1_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX0_FY1)(gpu, x, y, w, h, u, v, color, clut); \
+         else                   SPR_FN(TK, DrawSprite_T1_##BM_TAG##_TM1_MO##MO_LIT##_ME##ME_LIT##_FX0_FY1)(gpu, x, y, w, h, u, v, color, clut); \
          break; \
       case 0x3000: \
-         if (color == 0x808080) DrawSprite_T1_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX1_FY1(gpu, x, y, w, h, u, v, color, clut); \
-         else                   DrawSprite_T1_##BM_TAG##_TM1_MO##MO_LIT##_ME##ME_LIT##_FX1_FY1(gpu, x, y, w, h, u, v, color, clut); \
+         if (color == 0x808080) SPR_FN(TK, DrawSprite_T1_##BM_TAG##_TM0_MO##MO_LIT##_ME##ME_LIT##_FX1_FY1)(gpu, x, y, w, h, u, v, color, clut); \
+         else                   SPR_FN(TK, DrawSprite_T1_##BM_TAG##_TM1_MO##MO_LIT##_ME##ME_LIT##_FX1_FY1)(gpu, x, y, w, h, u, v, color, clut); \
          break; \
    }
 
 /* Pick the right SPR_DISPATCH_TM<n> based on TM_LIT.  C preprocessor
  * has no `if`, so use indirection through a pasted helper name. */
-#define SPR_DISPATCH_DRAW_(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT) SPR_DISPATCH_DRAW_TM##TM_LIT(BM_TAG, MO_LIT, ME_LIT, T_LIT)
-#define SPR_DISPATCH_DRAW(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT)  SPR_DISPATCH_DRAW_(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT)
-#define SPR_DISPATCH_DRAW_TM0(BM_TAG, MO_LIT, ME_LIT, T_LIT)      SPR_DISPATCH_TM0(BM_TAG, MO_LIT, ME_LIT, T_LIT)
-#define SPR_DISPATCH_DRAW_TM1(BM_TAG, MO_LIT, ME_LIT, T_LIT)      SPR_DISPATCH_TM1(BM_TAG, MO_LIT, ME_LIT) /* T_LIT must be 1 */
+#define SPR_DISPATCH_DRAW_(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT, TK) SPR_DISPATCH_DRAW_TM##TM_LIT(BM_TAG, MO_LIT, ME_LIT, T_LIT, TK)
+#define SPR_DISPATCH_DRAW(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT, TK)  SPR_DISPATCH_DRAW_(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT, TK)
+#define SPR_DISPATCH_DRAW_TM0(BM_TAG, MO_LIT, ME_LIT, T_LIT, TK)      SPR_DISPATCH_TM0(BM_TAG, MO_LIT, ME_LIT, T_LIT, TK)
+#define SPR_DISPATCH_DRAW_TM1(BM_TAG, MO_LIT, ME_LIT, T_LIT, TK)      SPR_DISPATCH_TM1(BM_TAG, MO_LIT, ME_LIT, TK) /* T_LIT must be 1 */
+
+/* A lane drawing bands draws with the variant that stamps its rows and
+ * texture cache reads */
+#ifdef GPU_HAVE_THREAD
+#define SPR_DISPATCH(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT) \
+   if (gpu->tc_track) \
+   { \
+      gpu->tc_draw += 0x10000; \
+      SPR_DISPATCH_DRAW(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT, 1) \
+   } \
+   else \
+   { \
+      SPR_DISPATCH_DRAW(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT, 0) \
+   }
+#else
+#define SPR_DISPATCH(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT) \
+   SPR_DISPATCH_DRAW(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT, 0)
+#endif
 
 #define DEFINE_Command_DrawSprite(SUFFIX, S_LIT, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
 static void Command_DrawSprite_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
@@ -616,13 +651,15 @@ static void Command_DrawSprite_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       return; \
    if (gpu->role == GPU_ROLE_FRONT) \
    { \
+      if (GPU_FP(gpu)) \
+         gpu_fp_write(gpu, x, y, x + w - 1, y + h - 1, true); \
       SpriteTiming(gpu, x, y, w, h, u, v, (T_LIT) ? (MO_LIT) : -1, \
             ((BM_VAL) >= 0) || (ME_LIT), true); \
       return; \
    } \
    if ((T_LIT) && GPU_RASTER_WALKS(gpu)) \
       SpriteTiming(gpu, x, y, w, h, u, v, (MO_LIT), false, false); \
-   SPR_DISPATCH_DRAW(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT) \
+   SPR_DISPATCH(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT) \
 }
 
 /* CMD_DRAWSPRITE_T0_BMGROUP and CMD_DRAWSPRITE_T1_BMGROUP emit the

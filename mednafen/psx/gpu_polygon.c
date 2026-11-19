@@ -726,7 +726,8 @@ GPU_SPAN_INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
 GPU_SPAN_INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
       const i_group *igp, const i_deltas *idl,
       const int GOURAUD_LIT, const int TM_LIT, const int MO_LIT,
-      const int DITHER_ON, const int BM_VAL, const int ME_LIT)
+      const int DITHER_ON, const int BM_VAL, const int ME_LIT,
+      const int TRACK)
 {
    const uint32_t us   = gpu->upscale_shift;
    const uint32_t dus  = gpu->dither_upscale_shift;
@@ -778,6 +779,18 @@ GPU_SPAN_INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
       {
          int32_t tex_u = (int32_t)(cu >> (COORD_FBS + COORD_POST_PADDING));
          int32_t tex_v = (int32_t)(cv >> (COORD_FBS + COORD_POST_PADDING));
+#ifdef GPU_HAVE_THREAD
+         if (TRACK)
+         {
+            if (MO_LIT == 0)
+               tex[l] = GetTexel_TM0_tk(gpu, tex_u, tex_v);
+            else if (MO_LIT == 1)
+               tex[l] = GetTexel_TM1_tk(gpu, tex_u, tex_v);
+            else
+               tex[l] = GetTexel_TM2_tk(gpu, tex_u, tex_v);
+         }
+         else
+#endif
          if (MO_LIT == 0)
             tex[l] = GetTexel_TM0(gpu, tex_u, tex_v);
          else if (MO_LIT == 1)
@@ -950,7 +963,8 @@ GPU_SPAN_INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
 GPU_SPAN_INLINE int DrawSpanVec_T(PS_GPU *gpu, int y, int32_t x, int32_t w,
       const i_group *igp, const i_deltas *idl,
       const int GOURAUD_LIT, const int TM_LIT, const int MO_LIT,
-      const int DITHER_ON, const int BM_VAL, const int ME_LIT)
+      const int DITHER_ON, const int BM_VAL, const int ME_LIT,
+      const int TRACK)
 {
    return 0;
 }
@@ -1156,7 +1170,7 @@ static INLINE void PCT_UVBatch(int n, float bias,
             tex_v = ig.v >> (COORD_FBS + COORD_POST_PADDING); \
          }
 
-#define DEFINE_DrawSpanX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, COST_LIT) \
+#define DEFINE_DrawSpanX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, COST_LIT, TRACK_LIT) \
 static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas *idl, const bool pct) \
 { \
    int32_t clipx0; \
@@ -1275,7 +1289,8 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
    if ((TEXTURED_LIT) && !pct) \
    { \
       int32_t _vt = DrawSpanVec_T(gpu, y, x, w, &ig, idl, (GOURAUD_LIT), \
-            (TM_LIT), (MO_LIT), DitherEnabled(gpu), (BM_VAL), (ME_LIT)); \
+            (TM_LIT), (MO_LIT), DitherEnabled(gpu), (BM_VAL), (ME_LIT), \
+            (TRACK_LIT)); \
       if (_vt > 0) \
       { \
          AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, (uint32_t)_vt); \
@@ -1322,7 +1337,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
           *     pre-clamp, the clamp brings them to 0 anyway). \
           * The bias matches the affine seed (gpu_uv_seed). */ \
          DRAWSPAN_TEX_UV(); \
-         fbw = GetTexel_TM##MO_LIT(gpu, tex_u, tex_v); \
+         fbw = GPU_GETTEXEL(MO_LIT, TRACK_LIT)(gpu, tex_u, tex_v); \
          if (fbw) \
          { \
             if (TM_LIT) \
@@ -1362,8 +1377,15 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
    } while (MDFN_LIKELY(--w > 0)); \
 }
 
+/* With the band lanes built, each with the variant they draw with (_tk) */
+#ifdef GPU_HAVE_THREAD
 #define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
-   DEFINE_DrawSpanX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0)
+   DEFINE_DrawSpanX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0, 0) \
+   DEFINE_DrawSpanX(SUFFIX##_tk, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0, 1)
+#else
+#define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+   DEFINE_DrawSpanX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0, 0)
+#endif
 
 /* DRAWSPAN_T0_BMGROUP and DRAWSPAN_T1_BMGROUP emit the 10
  * (BlendMode * MaskEval) specs for given outer parameters.
@@ -1414,15 +1436,15 @@ DRAWSPAN_T1_BMGROUP(1, 1, 2)
 /* The native timing walk's spans: one per combination that changes what
  * DrawTimeAvail is charged (textured or not, texture mode, Gouraud, and
  * for flat untextured spans whether blending or the mask test applies). */
-DEFINE_DrawSpanX(cost_t0_g0_o,   0, 0, -1, BMopaque, 0, 0, 0, 1)
-DEFINE_DrawSpanX(cost_t0_g0_b,   0, 0,  0, BMavg,    0, 0, 0, 1)
-DEFINE_DrawSpanX(cost_t0_g1,     1, 0, -1, BMopaque, 0, 0, 0, 1)
-DEFINE_DrawSpanX(cost_t1_g0_mo0, 0, 1, -1, BMopaque, 0, 0, 0, 1)
-DEFINE_DrawSpanX(cost_t1_g0_mo1, 0, 1, -1, BMopaque, 0, 1, 0, 1)
-DEFINE_DrawSpanX(cost_t1_g0_mo2, 0, 1, -1, BMopaque, 0, 2, 0, 1)
-DEFINE_DrawSpanX(cost_t1_g1_mo0, 1, 1, -1, BMopaque, 0, 0, 0, 1)
-DEFINE_DrawSpanX(cost_t1_g1_mo1, 1, 1, -1, BMopaque, 0, 1, 0, 1)
-DEFINE_DrawSpanX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1)
+DEFINE_DrawSpanX(cost_t0_g0_o,   0, 0, -1, BMopaque, 0, 0, 0, 1, 0)
+DEFINE_DrawSpanX(cost_t0_g0_b,   0, 0,  0, BMavg,    0, 0, 0, 1, 0)
+DEFINE_DrawSpanX(cost_t0_g1,     1, 0, -1, BMopaque, 0, 0, 0, 1, 0)
+DEFINE_DrawSpanX(cost_t1_g0_mo0, 0, 1, -1, BMopaque, 0, 0, 0, 1, 0)
+DEFINE_DrawSpanX(cost_t1_g0_mo1, 0, 1, -1, BMopaque, 0, 1, 0, 1, 0)
+DEFINE_DrawSpanX(cost_t1_g0_mo2, 0, 1, -1, BMopaque, 0, 2, 0, 1, 0)
+DEFINE_DrawSpanX(cost_t1_g1_mo0, 1, 1, -1, BMopaque, 0, 0, 0, 1, 0)
+DEFINE_DrawSpanX(cost_t1_g1_mo1, 1, 1, -1, BMopaque, 0, 1, 0, 1, 0)
+DEFINE_DrawSpanX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1, 0)
 
 /*
  * DrawTriangle - rasterise one triangle.
@@ -1438,7 +1460,7 @@ DEFINE_DrawSpanX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1)
  * where the rasterisation order of the three triangle vertices
  * is observable in some games' rendering.
  */
-#define DEFINE_DrawTriangleX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, COST_LIT) \
+#define DEFINE_DrawTriangleX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, COST_LIT, TRACK_LIT) \
 static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, const bool pct) \
 { \
    i_deltas idl; \
@@ -1616,6 +1638,8 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
                   gpu->DrawTimeAvail -= 2; \
                continue; \
             } \
+            if ((TRACK_LIT) && !gpu_band_row(gpu, yi >> POLY_US(gpu, COST_LIT))) \
+               continue; \
             DrawSpan_##SUFFIX(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl, pct_local); \
          } \
       } \
@@ -1632,6 +1656,8 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
                   gpu->DrawTimeAvail -= 2; \
                goto skipit_##SUFFIX; \
             } \
+            if ((TRACK_LIT) && !gpu_band_row(gpu, yi >> POLY_US(gpu, COST_LIT))) \
+               goto skipit_##SUFFIX; \
             DrawSpan_##SUFFIX(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl, pct_local); \
             skipit_##SUFFIX: ; \
             yi++; \
@@ -1642,8 +1668,25 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    } \
 }
 
+#ifdef GPU_HAVE_THREAD
 #define DEFINE_DrawTriangle(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
-   DEFINE_DrawTriangleX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0)
+   DEFINE_DrawTriangleX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0, 0) \
+   DEFINE_DrawTriangleX(SUFFIX##_tk, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0, 1)
+/* A triangle drawn by the instance that draws: a lane drawing bands draws
+ * it with the variant that stamps its rows and texture cache reads */
+#define GPU_DRAW_TRIANGLE(NAME) \
+   if (gpu->tc_track) \
+   { \
+      gpu->tc_draw += 0x10000; \
+      NAME##_tk(gpu, vertices, pct); \
+   } \
+   else \
+      NAME(gpu, vertices, pct);
+#else
+#define DEFINE_DrawTriangle(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
+   DEFINE_DrawTriangleX(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, 0, 0)
+#define GPU_DRAW_TRIANGLE(NAME) NAME(gpu, vertices, pct);
+#endif
 
 #define DRAWTRI_T0_BMGROUP(G) \
    DEFINE_DrawTriangle(g##G##_t0_BMopaque_TM0_MO0_ME0, G, 0, -1, BMopaque, 0, 0, 0) \
@@ -1685,15 +1728,15 @@ DRAWTRI_T1_BMGROUP(1, 1, 0)
 DRAWTRI_T1_BMGROUP(1, 1, 1)
 DRAWTRI_T1_BMGROUP(1, 1, 2)
 
-DEFINE_DrawTriangleX(cost_t0_g0_o,   0, 0, -1, BMopaque, 0, 0, 0, 1)
-DEFINE_DrawTriangleX(cost_t0_g0_b,   0, 0,  0, BMavg,    0, 0, 0, 1)
-DEFINE_DrawTriangleX(cost_t0_g1,     1, 0, -1, BMopaque, 0, 0, 0, 1)
-DEFINE_DrawTriangleX(cost_t1_g0_mo0, 0, 1, -1, BMopaque, 0, 0, 0, 1)
-DEFINE_DrawTriangleX(cost_t1_g0_mo1, 0, 1, -1, BMopaque, 0, 1, 0, 1)
-DEFINE_DrawTriangleX(cost_t1_g0_mo2, 0, 1, -1, BMopaque, 0, 2, 0, 1)
-DEFINE_DrawTriangleX(cost_t1_g1_mo0, 1, 1, -1, BMopaque, 0, 0, 0, 1)
-DEFINE_DrawTriangleX(cost_t1_g1_mo1, 1, 1, -1, BMopaque, 0, 1, 0, 1)
-DEFINE_DrawTriangleX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1)
+DEFINE_DrawTriangleX(cost_t0_g0_o,   0, 0, -1, BMopaque, 0, 0, 0, 1, 0)
+DEFINE_DrawTriangleX(cost_t0_g0_b,   0, 0,  0, BMavg,    0, 0, 0, 1, 0)
+DEFINE_DrawTriangleX(cost_t0_g1,     1, 0, -1, BMopaque, 0, 0, 0, 1, 0)
+DEFINE_DrawTriangleX(cost_t1_g0_mo0, 0, 1, -1, BMopaque, 0, 0, 0, 1, 0)
+DEFINE_DrawTriangleX(cost_t1_g0_mo1, 0, 1, -1, BMopaque, 0, 1, 0, 1, 0)
+DEFINE_DrawTriangleX(cost_t1_g0_mo2, 0, 1, -1, BMopaque, 0, 2, 0, 1, 0)
+DEFINE_DrawTriangleX(cost_t1_g1_mo0, 1, 1, -1, BMopaque, 0, 0, 0, 1, 0)
+DEFINE_DrawTriangleX(cost_t1_g1_mo1, 1, 1, -1, BMopaque, 0, 1, 0, 1, 0)
+DEFINE_DrawTriangleX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1, 0)
 
 /* Emulated GPU timing at an upscale: the triangle walked at native
  * resolution through the cost instance matching the primitive, on a copy
@@ -1723,6 +1766,22 @@ DEFINE_DrawTriangleX(cost_t1_g1_mo2, 1, 1, -1, BMopaque, 0, 2, 0, 1)
       else \
          DrawTriangle_cost_t0_g0_o((gpu), nv, (pct)); \
    } while (0)
+
+/* The native rows and columns a triangle can draw, for the lanes */
+static NO_INLINE void gpu_fp_poly(PS_GPU *g, const tri_vertex *v)
+{
+   const unsigned us = g->upscale_shift;
+   int32_t x0 = v[0].x, x1 = v[0].x, y0 = v[0].y, y1 = v[0].y;
+   unsigned k;
+   for (k = 1; k < 3; k++)
+   {
+      if (v[k].x < x0) x0 = v[k].x;
+      if (v[k].x > x1) x1 = v[k].x;
+      if (v[k].y < y0) y0 = v[k].y;
+      if (v[k].y > y1) y1 = v[k].y;
+   }
+   gpu_fp_write(g, x0 >> us, y0 >> us, x1 >> us, y1 >> us, true);
+}
 
 /* Forward declarations for the helper functions defined in
  * gpu_polygon_sub.c.  Since gpu_polygon.c is now itself plain C
@@ -2188,8 +2247,12 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
           * draws: see GPU_RASTER_CHARGES. */ \
          if (gpu->role == GPU_ROLE_FRONT || GPU_RASTER_WALKS(gpu)) \
             POLY_TIMING_WALK(gpu, vertices, pct, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, MO_LIT, ME_LIT); \
+         if (GPU_FP(gpu)) \
+            gpu_fp_poly(gpu, vertices); \
          if (GPU_TOUCHES_VRAM(gpu)) \
-            DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct); \
+         { \
+            GPU_DRAW_TRIANGLE(DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT) \
+         } \
       } \
       /* Line Render: Overwrite vertices with those of the second triangle */ \
       if ((lineFound) && (NV_LIT == 3) && (TEXTURED_LIT)) \

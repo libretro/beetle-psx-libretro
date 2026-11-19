@@ -1,3 +1,10 @@
+#include <retro_atomic.h>
+
+/* Whether the GPU thread and its band lanes are built (gpu_thread.c) */
+#if defined(HAVE_THREADS) && defined(RETRO_ATOMIC_LOCK_FREE)
+#define GPU_HAVE_THREAD 1
+#endif
+
 extern enum dither_mode psx_gpu_dither_mode;
 
 /* Return a pixel from VRAM */
@@ -307,6 +314,73 @@ static INLINE void gpu_set_role(PS_GPU *g, uint8_t role)
  * runs only when one does, and does not read the renderer's settings,
  * which the emulation thread may rewrite while it draws. */
 #define GPU_HAS_SW(g) ((g)->role == GPU_ROLE_BACK || rhi_intf_has_software_renderer())
+/* Whether this instance draws native VRAM row y (gpu.h, band_lanes) */
+#define GPU_BAND_NONE 0xFF
+#define GPU_ROW_MINE(g, y) (!(g)->band_lanes \
+      || ((g)->band_lanes != GPU_BAND_NONE \
+         && ((((unsigned)(y) & 511) >> 3) % (g)->band_lanes) == (g)->band_lane))
+
+/* For a lane drawing bands: whether it draws native row y, stamping its
+ * texture cache reads with the row if it does (gpu.h, tc_stamp), the
+ * row's first included */
+static INLINE bool gpu_band_row(PS_GPU *g, int32_t y)
+{
+   if (!GPU_ROW_MINE(g, y))
+      return false;
+   g->tc_stamp      = g->tc_draw | ((uint32_t)y & 0xFFFF);
+   g->last_tex_line = ~0U;
+   return true;
+}
+/* The emulation thread notes what each command writes and what texture
+ * it reads, while the lanes draw bands (gpu_thread_cmd_end). */
+#ifdef GPU_HAVE_THREAD
+#define GPU_FP(g) ((g)->role == GPU_ROLE_FRONT && (g)->tc_track)
+#else
+#define GPU_FP(g) 0
+#endif
+
+/* Native rectangle [x0, x1] x [y0, y1] written, clipped to the draw area
+ * when clip, added to the command's. */
+static NO_INLINE void gpu_fp_write(PS_GPU *g, int32_t x0, int32_t y0,
+      int32_t x1, int32_t y1, bool clip)
+{
+   if (clip)
+   {
+      if (x0 < g->ClipX0) x0 = g->ClipX0;
+      if (y0 < g->ClipY0) y0 = g->ClipY0;
+      if (x1 > g->ClipX1) x1 = g->ClipX1;
+      if (y1 > g->ClipY1) y1 = g->ClipY1;
+   }
+   if (x1 < x0 || y1 < y0)
+      return;
+   if (g->fp_write[1])
+   {
+      int32_t ox0 = (int32_t)(g->fp_write[0] & 0xFFFF);
+      int32_t oy0 = (int32_t)(g->fp_write[0] >> 16);
+      int32_t ox1 = ox0 + (int32_t)(g->fp_write[1] & 0xFFFF) - 1;
+      int32_t oy1 = oy0 + (int32_t)(g->fp_write[1] >> 16) - 1;
+      if (ox0 < x0) x0 = ox0;
+      if (oy0 < y0) y0 = oy0;
+      if (ox1 > x1) x1 = ox1;
+      if (oy1 > y1) y1 = oy1;
+   }
+   g->fp_write[0] = (uint32_t)x0 | ((uint32_t)y0 << 16);
+   g->fp_write[1] = (uint32_t)(x1 - x0 + 1) | ((uint32_t)(y1 - y0 + 1) << 16);
+}
+
+/* A textured command: the texture page it reads and, below 15 bits, its
+ * CLUT */
+static NO_INLINE void gpu_fp_texture(PS_GPU *g, uint16_t raw_clut, int tm)
+{
+   g->fp_textured = true;
+   if (tm < 2)
+   {
+      g->fp_clut[0] = ((uint32_t)(raw_clut & 0x3F) << 4)
+         | ((uint32_t)((raw_clut >> 6) & 0x1FF) << 16);
+      g->fp_clut[1] = (tm ? 256u : 16u) | (1u << 16);
+   }
+}
+
 /* Renderer calls and display bookkeeping happen on the emulation thread. */
 #define GPU_ON_EMU_THREAD(g)  ((g)->role != GPU_ROLE_BACK)
 /* VRAM is read and written by the instance that draws. */
@@ -338,6 +412,8 @@ static INLINE void gpu_set_role(PS_GPU *g, uint8_t role)
 #define DEFINE_Update_CLUT_Cache(SUFFIX, TM_VAL) \
 static INLINE void Update_CLUT_Cache_##SUFFIX(PS_GPU *g, uint16_t raw_clut) \
 { \
+   if (GPU_FP(g)) \
+      gpu_fp_texture(g, raw_clut, (TM_VAL)); \
    if ((TM_VAL) < 2) \
    { \
       const uint32_t new_ccvb = ((raw_clut & 0x7FFF) | ((TM_VAL) << 16)); \
@@ -348,7 +424,9 @@ static INLINE void Update_CLUT_Cache_##SUFFIX(PS_GPU *g, uint16_t raw_clut) \
          const uint32_t count = ((TM_VAL) ? 256 : 16); \
          unsigned i; \
          g->DrawTimeAvail -= count; \
-         if (GPU_TOUCHES_VRAM(g)) \
+         /* not by a lane drawing nothing: lane 0's is copied when the \
+          * lanes draw bands again (gpu_thread.c) */ \
+         if (GPU_TOUCHES_VRAM(g) && g->band_lanes != GPU_BAND_NONE) \
             for (i = 0; i < count; i++) \
             { \
                uint16_t x = (cxo + i) & 0x3FF; \
@@ -411,8 +489,9 @@ static INLINE void RecalcTexWindowStuff(PS_GPU *g)
 /* Generator macro for one GetTexel specialisation.  TM_VAL is the
  * literal texture-mode (0/1/2).  The switch on TM_VAL collapses to
  * the matching arm; the if (TM_VAL != 2) and if (TM_VAL == 0) tests
- * are literal so dead arms vanish. */
-#define DEFINE_GetTexel(SUFFIX, TM_VAL) \
+ * are literal so dead arms vanish.  TRACK_LIT stamps each cache read
+ * for a lane drawing bands (gpu.h, tc_pos). */
+#define DEFINE_GetTexel(SUFFIX, TM_VAL, TRACK_LIT) \
 static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg) \
 { \
    uint16_t fbw; \
@@ -434,6 +513,8 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
          case 1: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break; \
          case 2: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break; \
       } \
+      if (TRACK_LIT) \
+         g->tc_pos[c - TexCache] = g->tc_stamp; \
       if (MDFN_UNLIKELY(c->Tag != gro_line)) \
       { \
          uint32_t cache_x = fbtex_x & ~3; \
@@ -597,9 +678,18 @@ DEFINE_TimingSpan(TM2, 2)
  * can reference it as `struct TexCache_t` directly. */
 typedef struct TexCache_t PS_GPU_TexCache_t;
 
-DEFINE_GetTexel(TM0, 0)
-DEFINE_GetTexel(TM1, 1)
-DEFINE_GetTexel(TM2, 2)
+DEFINE_GetTexel(TM0, 0, 0)
+DEFINE_GetTexel(TM1, 1, 0)
+DEFINE_GetTexel(TM2, 2, 0)
+#ifdef GPU_HAVE_THREAD
+DEFINE_GetTexel(TM0_tk, 0, 1)
+DEFINE_GetTexel(TM1_tk, 1, 1)
+DEFINE_GetTexel(TM2_tk, 2, 1)
+#endif
+/* GetTexel_TM<TM>, or its tracked variant for TK 1; both literals */
+#define GPU_GETTEXEL(TM, TK)   GPU_GETTEXEL_##TK(TM)
+#define GPU_GETTEXEL_0(TM)     GetTexel_TM##TM
+#define GPU_GETTEXEL_1(TM)     GetTexel_TM##TM##_tk
 
 /* The template-style GetTexel dispatcher previously here is gone
  * in stage 5; callers now reference the right GetTexel_TM<n>

@@ -20,9 +20,10 @@
  * The host runs FRAMES frames, saving a state part way and loading it back
  * later, then hashes native VRAM (the savestate's GPURAM entry), the last
  * video frame and main RAM.  run.sh runs it with the GPU thread off, on,
- * and switched on and off every few frames, and checks the three agree.
+ * switched on and off every few frames, and with 2, 3 and 4 lanes drawing
+ * bands, and checks they all agree.
  *
- * usage: gpu_thread_test <core> <1x|2x|4x> <off|on|toggle> <pgxp|nopgxp> [deint]
+ * usage: gpu_thread_test <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint]
  * Runs in the current directory: it writes the probe EXE and an all-zero
  * BIOS image there. */
 #include <stdio.h>
@@ -380,6 +381,59 @@ static void build_list(void)
       }
       node(w, n);
    }
+
+   /* A 15-bit page read whole, by every band, then drawn over with no
+    * cache flush, then the 32x32 texels the cache was left holding read
+    * again: from the lines the first read left, whichever band fetched
+    * them, not from VRAM */
+   w[0] = 0xE3000000u; node(w, 1);
+   w[0] = 0xE4000000u | (511u << 10) | 1023u; node(w, 1);
+   w[0] = 0xE5000000u; node(w, 1);
+   w[0] = 0xE2000000u; node(w, 1);
+   w[0] = 0xE6000000u; node(w, 1);
+   w[0] = 0xE1000000u | (640u >> 6) | (2u << 7); node(w, 1);
+   w[0] = 0x01000000u; node(w, 1);
+   /* A page read by every band, then, the cache emptied by a page change,
+    * drawn over: no band may draw over texels another has still to read.
+    * One band down, so each texel row is read by another band than the
+    * one that draws it over, whatever the number of bands. */
+   w[0] = 0xE1000000u | (768u >> 6) | (2u << 7); node(w, 1);
+   w[0] = 0x65000000u | 0x808080u; w[1] = xy(0, 264);
+   w[2] = 0; w[3] = (240u << 16) | 256u;
+   node(w, 4);
+   w[0] = 0xE1000000u | (640u >> 6) | (2u << 7); node(w, 1);
+   w[0] = 0x60000000u | rcol(); w[1] = xy(768, 0);
+   w[2] = (256u << 16) | 256u;
+   node(w, 3);
+   w[0] = 0x01000000u; node(w, 1);
+   for (i = 0; i < 2; i++)
+   {
+      w[0] = 0x65000000u | 0x808080u; w[1] = xy((int)i * 256, 256);
+      w[2] = i ? (224u << 8) | 224u : 0;
+      w[3] = i ? (32u << 16) | 32u : (256u << 16) | 256u;
+      node(w, 4);
+      if (!i)
+      {
+         w[0] = 0x60000000u | rcol(); w[1] = xy(640, 0);
+         w[2] = (256u << 16) | 256u;
+         node(w, 3);
+      }
+   }
+   /* Still drawn by one lane: 8-bit (no cache flush), a CLUT not loaded
+    * before; then a flush, after which the bands draw again, the first
+    * with the CLUT that was loaded while they were not drawing */
+   w[0] = 0xE1000000u | (640u >> 6) | (1u << 7); node(w, 1);
+   for (i = 0; i < 2; i++)
+   {
+      w[0] = 0x65000000u | 0x808080u; w[1] = xy(512, 256 + (int)i * 64);
+      w[2] = ((500u << 6) | 1u) << 16; w[3] = (64u << 16) | 64u;
+      node(w, 4);
+      if (!i)
+      {
+         w[0] = 0x01000000u; node(w, 1);
+      }
+   }
+
    w[0] = 0xE6000000u; node(w, 1);
    /* Dithering on at the end, so what a GP1 reset clears shows next frame */
    w[0] = 0xE1000000u | (1u << 9); node(w, 1);
@@ -682,7 +736,12 @@ static const char *get_var(const char *key)
    if (!strcmp(key, "beetle_psx_internal_resolution"))
       return resolution;
    if (!strcmp(key, "beetle_psx_gpu_thread"))
+   {
+      /* a lane count: the lanes draw bands at every resolution */
+      if (thread_mode[0] >= '1' && thread_mode[0] <= '8')
+         return thread_mode;
       return thread_on() ? "enabled" : "disabled";
+   }
    if (!strcmp(key, "beetle_psx_pgxp_mode"))
       return pgxp_mode;
    if (!strcmp(key, "beetle_psx_pgxp_texture"))
@@ -776,7 +835,7 @@ int main(int argc, char **argv)
 
    if (argc < 5)
    {
-      fprintf(stderr, "usage: %s <core> <1x|2x|4x> <off|on|toggle> <pgxp|nopgxp> [deint]\n",
+      fprintf(stderr, "usage: %s <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint]\n",
             argv[0]);
       return 2;
    }
