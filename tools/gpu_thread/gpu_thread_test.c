@@ -25,7 +25,8 @@
  *
  * usage: gpu_thread_test <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint]
  * Runs in the current directory: it writes the probe EXE and an all-zero
- * BIOS image there. */
+ * BIOS image there.  "gpu_thread_test probe" only writes the probe EXE and
+ * keeps it, for the hardware renderers' hosts (tools/glhost/timing_lanes.sh). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -833,6 +834,8 @@ int main(int argc, char **argv)
    unsigned f;
    int found = 0;
 
+   if (argc == 2 && !strcmp(argv[1], "probe"))
+      return write_probe() ? 0 : 2;
    if (argc < 5)
    {
       fprintf(stderr, "usage: %s <core> <1x|2x|4x> <off|on|toggle|lanes> <pgxp|nopgxp> [deint]\n",

@@ -2229,7 +2229,6 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             } \
          } \
       } \
-      if (GPU_HAS_SW(gpu)) \
       { \
          /* Perspective-correct texturing for the SW rasteriser. \
           * Eligible when this primitive came in through the PGXP \
@@ -2243,15 +2242,20 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          bool pct = (PGXP_LIT) && (TEXTURED_LIT) \
                     && !invalidW \
                     && PGXP_texture_correction_enabled(); \
+         const bool sw = GPU_HAS_SW(gpu); \
          /* Timing from the native walk, drawing on whichever instance \
-          * draws: see GPU_RASTER_CHARGES. */ \
-         if (gpu->role == GPU_ROLE_FRONT || GPU_RASTER_WALKS(gpu)) \
+          * draws: see GPU_RASTER_CHARGES.  Without a software renderer \
+          * nothing draws, and the walk charges what drawing would. */ \
+         if (gpu->role == GPU_ROLE_FRONT || GPU_RASTER_WALKS(gpu) || !sw) \
             POLY_TIMING_WALK(gpu, vertices, pct, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, MO_LIT, ME_LIT); \
-         if (GPU_FP(gpu)) \
-            gpu_fp_poly(gpu, vertices); \
-         if (GPU_TOUCHES_VRAM(gpu)) \
+         if (sw) \
          { \
-            GPU_DRAW_TRIANGLE(DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT) \
+            if (GPU_FP(gpu)) \
+               gpu_fp_poly(gpu, vertices); \
+            if (GPU_TOUCHES_VRAM(gpu)) \
+            { \
+               GPU_DRAW_TRIANGLE(DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT) \
+            } \
          } \
       } \
       /* Line Render: Overwrite vertices with those of the second triangle */ \

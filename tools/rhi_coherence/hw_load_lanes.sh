@@ -13,7 +13,17 @@
 #     internal-resolution pixels the full upload throws away,
 #   - the loads do at most 3/4 of the full upload's work.
 # Content is gen_frame_exe.py with a per-buffer drawing area and
-# render-to-texture feedback.
+# render-to-texture feedback. The output is compared on content light
+# enough that every frame starts with the GPU idle: a state saved while it
+# draws holds VRAM the renderer has only partly drawn, which neither load
+# can give back as it was. The work is measured on the full content, as a
+# game redraws only part of VRAM a frame.
+#
+# A frontend that registers the core's savestate lifetime callbacks, as
+# RetroArch does, gets the renderer's own VRAM back instead: on Vulkan,
+# rolling back with the full content, which keeps the GPU drawing across
+# every frame boundary, must show exactly what running without rollback
+# shows, with the Software Framebuffer on and off.
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/rhi_coherence/hw_load_lanes.sh [core.so]
@@ -31,14 +41,15 @@ make -s -C tools/glhost glhost
 rm -rf "$OUT"
 mkdir -p "$OUT" "$SYS"
 [ -f "$SYS/scph5501.bin" ] || head -c 524288 /dev/zero > "$SYS/scph5501.bin"
-python3 tools/rhi_coherence/gen_frame_exe.py "$OUT/frame.exe" drawarea feedback
+python3 tools/rhi_coherence/gen_frame_exe.py "$OUT/frame.exe" drawarea feedback light
+python3 tools/rhi_coherence/gen_frame_exe.py "$OUT/frame_full.exe" drawarea feedback
 
-# vk_run <name> <res> [env...]
+# vk_run <name> <res> <exe> [env...]
 vk_run() {
-   n=$1; r=$2; shift 2
+   n=$1; r=$2; exe=$3; shift 3
    env "$@" VKHOST_DUMP_INTERVAL=2 \
       VKHOST_VARS="${P}_renderer=hardware_vk;${P}_renderer_software_fb=disabled;${P}_internal_resolution=$r" \
-      tools/vkhost/vkhost "$CORE" "$OUT/frame.exe" - "$FRAMES" "$OUT/$n" \
+      tools/vkhost/vkhost "$CORE" "$OUT/$exe" - "$FRAMES" "$OUT/$n" \
       > "$OUT/$n.log" 2>&1 || { cat "$OUT/$n.log"; exit 1; }
    if ! grep -q " 0 validation errors" "$OUT/$n.log"; then
       echo "$n: Vulkan validation errors" >&2
@@ -46,12 +57,21 @@ vk_run() {
    fi
 }
 
-# gl_run <name> <res> [env...]
+# vk_managed <name> <res> <software_fb> [env...]: the full content
+vk_managed() {
+   n=$1; r=$2; fb=$3; shift 3
+   env "$@" VKHOST_DUMP_INTERVAL=2 \
+      VKHOST_VARS="${P}_renderer=hardware_vk;${P}_renderer_software_fb=$fb;${P}_internal_resolution=$r" \
+      tools/vkhost/vkhost "$CORE" "$OUT/frame_full.exe" - "$FRAMES" "$OUT/$n" \
+      > "$OUT/$n.log" 2>&1 || { cat "$OUT/$n.log"; exit 1; }
+}
+
+# gl_run <name> <res> <exe> [env...]
 gl_run() {
-   n=$1; r=$2; shift 2
+   n=$1; r=$2; exe=$3; shift 3
    env "$@" GLHOST_FRAMEHASH=1 \
       GLHOST_VARS="${P}_renderer=hardware_gl;${P}_renderer_software_fb=disabled;${P}_internal_resolution=$r" \
-      tools/glhost/glhost "$CORE" "$OUT/frame.exe" - "$FRAMES" "$OUT/$n" \
+      tools/glhost/glhost "$CORE" "$OUT/$exe" - "$FRAMES" "$OUT/$n" \
       > "$OUT/$n.log" 2>&1 || { cat "$OUT/$n.log"; exit 1; }
    grep "\[glhost\] frame .* hash" "$OUT/$n.log" > "$OUT/$n.hash" || true
    grep -v "(replay)" "$OUT/$n.hash" > "$OUT/$n.shown" || true
@@ -85,25 +105,39 @@ fraction() {
    fi
 }
 
+steady() { sed -n "s/.*steady state: \([0-9]*\) $2.*/\1/p" "$OUT/$1.log"; }
 fail=0
 for res in 1x 2x; do
-   vk_run "vk_${res}_diff" $res VKHOST_PREEMPT=1
-   vk_run "vk_${res}_full" $res VKHOST_PREEMPT=1 BEETLE_FULL_VRAM_UPLOAD=1
+   vk_run "vk_${res}_diff" $res frame.exe VKHOST_PREEMPT=1
+   vk_run "vk_${res}_full" $res frame.exe VKHOST_PREEMPT=1 BEETLE_FULL_VRAM_UPLOAD=1
    vk_same "vk_${res}_diff" "vk_${res}_full"
+   vk_run "vk_${res}_wdiff" $res frame_full.exe VKHOST_PREEMPT=1
+   vk_run "vk_${res}_wfull" $res frame_full.exe VKHOST_PREEMPT=1 BEETLE_FULL_VRAM_UPLOAD=1
    fraction "vk $res compute workgroups" \
-      "$(sed -n 's/.*steady state: \([0-9]*\) compute.*/\1/p' "$OUT/vk_${res}_diff.log")" \
-      "$(sed -n 's/.*steady state: \([0-9]*\) compute.*/\1/p' "$OUT/vk_${res}_full.log")"
+      "$(steady "vk_${res}_wdiff" compute)" "$(steady "vk_${res}_wfull" compute)"
 
-   gl_run "gl_${res}_diff" $res GLHOST_PREEMPT=2
-   gl_run "gl_${res}_full" $res GLHOST_PREEMPT=2 BEETLE_FULL_VRAM_UPLOAD=1
+   gl_run "gl_${res}_diff" $res frame.exe GLHOST_PREEMPT=2
+   gl_run "gl_${res}_full" $res frame.exe GLHOST_PREEMPT=2 BEETLE_FULL_VRAM_UPLOAD=1
    if [ $res = 1x ]; then
       gl_same "gl_${res}_diff" "gl_${res}_full" hash
    else
       gl_same "gl_${res}_diff" "gl_${res}_full" shown
    fi
+   gl_run "gl_${res}_wdiff" $res frame_full.exe GLHOST_PREEMPT=2
+   gl_run "gl_${res}_wfull" $res frame_full.exe GLHOST_PREEMPT=2 BEETLE_FULL_VRAM_UPLOAD=1
    fraction "gl $res texels uploaded" \
-      "$(sed -n 's/.*steady state: \([0-9]*\) texels.*/\1/p' "$OUT/gl_${res}_diff.log")" \
-      "$(sed -n 's/.*steady state: \([0-9]*\) texels.*/\1/p' "$OUT/gl_${res}_full.log")"
+      "$(steady "gl_${res}_wdiff" texels)" "$(steady "gl_${res}_wfull" texels)"
+done
+for res in 1x 2x; do
+   for fb in enabled disabled; do
+      vk_managed "vk_${res}_${fb}_plain" $res $fb
+      vk_managed "vk_${res}_${fb}_managed" $res $fb VKHOST_PREEMPT=1 VKHOST_LIFETIME=1
+      vk_same "vk_${res}_${fb}_managed" "vk_${res}_${fb}_plain"
+      if ! grep -q " 0 refused loads" "$OUT/vk_${res}_${fb}_managed.log"; then
+         echo "vk_${res}_${fb}_managed: managed loads refused" >&2
+         fail=1
+      fi
+   done
 done
 [ "$fail" = 0 ] || exit 1
 echo "rhi_coherence: hardware load lanes passed"

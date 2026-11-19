@@ -647,9 +647,9 @@ static void Command_DrawSprite_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    x = sign_x_to_s32(11, x + gpu->OffsX); \
    y = sign_x_to_s32(11, y + gpu->OffsY); \
    GPU_SPR_RHI_PUSH_HOOK(gpu, x, y, w, h, u, v, color, clut, T_LIT, TM_LIT, MO_LIT, BM_VAL, ME_LIT); \
-   if (!GPU_HAS_SW(gpu)) \
-      return; \
-   if (gpu->role == GPU_ROLE_FRONT) \
+   /* Timing without drawing: on the emulation thread for the GPU thread, \
+    * and without a software renderer, where nothing draws */ \
+   if (gpu->role == GPU_ROLE_FRONT || !GPU_HAS_SW(gpu)) \
    { \
       if (GPU_FP(gpu)) \
          gpu_fp_write(gpu, x, y, x + w - 1, y + h - 1, true); \

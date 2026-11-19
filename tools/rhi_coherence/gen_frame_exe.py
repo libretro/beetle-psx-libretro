@@ -22,12 +22,17 @@ Options (any order after the output path):
   static    the texture page is uploaded once and never changes (no
             per-frame upload or VRAM copy), so its texture keeps one hash,
             as an HD replacement pack needs
-usage: gen_frame_exe.py out.exe [readback] [additive] [drawarea] [feedback] [static]"""
+  light     a quarter of the quads and sprites, so the emulated GPU draws
+            each iteration well inside one frame and every frame starts
+            with the GPU idle; the full count keeps it drawing across the
+            frame boundary, as a game running below the display rate does
+usage: gen_frame_exe.py out.exe [readback] [additive] [drawarea] [feedback] [static] [light]"""
 import struct, sys
 BASE = 0xA0010000
 GP0 = 0x1F801810
-QUADS = 600
-SPRITES = 400
+LIGHT = 'light' in sys.argv[2:]
+QUADS = 150 if LIGHT else 600
+SPRITES = 100 if LIGHT else 400
 READBACK = 'readback' in sys.argv[2:]
 ADDITIVE = 'additive' in sys.argv[2:]
 DRAWAREA = 'drawarea' in sys.argv[2:]

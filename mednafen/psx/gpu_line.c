@@ -305,10 +305,9 @@ static void Command_DrawLine_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    if (delta_y >= 512) \
       return; \
    GPU_LINE_RHI_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT); \
-   if (!GPU_HAS_SW(gpu)) \
-      return; \
-   /* A line costs two per step along its longer axis. */ \
-   if (gpu->role == GPU_ROLE_FRONT) \
+   /* A line costs two per step along its longer axis, charged here where \
+    * nothing draws it on this thread or at all */ \
+   if (gpu->role == GPU_ROLE_FRONT || !GPU_HAS_SW(gpu)) \
    { \
       if (GPU_FP(gpu)) \
          gpu_fp_write(gpu, MIN(points[0].x, points[1].x), MIN(points[0].y, points[1].y), \
