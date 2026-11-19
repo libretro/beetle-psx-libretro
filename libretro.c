@@ -4553,6 +4553,55 @@ static void fallback_log(enum retro_log_level level, const char *fmt, ...)
    va_end(va);
 }
 
+/* Managed savestates (RETRO_ENVIRONMENT_SET_SAVESTATE_LIFETIME): a state
+ * the frontend keeps in this instance for Run-Ahead or Preemptive Frames
+ * ends in a token naming a snapshot of VRAM as the hardware renderer held
+ * it, so a load puts the renderer back as it was - at its internal
+ * resolution - instead of uploading the state's 1x VRAM. The state before
+ * the token is an ordinary one: without its snapshot it loads as any other. */
+#define STATE_TOKEN_MAGIC 0x4d535042u /* "BPSM" */
+#define STATE_TOKEN_SIZE  16
+
+static bool state_lifetime;
+
+static bool state_managed(void)
+{
+   int context = RETRO_SAVESTATE_CONTEXT_NORMAL;
+   return state_lifetime
+      && environ_cb(RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT, &context)
+      && context == RETRO_SAVESTATE_CONTEXT_SAME_INSTANCE_MANAGED;
+}
+
+/* magic, slot, generation, whether there is a snapshot */
+static void state_token_write(uint8_t *end, bool have, uint32_t slot, uint32_t gen)
+{
+   uint32_t t[4];
+   t[0] = STATE_TOKEN_MAGIC;
+   t[1] = slot;
+   t[2] = gen;
+   t[3] = have ? 1 : 0;
+   memcpy(end - STATE_TOKEN_SIZE, t, STATE_TOKEN_SIZE);
+}
+
+static bool state_token_read(const uint8_t *end, uint32_t *slot, uint32_t *gen)
+{
+   uint32_t t[4];
+   memcpy(t, end - STATE_TOKEN_SIZE, STATE_TOKEN_SIZE);
+   if (t[0] != STATE_TOKEN_MAGIC || t[3] != 1)
+      return false;
+   *slot = t[1];
+   *gen  = t[2];
+   return true;
+}
+
+static void RETRO_CALLCONV state_release(const void *data, size_t size)
+{
+   uint32_t slot, gen;
+   if (data && size >= STATE_TOKEN_SIZE
+         && state_token_read((const uint8_t*)data + size, &slot, &gen))
+      rhi_intf_snapshot_release(slot, gen);
+}
+
 void retro_init(void)
 {
    struct retro_log_callback log;
@@ -4628,6 +4677,13 @@ void retro_init(void)
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
       libretro_supports_bitmasks = true;
+
+   {
+      struct retro_savestate_lifetime lifetime;
+      lifetime.version = RETRO_SAVESTATE_LIFETIME_VERSION;
+      lifetime.release = state_release;
+      state_lifetime   = environ_cb(RETRO_ENVIRONMENT_SET_SAVESTATE_LIFETIME, &lifetime);
+   }
 
    check_system_specs();
 }
@@ -7561,6 +7617,7 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
 
 size_t retro_serialize_size(void)
 {
+   size_t token = state_managed() ? STATE_TOKEN_SIZE : 0;
    if (enable_variable_serialization_size)
    {
       StateMem st;
@@ -7576,10 +7633,10 @@ size_t retro_serialize_size(void)
       if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
          return 0;
 
-      return st.len;
+      return st.len + token;
    }
 
-   return DEFAULT_STATE_SIZE; // 16MB
+   return DEFAULT_STATE_SIZE + token; // 16MB
 }
 
 bool UsingFastSavestates(void)
@@ -7597,9 +7654,16 @@ bool retro_serialize(void *data, size_t size)
 {
    StateMem st;
    bool     ret;
+   bool     managed = state_managed();
 
    if (!data || size == 0)
       return false;
+   if (managed)
+   {
+      if (size <= STATE_TOKEN_SIZE)
+         return false;
+      size -= STATE_TOKEN_SIZE;
+   }
 
    /* Same defensive check as retro_unserialize - StateAction touches
     * every subsystem and segfaults if any of them are NULL. */
@@ -7617,6 +7681,13 @@ bool retro_serialize(void *data, size_t size)
    FastSaveStates = UsingFastSavestates();
    ret            = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
    FastSaveStates = false;
+
+   if (ret && managed)
+   {
+      uint32_t slot = 0, gen = 0;
+      bool     have = rhi_intf_snapshot_save(&slot, &gen);
+      state_token_write((uint8_t*)data + size + STATE_TOKEN_SIZE, have, slot, gen);
+   }
 
    if (!ret)
       log_cb(RETRO_LOG_ERROR,
@@ -7642,6 +7713,16 @@ bool retro_unserialize(const void *data, size_t size)
    if (!data || size == 0 || !MainRAM || !PSX_CDC || !PSX_CPU || !PSX_FIO)
       return false;
 
+   if (state_managed())
+   {
+      uint32_t slot, gen;
+      if (size <= STATE_TOKEN_SIZE)
+         return false;
+      if (state_token_read((const uint8_t*)data + size, &slot, &gen))
+         GPU_SetStateSnapshot(true, slot, gen);
+      size -= STATE_TOKEN_SIZE;
+   }
+
    st.data           = (uint8_t*)data;
    st.loc            = 0;
    st.len            = size;
@@ -7653,6 +7734,7 @@ bool retro_unserialize(const void *data, size_t size)
    FastSaveStates = UsingFastSavestates();
    okay           = MDFNSS_LoadSM(&st, 0, 0);
    FastSaveStates = false;
+   GPU_SetStateSnapshot(false, 0, 0);
    return okay;
 }
 

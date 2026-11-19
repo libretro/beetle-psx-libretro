@@ -67,3 +67,8 @@ ever edited in this core.
   off, on and switched mid-run, at 1x, 2x and 4x, with PGXP and the "Off"
   deinterlacer. Needs a built core; build the core and the host with
   `-fsanitize=thread` (`CC="cc -fsanitize=thread"`) to check the drains.
+- `sh tools/vkhost/lifetime_lanes.sh` - managed savestates on the Vulkan
+  renderer: a rollback every frame with the frontend's lifetime callbacks
+  gives the frames of a run without one, at 1x to 4x, with the Software
+  Framebuffer, adaptive smoothing and HDR. Needs a HAVE_HW=1 build and a
+  Vulkan device (lavapipe works).

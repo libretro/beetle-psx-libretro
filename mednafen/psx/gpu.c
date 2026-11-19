@@ -3341,6 +3341,7 @@ void GPU_RestoreStateP2(bool load)
 }
 
 static void gpu_restore_state_p3(bool upload_all);
+static void gpu_restore_state_snapshot(void);
 
 static int gpu_full_upload = -1;
 
@@ -3357,6 +3358,25 @@ static bool gpu_full_vram_upload(void)
 void GPU_RestoreStateP3(void)
 {
    gpu_restore_state_p3(true);
+}
+
+/* A managed state's snapshot of VRAM as the hardware renderer held it,
+ * put back in place of uploading the state's 1x VRAM. */
+static bool     gpu_snapshot_on, gpu_snapshot_restoring;
+static uint32_t gpu_snapshot_slot, gpu_snapshot_gen;
+
+static void gpu_restore_state_snapshot(void)
+{
+   gpu_snapshot_restoring = true;
+   gpu_restore_state_p3(false);
+   gpu_snapshot_restoring = false;
+}
+
+void GPU_SetStateSnapshot(bool on, uint32_t slot, uint32_t gen)
+{
+   gpu_snapshot_on   = on;
+   gpu_snapshot_slot = slot;
+   gpu_snapshot_gen  = gen;
 }
 
 /* Upload rows [y0, y1) of each run of set 32-pixel column groups. */
@@ -3498,7 +3518,12 @@ static void gpu_restore_state_p3(bool upload_all)
    rhi_intf_set_draw_area( GPU.ClipX0, GPU.ClipY0,
                            GPU.ClipX1, GPU.ClipY1);
 
-   if (upload_all)
+   if (gpu_snapshot_restoring)
+   {
+      if (!rhi_intf_snapshot_restore(gpu_snapshot_slot, gpu_snapshot_gen))
+         rhi_intf_load_image(0, 0, 1024, 512, GPU.vram, 0, false, false);
+   }
+   else if (upload_all)
       rhi_intf_load_image( 0,    0,
                            1024, 512,
                            GPU.vram, 0, false, false);
@@ -3523,7 +3548,10 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
     * plus, without the software framebuffer, the blocks the coherence map
     * does not know to match GPU.vram. The context must be up. With
     * BEETLE_FULL_VRAM_UPLOAD=1 every load uploads all of VRAM. */
-   bool diff_load = load && GPU.upscale_shift == 0
+   /* A managed state whose snapshot is there needs no upload at all */
+   bool snapshot  = load && gpu_snapshot_on
+         && rhi_intf_snapshot_valid(gpu_snapshot_slot, gpu_snapshot_gen);
+   bool diff_load = load && !snapshot && GPU.upscale_shift == 0
          && rhi_intf_is_type() != RHI_SOFTWARE
          && rhi_intf_context_ready()
          && !gpu_full_vram_upload();
@@ -3730,7 +3758,10 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
 
    if(load)
    {
-      gpu_restore_state_p3(!(diff_load && ret));
+      if (snapshot && ret)
+         gpu_restore_state_snapshot();
+      else
+         gpu_restore_state_p3(!(diff_load && ret));
       if (fbw && ret)
       {
          if (fbw_rows)

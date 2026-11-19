@@ -187,6 +187,10 @@ void rhi_intf_toggle_display(bool status);
 bool rhi_intf_has_software_renderer(void);
 bool rhi_intf_context_ready(void);
 uint32_t rhi_intf_vram_dirty_groups(unsigned br);
+bool rhi_intf_snapshot_save(uint32_t *slot, uint32_t *gen);
+bool rhi_intf_snapshot_valid(uint32_t slot, uint32_t gen);
+bool rhi_intf_snapshot_restore(uint32_t slot, uint32_t gen);
+void rhi_intf_snapshot_release(uint32_t slot, uint32_t gen);
 
 double rhi_common_get_timing_fps(void);
 

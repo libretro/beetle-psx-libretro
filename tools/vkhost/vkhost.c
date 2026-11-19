@@ -16,6 +16,13 @@
  *   VKHOST_PREEMPT=1: model RetroArch's Preemptive Frames (rollback by
  *     one frame, glhost's GLHOST_PREEMPT=2): every frame restore the state
  *     saved before the previous one, replay that frame, save, then run.
+ *   VKHOST_LIFETIME=1: with VKHOST_PREEMPT, take the core's savestate
+ *     lifetime callbacks (RETRO_ENVIRONMENT_SET_SAVESTATE_LIFETIME) as
+ *     RetroArch does: the rollback's states are saved and loaded in the
+ *     managed context, a buffer's state is released before another is saved
+ *     into it, every one is released before context_destroy, and
+ *     GET_EXECUTION_PHASE reports the replay as REPLAY. Ends with how many
+ *     managed saves and releases there were.
  *   VKHOST_VARS_AT: semicolon list of frame:key=value option changes, each
  *     applied before that frame's retro_run and reported through
  *     GET_VARIABLE_UPDATE, as a frontend does when the user edits an option
@@ -754,6 +761,34 @@ static void up_dump_images(const char *outdir, int n)
 }
 
 /* ---- environment ---- */
+/* VKHOST_LIFETIME: the core's lifetime callbacks and the rollback's two
+ * state buffers, with whether each holds a managed state */
+static int lt_on;
+static int lt_managed_ctx;
+static enum retro_execution_phase lt_phase = RETRO_EXECUTION_PHASE_RETAINED;
+static struct retro_savestate_lifetime lt_iface;
+static void  *lt_buf[2];
+static size_t lt_size;
+static int    lt_owned[2];
+static long   lt_saves, lt_releases;
+
+static void lt_release(int i)
+{
+   if (lt_owned[i] && lt_iface.release)
+   {
+      lt_iface.release(lt_buf[i], lt_size);
+      lt_releases++;
+   }
+   lt_owned[i] = 0;
+}
+
+/* Before the core's context goes: nothing it held may outlive it */
+static void lt_release_all(void)
+{
+   lt_release(0);
+   lt_release(1);
+}
+
 static bool env_cb(unsigned cmd, void *data)
 {
    switch (cmd)
@@ -868,6 +903,27 @@ static bool env_cb(unsigned cmd, void *data)
       case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:
          *(const struct retro_hw_render_interface_vulkan **)data = &iface;
          return true;
+      case RETRO_ENVIRONMENT_SET_SAVESTATE_LIFETIME:
+      {
+         const struct retro_savestate_lifetime *l =
+            (const struct retro_savestate_lifetime *)data;
+         if (!lt_on || !l || l->version < 1
+               || l->version > RETRO_SAVESTATE_LIFETIME_VERSION || !l->release)
+            return false;
+         lt_iface = *l;
+         fprintf(stderr, "[vkhost] savestate lifetime registered\n");
+         return true;
+      }
+      case RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT:
+         if (data)
+            *(int *)data = lt_managed_ctx
+               ? RETRO_SAVESTATE_CONTEXT_SAME_INSTANCE_MANAGED
+               : RETRO_SAVESTATE_CONTEXT_NORMAL;
+         return true;
+      case RETRO_ENVIRONMENT_GET_EXECUTION_PHASE:
+         if (data)
+            *(enum retro_execution_phase *)data = lt_phase;
+         return true;
       case RETRO_ENVIRONMENT_GET_HDR_METADATA:
       case RETRO_ENVIRONMENT_GET_DISPLAY_METADATA:
          return host_hdr_metadata(cmd, data);
@@ -941,6 +997,7 @@ static void host_reinit_context(void)
    host_unlock_queue();
    context_live = 0;
    up_readback_free();
+   lt_release_all();
    hw_render.context_destroy();
    if (negotiation && negotiation->destroy_device)
       negotiation->destroy_device();
@@ -963,6 +1020,8 @@ static void video_cb(const void *data, unsigned width, unsigned height, size_t p
    if (up_on) up_log_frame(frame_valid, width, height); } }
 static void input_poll_cb(void) {}
 static int cur_frame;
+
+
 /* VKHOST_INPUT: comma list of first-last:joypad_id held ranges, e.g.
  * "20-30:3,60-300:4" (3=START, 4=UP per RETRO_DEVICE_ID_JOYPAD_*). */
 static int16_t input_state_cb(unsigned port, unsigned device, unsigned index, unsigned id)
@@ -1242,6 +1301,7 @@ int main(int argc, char **argv)
    char cmdbuf[1024];
    if (getenv("VKHOST_NEGOTIATION"))
       negotiation_offer = (unsigned)atoi(getenv("VKHOST_NEGOTIATION"));
+   lt_on = getenv("VKHOST_LIFETIME") != NULL;
 
    if (argc < 3)
    { fprintf(stderr, "usage: %s core content [state] [frames] [outdir]\n", argv[0]); return 2; }
@@ -1422,7 +1482,48 @@ run_frames_sw:
       for (i = 0; i < frames; i++)
       {
          cur_frame = i;
-         if (preempt && ser && unser && ssz)
+         if (preempt && ser && unser && ssz && lt_iface.release)
+         {
+            /* As RetroArch's Preemptive Frames with a core that registered
+             * lifetime callbacks: lt_buf[0] is the state before the
+             * previous frame, lt_buf[1] the one about to be saved */
+            size_t need;
+            lt_managed_ctx = 1;
+            need = ssz();
+            lt_managed_ctx = 0;
+            if (need > lt_size)
+            {
+               lt_release_all();
+               free(lt_buf[0]); free(lt_buf[1]);
+               lt_buf[0] = malloc(need); lt_buf[1] = malloc(need); lt_size = need;
+            }
+            if (lt_buf[0] && lt_buf[1])
+            {
+               if (have_prev)
+               {
+                  lt_managed_ctx = 1;
+                  if (!unser(lt_buf[0], lt_size))
+                     fprintf(stderr, "[vkhost] rollback unser FAILED frame %d\n", i);
+                  lt_managed_ctx = 0;
+                  lt_phase = RETRO_EXECUTION_PHASE_REPLAY;
+                  retro_run_fn();   /* replay the previous frame */
+                  lt_phase = RETRO_EXECUTION_PHASE_RETAINED;
+               }
+               lt_release(1);
+               lt_managed_ctx = 1;
+               lt_owned[1] = ser(lt_buf[1], lt_size);
+               lt_managed_ctx = 0;
+               if (lt_owned[1])
+                  lt_saves++;
+               else
+                  fprintf(stderr, "[vkhost] rollback ser FAILED frame %d\n", i);
+               { void *t = lt_buf[0]; int o = lt_owned[0];
+                 lt_buf[0] = lt_buf[1]; lt_owned[0] = lt_owned[1];
+                 lt_buf[1] = t; lt_owned[1] = o; }
+               have_prev = 1;
+            }
+         }
+         else if (preempt && ser && unser && ssz)
          {
             size_t need = ssz();
             if (need > pcap)
@@ -1567,6 +1668,7 @@ run_frames_sw:
    up_ready = 0;
    up_readback_free();
    context_live = 0;
+   lt_release_all();
    if (hw_render.context_destroy && vkctx.device) hw_render.context_destroy();
    if (queue_thread_run)
    {
@@ -1621,6 +1723,9 @@ run_frames_sw:
         fclose(f);
      }
    }
+   if (lt_on)
+      fprintf(stderr, "[vkhost] lifetime: %ld managed saves, %ld releases\n",
+            lt_saves, lt_releases);
    { void (*f)(void) = dlsym(core, "retro_unload_game"); if (f) f(); }
    { void (*f)(void) = dlsym(core, "retro_deinit"); if (f) f(); }
    if (next_content && !(validation_errors || queue_violations || queue_waits_locked))

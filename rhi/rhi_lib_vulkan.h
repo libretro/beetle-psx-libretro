@@ -117,6 +117,10 @@ void rhi_vulkan_toggle_display(bool status);
 
 bool rhi_vulkan_has_software_renderer(void);
 bool rhi_vulkan_context_ready(void);
+bool rhi_vulkan_snapshot_save(uint32_t *slot, uint32_t *gen);
+bool rhi_vulkan_snapshot_valid(uint32_t slot, uint32_t gen);
+bool rhi_vulkan_snapshot_restore(uint32_t slot, uint32_t gen);
+void rhi_vulkan_snapshot_release(uint32_t slot, uint32_t gen);
 
 #ifdef __cplusplus
 }

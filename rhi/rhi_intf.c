@@ -1160,6 +1160,47 @@ uint32_t rhi_intf_vram_dirty_groups(unsigned br)
    return tt_coh_dirty_groups(br);
 }
 
+/* Snapshots of VRAM as the hardware renderer holds it, for managed
+ * savestates. Only the Vulkan renderer takes them. */
+bool rhi_intf_snapshot_save(uint32_t *slot, uint32_t *gen)
+{
+#if defined(HAVE_VULKAN)
+   if (rhi_type == RHI_VULKAN)
+      return rhi_vulkan_snapshot_save(slot, gen);
+#endif
+   return false;
+}
+
+bool rhi_intf_snapshot_valid(uint32_t slot, uint32_t gen)
+{
+#if defined(HAVE_VULKAN)
+   if (rhi_type == RHI_VULKAN)
+      return rhi_vulkan_snapshot_valid(slot, gen);
+#endif
+   return false;
+}
+
+bool rhi_intf_snapshot_restore(uint32_t slot, uint32_t gen)
+{
+#if defined(HAVE_VULKAN)
+   if (rhi_type == RHI_VULKAN && rhi_vulkan_snapshot_restore(slot, gen))
+   {
+      /* What the GPU holds is no longer what the CPU copy was compared with */
+      tt_coh_reset();
+      return true;
+   }
+#endif
+   return false;
+}
+
+void rhi_intf_snapshot_release(uint32_t slot, uint32_t gen)
+{
+#if defined(HAVE_VULKAN)
+   if (rhi_type == RHI_VULKAN)
+      rhi_vulkan_snapshot_release(slot, gen);
+#endif
+}
+
 void rhi_intf_toggle_display(bool status)
 {
 #ifdef RHI_DUMP

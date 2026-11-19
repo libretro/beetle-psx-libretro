@@ -5965,6 +5965,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    typedef struct SaveState SaveState;
    enum { RENDERER_UPLOAD_RINGS = 8 };
    enum { RENDERER_IMAGE_CACHE = 32 };
+   /* At most this many snapshots, and no more than the budget's worth of
+    * GPU memory: the frontend keeps up to 16 managed states. */
+   enum { RENDERER_SNAPSHOTS = 16 };
+#define RENDERER_SNAPSHOT_BUDGET ((VkDeviceSize)1 << 30)
    struct Renderer
    {
          /* batch-7 out-of-line methods -> free functions. */
@@ -6227,6 +6231,23 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
           * and the frontend's per-sync-index handle is dropped once that
           * index comes round again. Sized for two frames of intermediates. */
          ImageHandle image_cache[RENDERER_IMAGE_CACHE];
+         /* Snapshots of VRAM as the renderer holds it - both domains at
+          * their own resolution and which one owns each block - for the
+          * frontend's managed savestates (RETRO_ENVIRONMENT_SET_SAVESTATE_
+          * LIFETIME). A slot's images are made the first time it is used
+          * and kept until the renderer goes. */
+         struct VramSnapshot
+         {
+            ImageHandle framebuffer;
+            ImageHandle scaled;
+            ImageHandle scaled_msaa;
+            StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
+            uint32_t prov[VRAM_PROV_WORDS];
+            uint32_t gen;
+            bool made;
+            bool live;
+         } snapshots[RENDERER_SNAPSHOTS];
+         unsigned snapshot_slots;
    };
 
    /* SaveState lifecycle free functions (SaveState is a plain struct). vram is
@@ -7217,6 +7238,161 @@ static void renderer_save_vram_state(Renderer *self, SaveState *out){
     * (renderer-rebuild) change. */
    fence_reset(&fence);
    bh_reset(&buffer);
+}
+
+/* ---- Managed savestate snapshots ------------------------------------------
+ * A snapshot is VRAM as the renderer holds it: the native framebuffer, the
+ * scaled one (and its multisampled image) at their own resolution, which of
+ * them owns each block, and which blocks the GPU wrote. Taken and put back
+ * by GPU copies alone; nothing is read back. */
+
+#define SNAPSHOT_HAZARDS (STATUS_FB_READ | STATUS_FB_WRITE \
+      | STATUS_SFB_READ | STATUS_SFB_WRITE)
+
+/* Across renderers, so a token from a renderer since rebuilt never matches */
+static uint32_t snapshot_gen_last;
+
+static VkDeviceSize renderer_snapshot_bytes(Renderer *self)
+{
+   const ImageCreateInfo *sc = image_get_create_info(ih_get(&self->scaled_framebuffer));
+   VkDeviceSize px  = (VkDeviceSize)sc->width * sc->height;
+   VkDeviceSize bpp = sc->format == VK_FORMAT_R16G16B16A16_SFLOAT ? 8 : 4;
+   VkDeviceSize n   = px * bpp + (VkDeviceSize)FB_WIDTH * FB_HEIGHT * 4;
+   if (self->msaa > 1)
+      n += px * bpp * self->msaa;
+   return n;
+}
+
+static ImageHandle renderer_snapshot_image(Renderer *self, const Image *like)
+{
+   ImageCreateInfo info = *image_get_create_info(like);
+   ImageHandle     h;
+   info.levels         = 1;
+   info.misc           = 0;
+   info.usage          = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+   info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+   h = device_create_image(self->device, &info, NULL);
+   if (h.data)
+      image_set_layout(ih_get(&h), Layout_General);
+   return h;
+}
+
+static bool renderer_snapshot_make(Renderer *self, struct VramSnapshot *sn)
+{
+   ih_move(&sn->framebuffer, renderer_snapshot_image(self, ih_get(&self->framebuffer)));
+   ih_move(&sn->scaled, renderer_snapshot_image(self, ih_get(&self->scaled_framebuffer)));
+   if (self->msaa > 1)
+      ih_move(&sn->scaled_msaa, renderer_snapshot_image(self, ih_get(&self->scaled_framebuffer_msaa)));
+   if (!sn->framebuffer.data || !sn->scaled.data
+         || (self->msaa > 1 && !sn->scaled_msaa.data))
+   {
+      ih_reset(&sn->framebuffer);
+      ih_reset(&sn->scaled);
+      ih_reset(&sn->scaled_msaa);
+      return false;
+   }
+   sn->made = true;
+   return true;
+}
+
+static void renderer_snapshot_copy(Renderer *self, const Image *dst, const Image *src)
+{
+   const ImageCreateInfo *i = image_get_create_info(src);
+   VkOffset3D o = { 0, 0, 0 };
+   VkExtent3D e;
+   e.width  = i->width;
+   e.height = i->height;
+   e.depth  = 1;
+   commandbuffer_copy_image(cbh_get(&self->cmd), dst, src, &o, &o, &e);
+}
+
+/* The slot taken, or -1 when none is free and the budget allows no other:
+ * the state is then an ordinary one. HD texture tracking keeps state of
+ * its own that a snapshot does not carry. */
+static int renderer_snapshot_save(Renderer *self, uint32_t *gen)
+{
+   struct VramSnapshot *sn;
+   unsigned i;
+   int      slot = -1;
+
+   if (self->texture_tracking_enabled)
+      return -1;
+   for (i = 0; i < self->snapshot_slots; i++)
+      if (!self->snapshots[i].live)
+      {
+         slot = (int)i;
+         break;
+      }
+   if (slot < 0)
+   {
+      if (self->snapshot_slots >= RENDERER_SNAPSHOTS
+            || (self->snapshot_slots + 1) * renderer_snapshot_bytes(self)
+               > RENDERER_SNAPSHOT_BUDGET
+            || !renderer_snapshot_make(self, &self->snapshots[self->snapshot_slots]))
+         return -1;
+      slot = (int)self->snapshot_slots++;
+   }
+   sn = &self->snapshots[slot];
+
+   /* Everything queued on either domain lands before the copies read it */
+   fbatlas_pipeline_barrier(&self->atlas, SNAPSHOT_HAZARDS);
+   renderer_ensure_command_buffer(self);
+   renderer_snapshot_copy(self, ih_get(&sn->framebuffer), ih_get(&self->framebuffer));
+   renderer_snapshot_copy(self, ih_get(&sn->scaled), ih_get(&self->scaled_framebuffer));
+   if (self->msaa > 1)
+      renderer_snapshot_copy(self, ih_get(&sn->scaled_msaa), ih_get(&self->scaled_framebuffer_msaa));
+   memcpy(sn->fb_info, self->atlas.fb_info, sizeof(sn->fb_info));
+   memcpy(sn->prov, self->vram_gpu_written, sizeof(sn->prov));
+   /* The copies read both domains everywhere: a later write waits for them */
+   for (i = 0; i < NUM_BLOCKS_X * NUM_BLOCKS_Y; i++)
+      self->atlas.fb_info[i] |= STATUS_TRANSFER_FB_READ | STATUS_TRANSFER_SFB_READ;
+
+   if (++snapshot_gen_last == 0)
+      ++snapshot_gen_last;
+   sn->gen  = snapshot_gen_last;
+   sn->live = true;
+   *gen     = sn->gen;
+   return slot;
+}
+
+static struct VramSnapshot *renderer_snapshot_find(Renderer *self,
+      uint32_t slot, uint32_t gen)
+{
+   struct VramSnapshot *sn;
+   if (slot >= self->snapshot_slots)
+      return NULL;
+   sn = &self->snapshots[slot];
+   return (sn->live && sn->gen == gen) ? sn : NULL;
+}
+
+static bool renderer_snapshot_restore(Renderer *self, uint32_t slot, uint32_t gen)
+{
+   struct VramSnapshot *sn = renderer_snapshot_find(self, slot, gen);
+   unsigned i;
+   if (!sn)
+      return false;
+
+   /* Everything queued reads and writes VRAM as it was; then it is replaced */
+   fbatlas_pipeline_barrier(&self->atlas, SNAPSHOT_HAZARDS);
+   renderer_ensure_command_buffer(self);
+   renderer_snapshot_copy(self, ih_get(&self->framebuffer), ih_get(&sn->framebuffer));
+   renderer_snapshot_copy(self, ih_get(&self->scaled_framebuffer), ih_get(&sn->scaled));
+   if (self->msaa > 1)
+      renderer_snapshot_copy(self, ih_get(&self->scaled_framebuffer_msaa), ih_get(&sn->scaled_msaa));
+   /* The copies wrote both domains everywhere: a later access waits for them */
+   for (i = 0; i < NUM_BLOCKS_X * NUM_BLOCKS_Y; i++)
+      self->atlas.fb_info[i] = sn->fb_info[i]
+            | STATUS_TRANSFER_FB_WRITE | STATUS_TRANSFER_SFB_WRITE;
+   memcpy(self->vram_gpu_written, sn->prov, sizeof(sn->prov));
+   fbatlas_invalidate_palette_cache(&self->atlas);
+   return true;
+}
+
+static void renderer_snapshot_release(Renderer *self, uint32_t slot, uint32_t gen)
+{
+   struct VramSnapshot *sn = renderer_snapshot_find(self, slot, gen);
+   if (sn)
+      sn->live = false;
 }
 
 static void renderer_init_primitive_pipelines(Renderer *self)
@@ -12131,6 +12307,12 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->framebuffer);
    ih_reset(&self->framebuffer_ssaa);
    ih_reset(&self->palette_cache);
+   { unsigned _si; for (_si = 0; _si < RENDERER_SNAPSHOTS; _si++)
+   {
+      ih_reset(&self->snapshots[_si].framebuffer);
+      ih_reset(&self->snapshots[_si].scaled);
+      ih_reset(&self->snapshots[_si].scaled_msaa);
+   } }
    ih_reset(&self->last_scanout);
    ih_reset(&self->reuseable_scanout);
    /* Analog path intermediates. These are recreated every frame, so ih_move
@@ -24402,4 +24584,32 @@ bool rhi_vulkan_has_software_renderer(void)
 bool rhi_vulkan_context_ready(void)
 {
    return device != NULL && renderer != NULL;
+}
+
+bool rhi_vulkan_snapshot_save(uint32_t *slot, uint32_t *gen)
+{
+   int s;
+   if (!device || !renderer)
+      return false;
+   s = renderer_snapshot_save(renderer, gen);
+   if (s < 0)
+      return false;
+   *slot = (uint32_t)s;
+   return true;
+}
+
+bool rhi_vulkan_snapshot_valid(uint32_t slot, uint32_t gen)
+{
+   return device && renderer && renderer_snapshot_find(renderer, slot, gen);
+}
+
+bool rhi_vulkan_snapshot_restore(uint32_t slot, uint32_t gen)
+{
+   return device && renderer && renderer_snapshot_restore(renderer, slot, gen);
+}
+
+void rhi_vulkan_snapshot_release(uint32_t slot, uint32_t gen)
+{
+   if (device && renderer)
+      renderer_snapshot_release(renderer, slot, gen);
 }
