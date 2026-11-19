@@ -185,7 +185,6 @@ void     PS_CDC_Write(PS_CDC *cdc, const int32_t timestamp,
 uint8_t  PS_CDC_Read(PS_CDC *cdc, const int32_t timestamp,
                      uint32_t A);
 
-bool     PS_CDC_DMACanRead(PS_CDC *cdc);
 uint32_t PS_CDC_DMARead(PS_CDC *cdc);
 void     PS_CDC_SoftReset(PS_CDC *cdc);
 

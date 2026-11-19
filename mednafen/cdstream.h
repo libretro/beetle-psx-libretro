@@ -79,11 +79,6 @@ typedef struct cdstream
  * cdstream_close on a failed-open stream. */
 bool cdstream_open(cdstream *out, const char *path);
 
-/* Open `path` and slurp its entire contents into RAM as a
- * memory-backed stream.  Returns true on success; on failure (file
- * missing, OOM, short read) `out` is zeroed and false is returned. */
-bool cdstream_open_memcached(cdstream *out, const char *path);
-
 /* Convert an open file-backed stream into a memory-backed one by
  * reading the rest of the file from the current position into a
  * fresh buffer.  On success the source RFILE is closed and `src`
@@ -269,10 +264,6 @@ int cdstream_get_line(cdstream *s, char *out, size_t cap);
  * Returns NULL on alloc or open failure.  Free with
  * cdstream_destroy. */
 cdstream *cdstream_new(const char *path);
-
-/* Heap-allocate a new cdstream and slurp `path` into RAM as
- * memory-backed.  Returns NULL on alloc, open, or read failure. */
-cdstream *cdstream_new_memcached(const char *path);
 
 #ifdef __cplusplus
 }

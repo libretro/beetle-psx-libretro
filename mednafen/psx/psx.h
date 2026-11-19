@@ -24,7 +24,6 @@ void MDFN_FASTCALL PSX_MemWrite24(int32_t timestamp, uint32_t A, uint32_t V);
 void MDFN_FASTCALL PSX_MemWrite32(int32_t timestamp, uint32_t A, uint32_t V);
 
 uint8_t  PSX_MemPeek8 (uint32_t A);
-uint16_t PSX_MemPeek16(uint32_t A);
 uint32_t PSX_MemPeek32(uint32_t A);
 
 /* Should write to WO-locations if possible */

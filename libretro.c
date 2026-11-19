@@ -1316,27 +1316,6 @@ MultiAccessSizeMem *PIOMem = NULL;
 MultiAccessSizeMem *MainRAM = NULL;
 MultiAccessSizeMem *ScratchRAM = NULL;
 
-/*
- * C-linkage accessors for MainRAM declared in mednafen/psx/psx_mem.h.
- * MainRAM itself is a MultiAccessSizeMem<> template instance and so
- * isn't reachable from a C TU; these forwarders let C consumers
- * (dma.c, ...) access the same byte-level read/write helpers
- * without going through psx.h's class declarations.
- *
- * Inline away to a single load/store under -O2 / LTO.
- */
-uint8_t  ScratchRAM_ReadU8 (uint32_t address) { return MASMEM_ReadU8(ScratchRAM, address); }
-uint16_t ScratchRAM_ReadU16(uint32_t address) { return MASMEM_ReadU16(ScratchRAM, address); }
-uint32_t ScratchRAM_ReadU24(uint32_t address) { return MASMEM_ReadU24(ScratchRAM, address); }
-uint32_t ScratchRAM_ReadU32(uint32_t address) { return MASMEM_ReadU32(ScratchRAM, address); }
-void     ScratchRAM_WriteU8 (uint32_t address, uint8_t  value) { MASMEM_WriteU8(ScratchRAM, address, value); }
-void     ScratchRAM_WriteU16(uint32_t address, uint16_t value) { MASMEM_WriteU16(ScratchRAM, address, value); }
-void     ScratchRAM_WriteU24(uint32_t address, uint32_t value) { MASMEM_WriteU24(ScratchRAM, address, value); }
-void     ScratchRAM_WriteU32(uint32_t address, uint32_t value) { MASMEM_WriteU32(ScratchRAM, address, value); }
-uint8_t *ScratchRAM_data8(void) { return ScratchRAM->data8; }
-uint8_t *MainRAM_data8   (void) { return MainRAM->data8;    }
-uint8_t *BIOSROM_data8   (void) { return BIOSROM->data8;    }
-
 #ifdef HAVE_LIGHTREC
 /* Size of Expansion 1 (8MB) */
 #define PSX_EXPANSION1_SIZE        0x800000U
@@ -1478,11 +1457,6 @@ static INLINE int32_t FirstRealEventTS(void)
       e = e->next;
 
    return e->event_time;
-}
-
-int32_t PSX_EventTS(const int type)
-{
-   return events[type].event_time;
 }
 
 bool PSX_AnyEventVirtual(void)
@@ -2137,11 +2111,6 @@ static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A, unsigned size, boo
 uint8_t PSX_MemPeek8(uint32_t A)
 {
    return MemPeek(0, A, 1, false);
-}
-
-uint16_t PSX_MemPeek16(uint32_t A)
-{
-   return MemPeek(0, A, 2, false);
 }
 
 uint32_t PSX_MemPeek32(uint32_t A)

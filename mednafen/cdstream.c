@@ -92,23 +92,6 @@ static data_transfer_t *cdstream_slurp_dt(const char *path,
    return dt;
 }
 
-bool cdstream_open_memcached(cdstream *out, const char *path)
-{
-   const uint8_t *base = NULL;
-   uint64_t       len  = 0;
-
-   memset(out, 0, sizeof(*out));
-
-   out->dt = cdstream_slurp_dt(path, &base, &len);
-   if (!out->dt)
-      return false;
-
-   out->buf  = (uint8_t *)base;
-   out->size = len;
-   out->pos  = 0;
-   return true;
-}
-
 bool cdstream_memcache_in_place(cdstream *src)
 {
    const uint8_t *base = NULL;
@@ -237,15 +220,3 @@ cdstream *cdstream_new(const char *path)
    return s;
 }
 
-cdstream *cdstream_new_memcached(const char *path)
-{
-   cdstream *s = (cdstream *)malloc(sizeof(*s));
-   if (!s)
-      return NULL;
-   if (!cdstream_open_memcached(s, path))
-   {
-      free(s);
-      return NULL;
-   }
-   return s;
-}

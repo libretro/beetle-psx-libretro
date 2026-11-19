@@ -1981,11 +1981,6 @@ uint8_t PS_CDC_Read(PS_CDC *cdc, const int32_t timestamp, uint32_t A)
 }
 
 
-bool PS_CDC_DMACanRead(PS_CDC *cdc)
-{
-   return(cdc->DMABuffer.in_count);
-}
-
 uint32_t PS_CDC_DMARead(PS_CDC *cdc)
 {
    return SimpleFIFO_ReadWordLE(&cdc->DMABuffer);
