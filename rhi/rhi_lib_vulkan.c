@@ -6488,10 +6488,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
    static INLINE void renderer_notify_texture_upload(Renderer *self,
          TTRect rect,
-         uint16_t *vram)
+         const uint16_t *src, uint32_t stride)
    {
       if (self->texture_tracking_enabled)
-         texture_tracker_upload(self->tracker, rect, vram);
+         texture_tracker_upload(self->tracker, rect, src, stride);
    }
    static INLINE void renderer_set_vram_framebuffer_coords(Renderer *self,
          unsigned xstart,
@@ -22664,7 +22664,7 @@ static void vk_defer_dispatch(void *user, const rhi_defer_op_t *op)
                                op->u.load_image.y,
                                op->u.load_image.w,
                                op->u.load_image.h,
-                               op->u.load_image.vram,
+                               op->u.load_image.vram, 0,
                                op->u.load_image.mask_test,
                                op->u.load_image.set_mask);
          break;
@@ -22678,6 +22678,8 @@ static void vk_context_reset(void)
 {
    /* A new context: the frontend has no frame of ours to repeat */
    vk_dupe_ready = false;
+   /* Uploads deferred until now read VRAM */
+   GPU_ThreadSettle();
 
    if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE, (void**)&vulkan) || !vulkan)
       return;
@@ -24257,22 +24259,23 @@ void rhi_vulkan_push_line(
 void rhi_vulkan_load_image(
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
-      uint16_t *vram,
+      const uint16_t *src, uint32_t stride,
       bool mask_test, bool set_mask)
 {
    if (!renderer)
    {
       /* Pre-context_reset uploads (e.g. savestate-load arriving before
        * the Vulkan context is up, or game boot pushing VRAM ahead of
-       * the frontend's context_reset). The captured `vram` pointer
-       * aliases GPU.vram, which lives for the whole core lifetime, so
-       * holding it across the deferred-replay window is safe. */
-      rhi_defer_push_load_image(&defer, x, y, w, h, vram, mask_test, set_mask);
+       * the frontend's context_reset). The replay reads GPU.vram, which
+       * lives for the whole core lifetime and by then holds the upload,
+       * so even a source lent for this call alone is not kept. */
+      rhi_defer_push_load_image(&defer, x, y, w, h,
+            stride ? GPU_get_vram() : src, mask_test, set_mask);
       return;
    }
 
    { TTRect _ntu_rect; _ntu_rect.x = x; _ntu_rect.y = y; _ntu_rect.width = w; _ntu_rect.height = h;
-     renderer_notify_texture_upload(renderer, _ntu_rect, vram); }
+     renderer_notify_texture_upload(renderer, _ntu_rect, src, stride); }
    renderer->render_state.mask_test      = mask_test;
    renderer->render_state.force_mask_bit = set_mask;
    {
@@ -24280,7 +24283,7 @@ void rhi_vulkan_load_image(
       BufferHandle  handle;
       const Buffer *mapped = NULL;
       uint16_t     *tmp;
-      bool          dual_copy, y_wrap;
+      unsigned      first, off_y;
       handle.data = NULL;
       tmp = renderer_copy_cpu_to_vram(renderer, &_r, &handle, &mapped);
       if (!tmp)
@@ -24289,62 +24292,21 @@ void rhi_vulkan_load_image(
          return;
       }
 
-      /* The row loop has two independent invariants: x-wrap (dual_copy)
-       * and y-wrap. Both are determined entirely by (x, y, w, h) before
-       * the loop runs. Hoisting them out lets the inner loops degenerate
-       * to a single straight memcpy in the common no-wrap case and lets
-       * the compiler/CPU prefetcher see the full source-pointer stride.
-       *
-       * The (y + off_y) & (FB_HEIGHT - 1) mask in the original code was
-       * a no-op for every iteration when y + h <= FB_HEIGHT (the dominant
-       * case for upload rects), but the compiler can't prove that without
-       * splitting the loop.
-       */
-      dual_copy = x + w > FB_WIDTH;
-      y_wrap    = y + h > FB_HEIGHT;
-
-      if (dual_copy)
-      {
-         unsigned off_y;
-         const unsigned first  = FB_WIDTH - x;
-         const unsigned second = w - first;
-         if (y_wrap)
-         {
-            for (off_y = 0; off_y < h; off_y++)
-            {
-               const uint16_t *row = vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH;
-               memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
-               memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
-            }
-         }
-         else
-         {
-            for (off_y = 0; off_y < h; off_y++)
-            {
-               const uint16_t *row = vram + (y + off_y) * FB_WIDTH;
-               memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
-               memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
-            }
-         }
-      }
+      /* Into the staging ring row by row: a source holding just the rect
+       * with its own width as the pitch goes in one copy; VRAM rows wrap
+       * at 1024 and at 512 lines. */
+      first = RHI_SRC_FIRST(stride, x, w);
+      if (stride == w)
+         memcpy(tmp, src, (size_t)w * h * sizeof(uint16_t));
       else
-      {
-         unsigned off_y;
-         if (y_wrap)
+         for (off_y = 0; off_y < h; off_y++)
          {
-            for (off_y = 0; off_y < h; off_y++)
-               memcpy(tmp + off_y * w,
-                     vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH + x,
-                     w * sizeof(uint16_t));
+            memcpy(tmp + off_y * w, RHI_SRC_ROW(src, stride, x, y, off_y),
+                  first * sizeof(uint16_t));
+            if (first < w)
+               memcpy(tmp + off_y * w + first, RHI_SRC_WRAP(src, y, off_y),
+                     (w - first) * sizeof(uint16_t));
          }
-         else
-         {
-            for (off_y = 0; off_y < h; off_y++)
-               memcpy(tmp + off_y * w,
-                     vram + (y + off_y) * FB_WIDTH + x,
-                     w * sizeof(uint16_t));
-         }
-      }
       /* Only this rect's bytes of the ring go out. */
       device_flush_host_buffer(renderer->device, mapped,
             (VkDeviceSize)((const uint8_t *)tmp - (const uint8_t *)buffer_get_allocation(mapped)->host_base),

@@ -56,7 +56,35 @@
 /* Forward decl: gpu_common.h's PlotNativePixel template calls
  * texel_put. The actual definition is below at file scope (static)
  * because it's used only inside this translation unit. */
-static void texel_put(uint32_t x, uint32_t y, uint16_t v);
+static void texel_put(PS_GPU *g, uint32_t x, uint32_t y, uint16_t v);
+
+/* A polygon's PGXP vertex.  The emulation thread resolves it and, with
+ * the GPU thread running, keeps a copy in the command's ring record,
+ * which is what the GPU thread reads (gpu_thread.c). */
+static INLINE void gpu_pgxp_vertex(PS_GPU *g, uint32_t idx,
+      const uint32_t *cb, OGLVertex *vert)
+{
+   uint32_t *side;
+   if (g->role == GPU_ROLE_BACK)
+   {
+      side = g->pgxp_side + 4 * g->pgxp_side_n++;
+      memcpy(&vert->x, &side[0], sizeof(float));
+      memcpy(&vert->y, &side[1], sizeof(float));
+      memcpy(&vert->w, &side[2], sizeof(float));
+      vert->z       = 0.0f;
+      vert->valid_w = (uint8_t)side[3];
+      return;
+   }
+   PGXP_GetVertex(idx, cb, vert, 0, 0);
+   if (g->role == GPU_ROLE_FRONT)
+   {
+      side = g->pgxp_side + 4 * g->pgxp_side_n++;
+      memcpy(&side[0], &vert->x, sizeof(float));
+      memcpy(&side[1], &vert->y, sizeof(float));
+      memcpy(&side[2], &vert->w, sizeof(float));
+      side[3] = vert->valid_w;
+   }
+}
 
 #include "gpu_common.h"
 
@@ -115,6 +143,25 @@ static const int8_t dither_table[4][4] =
 };
 
 static FastFIFO GPU_BlitterFIFO; /* 0x10 on an actual PS1 GPU, 0x20 here (see comment at top of gpu.h) */
+
+/* The GPU thread's side of the emulation thread (gpu_thread.c). */
+static uint32_t *gpu_thread_cmd_begin(unsigned len);
+static void      gpu_thread_cmd_end(uint32_t *rec, uint32_t cc, bool cont,
+      unsigned len);
+static void      gpu_thread_fbwrite(uint32_t word);
+static void      gpu_thread_fbwrite_begin(uint32_t words);
+static const uint16_t *gpu_thread_fbwrite_lend(void);
+static void      gpu_thread_fbwrite_end(void);
+static void      gpu_thread_gp1(uint32_t v);
+static void      gpu_thread_scanout(const MDFN_Surface *surface,
+      int32_t dest_line, uint32_t y, bool rgb24, bool skip_margin,
+      int32_t udx_start, int32_t udx_end, uint32_t udmw, int32_t ufb_x);
+static void      gpu_thread_copy(void *dst, const void *src, size_t bytes);
+static void      gpu_thread_clear(MDFN_Surface *surface, int32_t rows,
+      int32_t cols);
+static void      gpu_thread_drain(void);
+static void      gpu_thread_settle(void);
+static void      gpu_thread_stop(void);
 
 struct CTEntry
 {
@@ -315,18 +362,18 @@ static INLINE void InvalidateCache(PS_GPU *gpu)
  * #includes gpu_polygon.cpp / gpu_sprite.cpp / gpu_line.cpp, and the
  * sole header use is a static-INLINE in gpu_common.h that resolves
  * within this TU). */
-static void texel_put(uint32_t x, uint32_t y, uint16_t v)
+static void texel_put(PS_GPU *g, uint32_t x, uint32_t y, uint16_t v)
 {
    uint32_t dy, dx;
-   x <<= GPU.upscale_shift;
-   y <<= GPU.upscale_shift;
+   x <<= g->upscale_shift;
+   y <<= g->upscale_shift;
 
    /* Duplicate the pixel as many times as necessary (nearest
     * neighbour upscaling) */
-   for (dy = 0; dy < UPSCALE(&GPU); dy++)
+   for (dy = 0; dy < UPSCALE(g); dy++)
    {
-      for (dx = 0; dx < UPSCALE(&GPU); dx++)
-         vram_put(&GPU, x + dx, y + dy, v);
+      for (dx = 0; dx < UPSCALE(g); dx++)
+         vram_put(g, x + dx, y + dy, v);
    }
 }
 
@@ -341,6 +388,7 @@ static void GPU_set_upscale_shift(uint8_t factor)
          GPU.TexCacheTimingTag[i] = GPU.TexCache[i].Tag;
    GPU.last_timing_line = ~0U;
    GPU.upscale_shift = factor;
+   gpu_set_role(&GPU, GPU.role);
 }
 
 /* HW polygon-subdivision (textured/Phong tessellation) is not present in this
@@ -485,11 +533,14 @@ GCMD_DRAWPOLY_BMGROUP_ALL(4, 1)
 static void Command_ClearCache(PS_GPU* g, const uint32_t *cb)
 {
    InvalidateCache(g);
-   rhi_intf_invalidate_clut_cache();
+   if (GPU_ON_EMU_THREAD(g))
+      rhi_intf_invalidate_clut_cache();
 }
 
 static void Command_IRQ(PS_GPU* g, const uint32_t *cb)
 {
+   if (!GPU_ON_EMU_THREAD(g))
+      return;
    g->IRQPending = true;
    IRQ_Assert(IRQ_GPU, g->IRQPending);
 }
@@ -546,7 +597,8 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
    int32_t destY             = (cb[1] >> 16) & 0x3FF;
    int32_t width             = (((cb[2] >> 0) & 0x3FF) + 0xF) & ~0xF;
    int32_t height            = (cb[2] >> 16) & 0x1FF;
-   const bool sw             = rhi_intf_has_software_renderer();
+   const bool sw             = GPU_HAS_SW(gpu)
+                               && GPU_TOUCHES_VRAM(gpu);
 
    gpu->DrawTimeAvail       -= 46; /* Approximate */
 
@@ -583,9 +635,9 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
           * hand the remainder (if any) back to the scalar loop, which
           * re-derives d_x with `& 1023` and wraps correctly on its
           * own.  Bails entirely (x stays 0) when not at native res. */
-         if (GPU.upscale_shift == 0)
+         if (gpu->upscale_shift == 0)
          {
-            uint16_t       *row     = &GPU.vram[(uint32_t)d_y << 10];
+            uint16_t       *row     = &gpu->vram[(uint32_t)d_y << 10];
             const int32_t   to_wrap = 1024 - destX; /* pixels before x hits 1024 */
             const int32_t   contig  = (width < to_wrap) ? width : to_wrap;
 #if defined(__SSE2__)
@@ -605,10 +657,13 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
          {
             const int32_t d_x = (x + destX) & 1023;
 
-            texel_put(d_x, d_y, fill_value);
+            texel_put(gpu, d_x, d_y, fill_value);
          }
       }
    }
+
+   if (!GPU_ON_EMU_THREAD(gpu))
+      return;
 
    rhi_intf_fill_rect(cb[0], destX, destY, width, height);
 
@@ -634,7 +689,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
    tt_log("gpu Command_FBCopy src=(%d,%d) dst=(%d,%d) %dx%d sw=%d mask_eval=%d mask_set=%d\n",
          (int)sourceX, (int)sourceY, (int)destX, (int)destY,
          (int)width, (int)height,
-         (int)rhi_intf_has_software_renderer(),
+         (int)GPU_HAS_SW(g),
          (int)(g->MaskEvalAND != 0),
          (int)(g->MaskSetOR != 0));
 
@@ -646,7 +701,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
     * back from GPU.vram.  Hardware backends do the copy themselves
     * via rhi_intf_copy_rect below, so the per-pixel software loop
     * would just dirty VRAM that nothing consumes. */
-   if (rhi_intf_has_software_renderer())
+   if (GPU_HAS_SW(g) && GPU_TOUCHES_VRAM(g))
    {
       unsigned y;
       for(y = 0; y < (unsigned)height; y++)
@@ -675,11 +730,14 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
                int32_t d_x = (x + chunk_x + destX) & 1023;
 
                if(!(texel_fetch(g, d_x, d_y) & g->MaskEvalAND))
-                  texel_put(d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
+                  texel_put(g, d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
             }
          }
       }
    }
+
+   if (!GPU_ON_EMU_THREAD(g))
+      return;
 
    rhi_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND != 0, g->MaskSetOR != 0);
 
@@ -709,7 +767,7 @@ static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
    tt_log("gpu Command_FBWrite rect=(%u,%u %ux%u) sw=%d mask_eval=%d mask_set=%d\n",
          (unsigned)g->FBRW_X, (unsigned)g->FBRW_Y,
          (unsigned)g->FBRW_W, (unsigned)g->FBRW_H,
-         (int)rhi_intf_has_software_renderer(),
+         (int)GPU_HAS_SW(g),
          (int)(g->MaskEvalAND != 0),
          (int)(g->MaskSetOR != 0));
 
@@ -718,7 +776,8 @@ static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = INCMD_FBWRITE;
 
-   if (RectOverlapsDisplay((int32_t)g->FBRW_X, (int32_t)g->FBRW_Y,
+   if (GPU_ON_EMU_THREAD(g)
+         && RectOverlapsDisplay((int32_t)g->FBRW_X, (int32_t)g->FBRW_Y,
             (int32_t)g->FBRW_W, (int32_t)g->FBRW_H))
       GPU.display_possibly_dirty = true;
 }
@@ -730,6 +789,15 @@ static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
 static void Command_FBRead(PS_GPU* g, const uint32_t *cb)
 {
    /*assert(g->InCmd == INCMD_NONE); */
+
+   /* The emulation thread reads the transfer out of VRAM itself, after
+    * waiting for the GPU thread (gpu_thread_drain); the GPU thread only
+    * drops its texture cache, as the read does. */
+   if (!GPU_ON_EMU_THREAD(g))
+   {
+      InvalidateTexCache(g);
+      return;
+   }
 
    g->FBRW_X = (cb[1] >>  0) & 0x3FF;
    g->FBRW_Y = (cb[1] >> 16) & 0x3FF;
@@ -779,7 +847,7 @@ static void Command_DrawMode(PS_GPU* g, const uint32_t *cb)
    g->dtd =        (cmdw >> 9) & 1;
    g->dfe =        (cmdw >> 10) & 1;
 
-   if (g->dfe)
+   if (g->dfe && GPU_ON_EMU_THREAD(g))
       GPU.display_possibly_dirty = true;
 }
 
@@ -791,14 +859,16 @@ static void Command_TexWindow(PS_GPU* g, const uint32_t *cb)
    g->twy = ((*cb >> 15) & 0x1F);
 
    RecalcTexWindowStuff(g);
-   rhi_intf_set_tex_window(g->tww, g->twh, g->twx, g->twy);
+   if (GPU_ON_EMU_THREAD(g))
+      rhi_intf_set_tex_window(g->tww, g->twh, g->twx, g->twy);
 }
 
 static void Command_Clip0(PS_GPU* g, const uint32_t *cb)
 {
    g->ClipX0 = *cb & 1023;
    g->ClipY0 = (*cb >> 10) & 1023;
-   rhi_intf_set_draw_area(g->ClipX0, g->ClipY0,
+   if (GPU_ON_EMU_THREAD(g))
+      rhi_intf_set_draw_area(g->ClipX0, g->ClipY0,
            g->ClipX1, g->ClipY1);
 }
 
@@ -806,7 +876,8 @@ static void Command_Clip1(PS_GPU* g, const uint32_t *cb)
 {
    g->ClipX1 = *cb & 1023;
    g->ClipY1 = (*cb >> 10) & 1023;
-   rhi_intf_set_draw_area(g->ClipX0, g->ClipY0,
+   if (GPU_ON_EMU_THREAD(g))
+      rhi_intf_set_draw_area(g->ClipX0, g->ClipY0,
          g->ClipX1, g->ClipY1);
 }
 
@@ -821,7 +892,8 @@ static void Command_MaskSetting(PS_GPU* g, const uint32_t *cb)
    g->MaskSetOR   = (*cb & 1) ? 0x8000 : 0x0000;
    g->MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
 
-   rhi_intf_set_mask_setting(g->MaskSetOR, g->MaskEvalAND);
+   if (GPU_ON_EMU_THREAD(g))
+      rhi_intf_set_mask_setting(g->MaskSetOR, g->MaskEvalAND);
 }
 
 
@@ -1215,6 +1287,7 @@ bool GPU_Init(bool pal_clock_and_tv,
 
    GPU.upscale_shift = upscale_shift;
    GPU.dither_upscale_shift = 0;
+   gpu_set_role(&GPU, GPU_ROLE_INLINE);
 
    GPU.killQuadPart = 0;
 
@@ -1232,6 +1305,7 @@ void GPU_RecalcClockRatio(void) {
 
 void GPU_Destroy(void)
 {
+   gpu_thread_stop();
    free(GPU.vram);
    GPU.vram = NULL;
    free(state_vram_1x);
@@ -1260,6 +1334,8 @@ bool GPU_Rescale(uint8_t ushift)
    uint16_t *new_vram;
    unsigned x;
    unsigned y;
+
+   gpu_thread_settle();
 
    /* Step 1+2: allocate scratch buffer at 1x. If we're already at 1x
     * we can alias the old vram directly; otherwise allocate scratch
@@ -1301,7 +1377,7 @@ bool GPU_Rescale(uint8_t ushift)
     * via texel_put (nearest neighbour). */
    for (y = 0; y < 512; y++)
       for (x = 0; x < 1024; x++)
-         texel_put(x, y, vram_new[y * 1024 + x]);
+         texel_put(&GPU, x, y, vram_new[y * 1024 + x]);
 
    /* Step 5: free the old buffer (skipping the alias case where
     * old_vram == vram_new) and clear the scratch handle. */
@@ -1313,12 +1389,54 @@ bool GPU_Rescale(uint8_t ushift)
    return true;
 }
 
+/* The part of GP1(00h) that the drawing sees, for the instance g. */
+static void SoftResetRaster(PS_GPU *g)
+{
+   InvalidateCache(g);
+   g->InCmd = INCMD_NONE;
+
+   g->off_u = g->off_v = 0;
+   g->may_be_2d = false;
+
+   g->TexPageX = 0;
+   g->TexPageY = 0;
+
+   g->SpriteFlip = 0;
+
+   g->abr = 0;
+   g->TexMode = 0;
+
+   g->dtd = 0;
+   g->dfe = 0;
+
+   g->tww = 0;
+   g->twh = 0;
+   g->twx = 0;
+   g->twy = 0;
+
+   RecalcTexWindowStuff(g);
+
+   g->ClipX0 = 0;
+   g->ClipY0 = 0;
+   g->ClipX1 = 0;
+   g->ClipY1 = 0;
+
+   g->OffsX = 0;
+   g->OffsY = 0;
+
+   g->MaskSetOR = 0;
+   g->MaskEvalAND = 0;
+
+   g->TexDisable = false;
+   g->TexDisableAllowChange = false;
+}
+
 static void GPU_SoftReset(void) /* Control command 0x00 */
 {
    GPU.IRQPending = false;
    IRQ_Assert(IRQ_GPU, GPU.IRQPending);
 
-   InvalidateCache(&GPU);
+   SoftResetRaster(&GPU);
    rhi_intf_invalidate_clut_cache();
    GPU.DMAControl = 0;
 
@@ -1327,10 +1445,6 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
 
    FastFIFO_Flush(&GPU_BlitterFIFO);
    GPU.DataReadBufferEx = 0;
-   GPU.InCmd = INCMD_NONE;
-
-   GPU.off_u = GPU.off_v = 0;
-   GPU.may_be_2d = false;
 
    GPU.DisplayOff = 1;
    GPU.DisplayFB_XStart = 0;
@@ -1345,50 +1459,12 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
    GPU.VertStart = 0x10;
    GPU.VertEnd = 0x100;
 
-
-   /* */
-   GPU.TexPageX = 0;
-   GPU.TexPageY = 0;
-
-   GPU.SpriteFlip = 0;
-
-   GPU.abr = 0;
-   GPU.TexMode = 0;
-
-   GPU.dtd = 0;
-   GPU.dfe = 0;
-
-   /* */
-   GPU.tww = 0;
-   GPU.twh = 0;
-   GPU.twx = 0;
-   GPU.twy = 0;
-
-   RecalcTexWindowStuff(&GPU);
    rhi_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
-
-   /* */
-   GPU.ClipX0 = 0;
-   GPU.ClipY0 = 0;
-
-   /* */
-   GPU.ClipX1 = 0;
-   GPU.ClipY1 = 0;
-
-   /* */
-   GPU.OffsX = 0;
-   GPU.OffsY = 0;
-
-   /* */
-   GPU.MaskSetOR = 0;
-   GPU.MaskEvalAND = 0;
-
-   GPU.TexDisable = false;
-   GPU.TexDisableAllowChange = false;
 }
 
 void GPU_Power(void)
 {
+   gpu_thread_settle();
    memset(GPU.vram, 0, 512 * 1024 * UPSCALE(&GPU) * UPSCALE(&GPU) * sizeof(*GPU.vram));
 
    memset(GPU.CLUT_Cache, 0, sizeof(GPU.CLUT_Cache));
@@ -1513,15 +1589,83 @@ void GPU_ResetTS(void)
 }
 
 
+/* One word of a CPU-to-VRAM transfer into instance g: two pixels, the
+ * mask test applied where a software renderer keeps VRAM.  True when the
+ * transfer is complete. */
+static bool gpu_fbwrite_word(PS_GPU *g, uint32_t InData)
+{
+   unsigned i;
+   /* Cannot rely on mask bit if we don't have SW renderer, HW renderer will
+    * perform masking. */
+   const bool sw = GPU_HAS_SW(g);
+
+   for(i = 0; i < 2; i++)
+   {
+      if (GPU_TOUCHES_VRAM(g))
+      {
+         bool fetch = false;
+         if (sw)
+            fetch = texel_fetch(g, g->FBRW_CurX & 1023, g->FBRW_CurY & 511) & g->MaskEvalAND;
+
+         if (!fetch)
+            texel_put(g, g->FBRW_CurX & 1023, g->FBRW_CurY & 511, InData | g->MaskSetOR);
+      }
+
+      g->FBRW_CurX++;
+      if(g->FBRW_CurX == (g->FBRW_X + g->FBRW_W))
+      {
+         g->FBRW_CurX = g->FBRW_X;
+         g->FBRW_CurY++;
+         if(g->FBRW_CurY == (g->FBRW_Y + g->FBRW_H))
+         {
+            g->InCmd = INCMD_NONE;
+            return true;
+         }
+      }
+      InData >>= 16;
+   }
+   return false;
+}
+
+/* Run one GP0 command on instance g: a textured polygon's in-band texture
+ * page, then the command.  cont: the second half of a quad, or a further
+ * polyline vertex, whose words carry no command byte. */
+static INLINE void gpu_run_command(PS_GPU *g, uint32_t cc, bool cont,
+      const uint32_t *CB)
+{
+   const CTEntry *command = &Commands[cc];
+
+   /* A very very ugly kludge to support */
+   /* texture mode specialization. */
+   /* fixme/cleanup/SOMETHING in the future. */
+
+   /* Don't alter SpriteFlip here. */
+   if (!cont && cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
+      SetTPage(g, CB[4 + ((cc >> 4) & 0x1)] >> 16);
+
+   if ((cc >= 0x80) && (cc <= 0x9F))
+      Command_FBCopy(g, CB);
+   else if ((cc >= 0xA0) && (cc <= 0xBF))
+      Command_FBWrite(g, CB);
+   else if ((cc >= 0xC0) && (cc <= 0xDF))
+      Command_FBRead(g, CB);
+   else
+   {
+      if (command->func[g->abr][g->TexMode])
+         command->func[g->abr][g->TexMode | (g->MaskEvalAND ? 0x4 : 0x0)](g, CB);
+   }
+}
+
 static void ProcessFIFO(uint32_t in_count)
 {
-   uint32_t CB[0x10], InData;
+   uint32_t CB_local[0x10], InData;
+   uint32_t *CB = CB_local;
+   uint32_t *rec = NULL;
    unsigned i;
    unsigned command_len;
    uint32_t cc            = GPU.InCmd_CC;
    const CTEntry *command = &Commands[cc];
    bool read_fifo         = false;
-   bool sw                = rhi_intf_has_software_renderer();
 
    switch (GPU.InCmd)
    {
@@ -1531,36 +1675,27 @@ static void ProcessFIFO(uint32_t in_count)
       case INCMD_FBWRITE:
          InData = FastFIFO_Read(&GPU_BlitterFIFO);
 
-         for(i = 0; i < 2; i++)
+         if (GPU.role == GPU_ROLE_FRONT)
+            gpu_thread_fbwrite(InData);
+
+         if (gpu_fbwrite_word(&GPU, InData))
          {
-            /* Cannot rely on mask bit if we don't have SW renderer, HW renderer will
-             * perform masking. */
-            bool fetch = false;
-            if (sw)
-                fetch = texel_fetch(&GPU, GPU.FBRW_CurX & 1023, GPU.FBRW_CurY & 511) & GPU.MaskEvalAND;
-
-            if (!fetch)
-               texel_put(GPU.FBRW_CurX & 1023, GPU.FBRW_CurY & 511, InData | GPU.MaskSetOR);
-
-            GPU.FBRW_CurX++;
-            if(GPU.FBRW_CurX == (GPU.FBRW_X + GPU.FBRW_W))
-            {
-               GPU.FBRW_CurX = GPU.FBRW_X;
-               GPU.FBRW_CurY++;
-               if(GPU.FBRW_CurY == (GPU.FBRW_Y + GPU.FBRW_H))
-               {
-                  /* Upload complete, send over to RHI */
-                  rhi_intf_load_image(
-                        GPU.FBRW_X, GPU.FBRW_Y,
-                        GPU.FBRW_W, GPU.FBRW_H,
-                        GPU.vram,
-                        GPU.MaskEvalAND != 0,
-                        GPU.MaskSetOR != 0);
-                  GPU.InCmd = INCMD_NONE;
-                  break;   /* Break out of the for() loop. */
-               }
-            }
-            InData >>= 16;
+            /* Upload complete, send over to RHI: lent from the ring
+             * record the GPU thread writes VRAM from, or from VRAM once
+             * the GPU thread has written it */
+            const uint16_t *lent = NULL;
+            if (GPU.role == GPU_ROLE_FRONT)
+               lent = gpu_thread_fbwrite_lend();
+            if (!lent && rhi_intf_is_type() != RHI_SOFTWARE)
+               gpu_thread_drain();
+            rhi_intf_load_image(
+                  GPU.FBRW_X, GPU.FBRW_Y,
+                  GPU.FBRW_W, GPU.FBRW_H,
+                  lent ? lent : GPU.vram, lent ? GPU.FBRW_W : 0,
+                  GPU.MaskEvalAND != 0,
+                  GPU.MaskSetOR != 0);
+            if (lent)
+               gpu_thread_fbwrite_end();
          }
          return;
 
@@ -1581,6 +1716,8 @@ static void ProcessFIFO(uint32_t in_count)
          {
             FastFIFO_Read(&GPU_BlitterFIFO);
             GPU.InCmd = INCMD_NONE;
+            if (GPU.role == GPU_ROLE_FRONT)
+               gpu_thread_gp1(0x01000000);
             return;
          }
 
@@ -1601,6 +1738,14 @@ static void ProcessFIFO(uint32_t in_count)
    if(in_count < command_len)
       return;
 
+   /* The command's words go once from the FIFO to where they are run
+    * from: the ring record the GPU thread runs them from too. */
+   if (GPU.role == GPU_ROLE_FRONT)
+   {
+      rec = gpu_thread_cmd_begin(command_len);
+      CB  = rec + 2;
+   }
+
    for (i = 0; i < command_len; i++)
    {
       if(PGXP_enabled())
@@ -1608,30 +1753,20 @@ static void ProcessFIFO(uint32_t in_count)
       CB[i] = FastFIFO_Read(&GPU_BlitterFIFO);
    }
 
-   if (!read_fifo)
-   {
-      if(!command->ss_cmd)
-         GPU.DrawTimeAvail -= 2;
+   if (!read_fifo && !command->ss_cmd)
+      GPU.DrawTimeAvail -= 2;
 
-      /* A very very ugly kludge to support */
-      /* texture mode specialization. */
-      /* fixme/cleanup/SOMETHING in the future. */
-      
-      /* Don't alter SpriteFlip here. */
-      if(cc >= 0x20 && cc <= 0x3F && (cc & 0x4))
-         SetTPage(&GPU, CB[4 + ((cc >> 4) & 0x1)] >> 16);
-   }
+   gpu_run_command(&GPU, cc, read_fifo, CB);
 
-   if ((cc >= 0x80) && (cc <= 0x9F))
-      Command_FBCopy(&GPU, CB);
-   else if ((cc >= 0xA0) && (cc <= 0xBF))
-      Command_FBWrite(&GPU, CB);
-   else if ((cc >= 0xC0) && (cc <= 0xDF))
-      Command_FBRead(&GPU, CB);
-   else
+   if (rec)
    {
-      if (command->func[GPU.abr][GPU.TexMode])
-         command->func[GPU.abr][GPU.TexMode | (GPU.MaskEvalAND ? 0x4 : 0x0)](&GPU, CB);
+      gpu_thread_cmd_end(rec, cc, read_fifo, command_len);
+      if (GPU.InCmd == INCMD_FBWRITE)
+         gpu_thread_fbwrite_begin((GPU.FBRW_W * GPU.FBRW_H + 1) / 2);
+      /* The transfer is read out of VRAM here, once the GPU thread has
+       * drawn everything before it. */
+      if (GPU.InCmd == INCMD_FBREAD)
+         gpu_thread_drain();
    }
 }
 
@@ -1683,6 +1818,8 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd); /* 0x200, 0xC00 set by GPU_SoftReset() */
             rhi_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd); /* 0x10, 0x100 set by GPU_SoftReset() */
             RHI_UpdateDisplayMode();
+            if (GPU.role == GPU_ROLE_FRONT)
+               gpu_thread_gp1(V | (command << 24));
             break;
 
          case 0x01:  /* Reset command buffer */
@@ -1690,6 +1827,8 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
                GPU.DrawTimeAvail = 0;
             FastFIFO_Flush(&GPU_BlitterFIFO);
             GPU.InCmd = INCMD_NONE;
+            if (GPU.role == GPU_ROLE_FRONT)
+               gpu_thread_gp1(V | (command << 24));
             break;
 
          case 0x02:  /* Acknowledge IRQ */
@@ -1746,6 +1885,8 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 
          case 0x09:
             GPU.TexDisableAllowChange = V & 1;
+            if (GPU.role == GPU_ROLE_FRONT)
+               gpu_thread_gp1(V | (command << 24));
             break;
 
          case 0x10:  /* GPU info(?) */
@@ -2111,6 +2252,50 @@ static INLINE void ScanoutRow(const MDFN_Surface *surface, uint32_t *row,
    }
 }
 
+/* Zeroes the first cols pixels of the first rows rows of surface. */
+static void gpu_surface_clear_now(MDFN_Surface *surface, int32_t rows,
+      int32_t cols)
+{
+   int32_t y;
+   for (y = 0; y < rows; y++)
+      memset(surface->pixels + (size_t)y * surface->pitch32, 0,
+            (size_t)cols * sizeof(uint32_t));
+}
+
+/* The same, in order with the GPU thread's scanout when it runs. */
+static void gpu_surface_clear(MDFN_Surface *surface, int32_t rows,
+      int32_t cols)
+{
+   if (GPU.role == GPU_ROLE_FRONT)
+      gpu_thread_clear(surface, rows, cols);
+   else
+      gpu_surface_clear_now(surface, rows, cols);
+}
+
+/* One scanout line, all its upscaled rows, from vram into surface. */
+static void gpu_scanout_line(const MDFN_Surface *surface, int32_t dest_line,
+      uint32_t y, bool rgb24, bool skip_margin, int32_t udx_start,
+      int32_t udx_end, uint32_t udmw, int32_t ufb_x,
+      const uint16_t *vram, unsigned us)
+{
+   const unsigned up = 1u << us;
+   unsigned i;
+
+   for (i = 0; i < up; i++)
+   {
+      const uint16_t *src = vram + ((y + i) << (10 + us));
+      const int32_t   row = (dest_line << us) + i;
+
+      if (row >= surface->h)
+         break;
+
+      ScanoutRow(surface,
+            surface->pixels + (size_t)row * surface->pitch32,
+            rgb24, src, udx_start, udx_end, udmw, ufb_x, us, up,
+            skip_margin);
+   }
+}
+
 /* The surface the frame started on, while on a loan. */
 static MDFN_Surface *loan_own;
 
@@ -2141,9 +2326,15 @@ static void EnterLoan(bool fits)
          const int32_t row = (line << s) + i;
          if (row >= loan->h)
             break;
-         memcpy(loan->pixels + (size_t)row * loan->pitchinpix,
-               own->pixels + (size_t)row * own->pitchinpix + loan->x0,
-               (size_t)loan->w * sizeof(uint32_t));
+         /* The GPU thread scanned those rows out, so it moves them */
+         if (GPU.role == GPU_ROLE_FRONT)
+            gpu_thread_copy(loan->pixels + (size_t)row * loan->pitchinpix,
+                  own->pixels + (size_t)row * own->pitchinpix + loan->x0,
+                  (size_t)loan->w * sizeof(uint32_t));
+         else
+            memcpy(loan->pixels + (size_t)row * loan->pitchinpix,
+                  own->pixels + (size_t)row * own->pitchinpix + loan->x0,
+                  (size_t)loan->w * sizeof(uint32_t));
       }
    }
 
@@ -2425,13 +2616,8 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                      GPU.DisplayRect->h = VisibleLineCount;
 
                      for(y = 0; y < GPU.DisplayRect->h; y++)
-                     {
-                        uint32_t *row = GPU.surface->pixels + y * GPU.surface->pitch32;
-
                         GPU.LineWidths[y] = 384;
-
-                        memset(row, 0, 384 * sizeof(int32_t));
-                     }
+                     gpu_surface_clear(GPU.surface, GPU.DisplayRect->h, 384);
 
                      /* The mismatch clear zeroes only [0, 384) per
                       * row.  If a previous frame had a wider dmw
@@ -2457,11 +2643,9 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                      GPU.LineWidths[0] = 0;
 
                      for(i = 0; i < (GPU.DisplayRect->y + GPU.DisplayRect->h); i++)
-                     {
-                        GPU.surface->pixels[i * GPU.surface->pitch32 + 0] =
-                           GPU.surface->pixels[i * GPU.surface->pitch32 + 1] = 0;
                         GPU.LineWidths[i] = 2;
-                     }
+                     gpu_surface_clear(GPU.surface,
+                           GPU.DisplayRect->y + GPU.DisplayRect->h, 2);
                   }
 
                   EnterLoan(
@@ -2623,7 +2807,6 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                   int32_t udx_start   = dx_start << GPU.upscale_shift;
                   int32_t udx_end     = dx_end   << GPU.upscale_shift;
                   int32_t ufb_x       = fb_x     << GPU.upscale_shift;
-                  unsigned _upscale = UPSCALE(&GPU);
 
                   /* The loan is as wide as line 0 was last frame. */
                   if (     dest_line == 0
@@ -2693,7 +2876,6 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                   }
                   else
                   {
-                     uint32_t i;
                      /* Margin zero-fill skip: if this dest_line's
                       * (dx_start, dx_end, dmw) hasn't changed since
                       * last frame AND nothing has invalidated the
@@ -2712,28 +2894,17 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                          && scanout_cache[dest_line].dx_end   == dx_end
                          && scanout_cache[dest_line].dmw      == (uint32_t)dmw;
 
-                     for (i = 0; i < _upscale; i++)
-                     {
-                        const uint16_t *src = GPU.vram +
-                           ((y + i) << (10 + GPU.upscale_shift));
-                        const int32_t row =
-                           (dest_line << GPU.upscale_shift) + i;
-
-                        if (row >= GPU.surface->h)
-                           break;
-
-                        ScanoutRow(GPU.surface,
-                              GPU.surface->pixels + (size_t)row * GPU.surface->pitch32,
+                     /* With the GPU thread running, it scans the line
+                      * out in order with its drawing. */
+                     if (GPU.role == GPU_ROLE_FRONT)
+                        gpu_thread_scanout(GPU.surface, dest_line, y,
                               (GPU.DisplayMode & DISP_RGB24) != 0,
-                              src,
-                              udx_start,
-                              udx_end,
-                              udmw,
-                              ufb_x,
-                              GPU.upscale_shift,
-                              _upscale,
-                              skip_margin);
-                     }
+                              skip_margin, udx_start, udx_end, udmw, ufb_x);
+                     else
+                        gpu_scanout_line(GPU.surface, dest_line, y,
+                              (GPU.DisplayMode & DISP_RGB24) != 0,
+                              skip_margin, udx_start, udx_end, udmw, ufb_x,
+                              GPU.vram, GPU.upscale_shift);
 
                      if (dest_line >= 0 && dest_line < GPU_DEST_LINE_MAX)
                         row_written[dest_line] = on_loan ? ROW_LOAN : ROW_OWN;
@@ -2932,6 +3103,8 @@ void GPU_FlushDeferredScanout(MDFN_Surface *target)
    uint32_t *pixels;
    unsigned r;
 
+   gpu_thread_drain();
+
    /* Fast path and HW-renderer safety:  with no deferred records
     * there's nothing to flush, and dereferencing GPU.surface below
     * would crash on the HW renderers where alloc_surface() now
@@ -3064,6 +3237,7 @@ void GPU_FlushDeferredScanout(MDFN_Surface *target)
 void GPU_RestoreStateP1(bool load, bool sizing)
 {
    unsigned i;
+   gpu_thread_settle();
    /* The idle schedule is not part of a state; the ForceEventUpdates()
     * after a load puts the GPU on a fresh grid, as it always has. */
    if (load && GPU.idle_virtual)
@@ -3095,10 +3269,10 @@ void GPU_RestoreStateP1(bool load, bool sizing)
          const bool     ms   = GPU.MaskSetOR != 0;
          if (rows)
             rhi_intf_load_image(GPU.FBRW_X, GPU.FBRW_Y, GPU.FBRW_W, rows,
-                  GPU.vram, mt, ms);
+                  GPU.vram, 0, mt, ms);
          if (GPU.FBRW_CurX != GPU.FBRW_X)
             rhi_intf_load_image(GPU.FBRW_X, GPU.FBRW_CurY,
-                  (GPU.FBRW_CurX - GPU.FBRW_X) & 1023, 1, GPU.vram, mt, ms);
+                  (GPU.FBRW_CurX - GPU.FBRW_X) & 1023, 1, GPU.vram, 0, mt, ms);
       }
       rhi_intf_read_vram(0, 0, 1024, 512, GPU.vram);
    }
@@ -3158,7 +3332,7 @@ void GPU_RestoreStateP2(bool load)
          {
             unsigned x;
             for (x = 0; x < 1024; x++)
-               texel_put(x, y, vram_new[y * 1024 + x]);
+               texel_put(&GPU, x, y, vram_new[y * 1024 + x]);
          }
       }
 
@@ -3202,7 +3376,7 @@ static void gpu_upload_cols(uint32_t cols, unsigned y0, unsigned y1)
          cols >>= 1;
          n++;
       }
-      rhi_intf_load_image(g * 32, y0, n * 32, y1 - y0, GPU.vram,
+      rhi_intf_load_image(g * 32, y0, n * 32, y1 - y0, GPU.vram, 0,
             false, false);
       g += n;
    }
@@ -3327,7 +3501,7 @@ static void gpu_restore_state_p3(bool upload_all)
    if (upload_all)
       rhi_intf_load_image( 0,    0,
                            1024, 512,
-                           GPU.vram, false, false);
+                           GPU.vram, 0, false, false);
    else
       gpu_upload_changed_rows(!rhi_intf_has_software_renderer());
 
@@ -3560,10 +3734,10 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       if (fbw && ret)
       {
          if (fbw_rows)
-            rhi_intf_load_image(fbw_x, fbw_y, fbw_w, fbw_rows, GPU.vram,
+            rhi_intf_load_image(fbw_x, fbw_y, fbw_w, fbw_rows, GPU.vram, 0,
                   false, false);
          if (fbw_curx)
-            rhi_intf_load_image(fbw_x, fbw_cury, fbw_curx, 1, GPU.vram,
+            rhi_intf_load_image(fbw_x, fbw_cury, fbw_curx, 1, GPU.vram, 0,
                   false, false);
       }
    }
@@ -3594,6 +3768,7 @@ unsigned GPU_get_display_change_count(void)
 
 void GPU_set_dither_upscale_shift(uint8_t factor)
 {
+   gpu_thread_settle();
    GPU.dither_upscale_shift = factor;
 }
 
@@ -3619,6 +3794,7 @@ bool GPU_DMACanWrite(void)
 
 uint16_t *GPU_get_vram(void)
 {
+   gpu_thread_drain();
    return GPU.vram;
 }
 
@@ -3633,3 +3809,5 @@ void GPU_set_visible_scanlines(int sls, int sle)
    GPU.LineVisFirst = sls;
    GPU.LineVisLast = sle;
 }
+
+#include "gpu_thread.c"

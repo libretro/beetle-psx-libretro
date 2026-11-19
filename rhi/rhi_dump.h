@@ -56,7 +56,7 @@ typedef struct rhi_dump_line_data
 
 void rhi_dump_line(const struct rhi_dump_line_data *line);
 void rhi_dump_load_image(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
-      const uint16_t *vram, bool mask_test, bool set_mask);
+      const uint16_t *src, uint32_t stride, bool mask_test, bool set_mask);
 
 void rhi_dump_fill_rect(uint32_t color, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 void rhi_dump_copy_rect(uint16_t src_x, uint16_t src_y, uint16_t dst_x, uint16_t dst_y, uint16_t w, uint16_t h, bool mask_test, bool set_mask);

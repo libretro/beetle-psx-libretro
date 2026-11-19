@@ -996,10 +996,10 @@ static bool rhi_intf_read_rects(const tt_coh_rect *r, unsigned n, uint16_t *vram
 
 void rhi_intf_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
-      uint16_t *vram, bool mask_test, bool set_mask)
+      const uint16_t *src, uint32_t stride, bool mask_test, bool set_mask)
 {
 #ifdef RHI_DUMP
-   rhi_dump_load_image(x, y, w, h, vram, mask_test, set_mask);
+   rhi_dump_load_image(x, y, w, h, src, stride, mask_test, set_mask);
 #endif
 #ifdef DEBUG
    tt_log("load_image rect=(%u,%u %ux%u) mask_test=%d set_mask=%d\n",
@@ -1026,12 +1026,12 @@ void rhi_intf_load_image(uint16_t x, uint16_t y,
          break;
       case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rhi_gl_load_image(x, y, w, h, vram, mask_test, set_mask);
+         rhi_gl_load_image(x, y, w, h, src, stride, mask_test, set_mask);
 #endif
          break;
       case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rhi_vulkan_load_image(x, y, w, h, vram, mask_test, set_mask);
+         rhi_vulkan_load_image(x, y, w, h, src, stride, mask_test, set_mask);
 #endif
          break;
    }

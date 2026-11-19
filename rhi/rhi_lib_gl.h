@@ -97,7 +97,7 @@ void rhi_gl_push_line(int16_t p0x, int16_t p0y,
 
 void rhi_gl_load_image(uint16_t x, uint16_t y,
                        uint16_t w, uint16_t h,
-                       uint16_t *vram,
+                       const uint16_t *src, uint32_t stride,
                        bool mask_test, bool set_mask);
 
 bool rhi_gl_read_vram(uint16_t x, uint16_t y,

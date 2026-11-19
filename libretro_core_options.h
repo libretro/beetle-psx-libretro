@@ -341,6 +341,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      "GPU Thread",
+      NULL,
+      "Draws the software renderer's picture, and the Software Framebuffer under the hardware renderers, on a thread of its own when the CPU has two or more fast cores. The picture and the emulated timing are the same either way. Not used while a light gun is connected.",
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       "Color Format",
       NULL,

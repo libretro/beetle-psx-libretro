@@ -154,11 +154,18 @@ void rhi_intf_push_line(int16_t p0x, int16_t p0y,
                         bool mask_test,
                         bool set_mask);
 
+/* A CPU-to-VRAM upload of the rectangle (x, y, w, h).  Its pixels come
+ * from src: with stride 0, src is VRAM and the rectangle is read at its
+ * own coordinates, wrapping at 1024x512 as VRAM does; otherwise src holds
+ * only the rectangle, row after row, stride pixels apart, and is valid for
+ * the call alone, so a renderer that keeps it for later copies it. */
 void rhi_intf_load_image(uint16_t x, uint16_t y,
                          uint16_t w, uint16_t h,
-                         uint16_t *vram,
+                         const uint16_t *src, uint32_t stride,
                          bool mask_test,
                          bool set_mask);
+
+/* RHI_SRC_ROW and its neighbours (rhi_tt.h) read such a source. */
 
 bool rhi_intf_read_vram(uint16_t x, uint16_t y,
                         uint16_t w, uint16_t h,

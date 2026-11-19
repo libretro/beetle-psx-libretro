@@ -94,6 +94,8 @@ uint8_t widescreen_hack_aspect_ratio_setting;
 uint8_t psx_gpu_upscale_shift;
 uint8_t psx_gpu_upscale_shift_hw;
 bool psx_gpu_rasterize_both_fields = false;
+/* Software drawing on the GPU thread, when the CPU has the cores for it */
+static bool psx_gpu_thread = true;
 bool psx_gpu_bob_scanout = false;
 int line_render_mode;
 int filter_mode;
@@ -4832,6 +4834,15 @@ static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
 
+   /* Options change what the GPU thread's drawing reads */
+   GPU_ThreadSettle();
+
+   var.key = BEETLE_OPT(gpu_thread);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      psx_gpu_thread = strcmp(var.value, "disabled") != 0;
+   else
+      psx_gpu_thread = true;
+
    /* Read before refreshing either renderer, so an option change cannot
     * rebuild storage using the previous frame's drawing policy. */
    psx_internal_color_mode = PSX_INTERNAL_COLOR_16BPP;
@@ -7059,6 +7070,8 @@ void retro_run(void)
    espec->SoundBufSize = 0;
 
    FrontIO_UpdateInput(PSX_FIO);
+   /* A light gun samples the picture line by line as it is scanned out */
+   GPU_ThreadSelect(psx_gpu_thread && !FrontIO_ReadsScanout(PSX_FIO));
    GPU_StartFrame(espec);
 
    Running = -1;
@@ -7067,6 +7080,8 @@ void retro_run(void)
    assert(timestamp);
 
    ForceEventUpdates(timestamp);
+
+   GPU_ThreadFrameEnd();
 
    /* The deferred SW-renderer scanout records collected during this
     * frame's emulation (psx_gpu_rasterize_both_fields) are drained in

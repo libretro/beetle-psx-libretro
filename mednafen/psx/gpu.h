@@ -16,6 +16,16 @@
 #define INCMD_FBWRITE  4
 #define INCMD_FBREAD   8
 
+/* Which part of the work a PS_GPU instance does.  INLINE does all of it
+ * on the emulation thread.  With the GPU thread running, the emulation
+ * thread's instance is FRONT: it decodes every GP0 command for emulated
+ * timing and for the GL/Vulkan renderers, without touching VRAM.  The GPU
+ * thread's instance is BACK: it runs the same commands from the ring and
+ * draws them into VRAM, with no timing and no renderer calls. */
+#define GPU_ROLE_INLINE 0
+#define GPU_ROLE_FRONT  1
+#define GPU_ROLE_BACK   2
+
 #define DISP_VERT480    0x04
 #define DISP_PAL        0x08
 #define DISP_RGB24      0x10
@@ -106,6 +116,10 @@ struct PS_GPU
    /* Beetle-psx upscaling vars */
    uint8_t upscale_shift;
    uint8_t dither_upscale_shift;
+   uint8_t role;        /* GPU_ROLE_* */
+   /* GPU_TIMING_*, from role and upscale_shift (gpu_set_role): who
+    * charges DrawTimeAvail for what the drawing reads */
+   uint8_t timing;
 
    // Drawing stuff
    int32_t ClipX0;
@@ -285,6 +299,12 @@ struct PS_GPU
    wrestle a variable-sized struct.
    */
    uint16_t *vram;
+
+   /* PGXP vertices of the command being run, as the emulation thread
+    * resolved them: written there and read back on the GPU thread, four
+    * words each, from the command's ring record. */
+   uint32_t *pgxp_side;
+   unsigned  pgxp_side_n;
 };
 typedef struct PS_GPU PS_GPU;
 
@@ -388,6 +408,17 @@ void GPU_InvalidateScanoutCache(void);
 bool GPU_LoanComplete(int32_t lines);
 
 int GPU_StateAction(StateMem *sm, int load, int data_only);
+
+/* Software drawing on a thread of its own (gpu_thread.c).  Once per frame,
+ * before it starts: whether to draw on the GPU thread.  Needs a software
+ * renderer or framebuffer, and nothing reading the picture line by line. */
+void     GPU_ThreadSelect(bool want);
+/* After the frame's emulation: a software-rendered frame waits for its
+ * picture; the GPU renderers' frames hand over what is pending. */
+void     GPU_ThreadFrameEnd(void);
+/* Before core options or a renderer change what the drawing reads, or a
+ * renderer reads VRAM outside the GP0 stream. */
+void     GPU_ThreadSettle(void);
 
 void GPU_set_visible_scanlines(int sls, int sle); // Beetle PSX addition
 

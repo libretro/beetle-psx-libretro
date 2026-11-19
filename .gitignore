@@ -52,6 +52,10 @@ tools/gte_state/gte_state_test.exe
 tools/gpu_span/gpu_span_test
 tools/gpu_span/gpu_span_test.exe
 
+# GPU thread lane build output (tools/gpu_thread)
+tools/gpu_thread/gpu_thread_test
+tools/gpu_thread/gpu_thread_test.exe
+
 # Python bytecode from the VCD authoring script (tools/vcd)
 __pycache__/
 *.pyc

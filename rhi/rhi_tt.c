@@ -2629,7 +2629,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
 
    void texture_tracker_upload(struct TextureTracker *self,
          TTRect rect,
-         uint16_t *vram);
+         const uint16_t *src, uint32_t stride);
    void texture_tracker_blit(struct TextureTracker *self,
          TTRect dst,
          TTRect src);
@@ -2684,7 +2684,7 @@ void texture_tracker_set_cache_budgets(struct TextureTracker *self,
          UsedMode *mode,
          uint32_t palette_hash_override);
    /* ---- Page-aligned experiment + HD QoL forward declarations (PAGE_ALIGN.md) ---- */
-   static void texture_tracker_mirror_store(struct TextureTracker *self, TTRect rect, const uint16_t *vram);
+   static void texture_tracker_mirror_store(struct TextureTracker *self, TTRect rect, const uint16_t *src, uint32_t stride);
    static void texture_tracker_mirror_blit(struct TextureTracker *self, TTRect dst, TTRect src);
    static void texture_tracker_mirror_fill(struct TextureTracker *self, TTRect rect, uint16_t value);
    static void texture_tracker_invalidate_page_hashes(struct TextureTracker *self, TTRect written);
@@ -4453,20 +4453,20 @@ static TTRect fromSRect(SRect rect) {
 
    static uint32_t texture_tracker_hash_vram(struct TextureTracker *self,
          TTRect rect,
-         uint16_t *vram){
+         const uint16_t *src, uint32_t stride){
       /* The CRC of the rect's rows chained in place: the same value as over
-       * a packed copy, without making one. Rows split where x wraps. */
-      unsigned first = rect.width < FB_WIDTH - (rect.x & (FB_WIDTH - 1))
-            ? rect.width : FB_WIDTH - (rect.x & (FB_WIDTH - 1));
+       * a packed copy, without making one. VRAM rows split where x wraps. */
+      unsigned first = RHI_SRC_FIRST(stride, rect.x, rect.width);
       uint32_t hash = 0;
       unsigned j;
       (void)self;
       for (j = 0; j < rect.height; j++)
       {
-         const uint16_t *row = vram + ((rect.y + j) & (FB_HEIGHT - 1)) * FB_WIDTH;
-         hash = crc32(hash, row + (rect.x & (FB_WIDTH - 1)), first * sizeof(uint16_t));
+         hash = crc32(hash, RHI_SRC_ROW(src, stride, rect.x, rect.y, j),
+               first * sizeof(uint16_t));
          if (first < rect.width)
-            hash = crc32(hash, row, (rect.width - first) * sizeof(uint16_t));
+            hash = crc32(hash, RHI_SRC_WRAP(src, rect.y, j),
+                  (rect.width - first) * sizeof(uint16_t));
       }
       return hash;
    }
@@ -4529,9 +4529,9 @@ static TTRect fromSRect(SRect rect) {
          return;
       }
 
-      hash = texture_tracker_hash_vram(self, rect, vram);
+      hash = texture_tracker_hash_vram(self, rect, vram, 0);
 
-      texture_tracker_mirror_store(self, rect, vram); /* keep the page mirror current */
+      texture_tracker_mirror_store(self, rect, vram, 0); /* keep the page mirror current */
 
       { int i; for (i = 0; i < rrvec_size(&self->restorable_rects); ) {
          if (rect_intersects(&self->restorable_rects.items[i].rect, &rect))
@@ -4569,7 +4569,7 @@ static TTRect fromSRect(SRect rect) {
 
    void texture_tracker_upload(struct TextureTracker *self,
          TTRect rect,
-         uint16_t *vram){
+         const uint16_t *src, uint32_t stride){
       TextureUpload * upload;
       RestorableRect * restore;
       texture_tracker_clear_palette_cache(self, rect);
@@ -4578,7 +4578,7 @@ static TTRect fromSRect(SRect rect) {
          /* probably loading a save state, this is the entirety of vram */
          rect_tracker_clear(&self->tracker, toSRect(rect));
          fused_pages_mark_dead(&self->fused_pages, rect);
-         texture_tracker_mirror_store(self, rect, vram); /* refresh the whole mirror */
+         texture_tracker_mirror_store(self, rect, src, stride); /* refresh the whole mirror */
          return;
       }
 
@@ -4589,14 +4589,14 @@ static TTRect fromSRect(SRect rect) {
 
       /* Keep the CPU VRAM mirror current with the uploaded bytes (page-aligned
        * experiment), unconditionally regardless of dedup/restore below. */
-      texture_tracker_mirror_store(self, rect, vram);
+      texture_tracker_mirror_store(self, rect, src, stride);
 
       upload = NULL;
       { bool preexisting = false;
       {
          /* Hashed in place; the packed copy is made only for a new upload,
           * which keeps it. */
-         uint32_t hash = texture_tracker_hash_vram(self, rect, vram);
+         uint32_t hash = texture_tracker_hash_vram(self, rect, src, stride);
          /* TODO: check for hash collision, by checking if existing upload has
           * different dimensions. not sure how to recover if it does, but the
           * odds of a collision are probably much higher than the odds that both
@@ -4607,11 +4607,17 @@ static TTRect fromSRect(SRect rect) {
             size_t img_n = (size_t)rect.width * (size_t)rect.height;
             uint16_t *img = (uint16_t *)malloc(img_n * sizeof(uint16_t));
             size_t vi = 0;
-            unsigned j, i;
+            unsigned first = RHI_SRC_FIRST(stride, rect.x, rect.width);
+            unsigned j;
             for (j = 0; j < rect.height; j++)
-               for (i = 0; i < rect.width; i++)
-                  img[vi++] = vram[((rect.y + j) & (FB_HEIGHT - 1)) * FB_WIDTH
-                        + ((rect.x + i) & (FB_WIDTH - 1))];
+            {
+               memcpy(img + vi, RHI_SRC_ROW(src, stride, rect.x, rect.y, j),
+                     first * sizeof(uint16_t));
+               if (first < rect.width)
+                  memcpy(img + vi + first, RHI_SRC_WRAP(src, rect.y, j),
+                        (rect.width - first) * sizeof(uint16_t));
+               vi += rect.width;
+            }
             upload = texture_upload_new();  /* owns +1 */
             upload->image = img;            /* transfer ownership */
             upload->image_count = (int)img_n;
@@ -5778,14 +5784,26 @@ static bool is_power_of_two(int n) {
    }
 
    /* --- VRAM mirror helpers. All x/y wrap to match the live VRAM access pattern. --- */
-   static void texture_tracker_mirror_store(struct TextureTracker *self, TTRect rect, const uint16_t *vram) {
-      unsigned j, i;
+   static void texture_tracker_mirror_store(struct TextureTracker *self, TTRect rect, const uint16_t *src, uint32_t stride) {
+      unsigned first = RHI_SRC_FIRST(stride, rect.x, rect.width);
+      unsigned j;
       texture_tracker_invalidate_page_hashes(self, rect);
-      for (j = rect.y; j < rect.y + rect.height; j++) {
-         unsigned my = j & (FB_HEIGHT - 1);
-         for (i = rect.x; i < rect.x + rect.width; i++) {
-            unsigned mx = i & (FB_WIDTH - 1);
-            self->vram_mirror[my * FB_WIDTH + mx] = vram[my * FB_WIDTH + mx];
+      for (j = 0; j < rect.height; j++) {
+         uint16_t *row = self->vram_mirror
+               + (size_t)((rect.y + j) & (FB_HEIGHT - 1)) * FB_WIDTH;
+         unsigned mx = rect.x & (FB_WIDTH - 1);
+         unsigned split = (mx + rect.width <= FB_WIDTH) ? rect.width : FB_WIDTH - mx;
+         const uint16_t *s = RHI_SRC_ROW(src, stride, rect.x, rect.y, j);
+         if (stride) {
+            /* the source row is whole; the mirror's row wraps */
+            memcpy(row + mx, s, split * sizeof(uint16_t));
+            if (split < rect.width)
+               memcpy(row, s + split, (rect.width - split) * sizeof(uint16_t));
+         } else {
+            memcpy(row + mx, s, first * sizeof(uint16_t));
+            if (first < rect.width)
+               memcpy(row, RHI_SRC_WRAP(src, rect.y, j),
+                     (rect.width - first) * sizeof(uint16_t));
          }
       }
    }
@@ -7476,7 +7494,7 @@ static int64_t page_bytes(FusionRects *fusion)
        * hash from it. mirror_store also drops any memoised page hash. */
       if (state->vram_mirror != NULL && self->vram_mirror != NULL) {
          TTRect _full = { 0, 0, FB_WIDTH, FB_HEIGHT };
-         texture_tracker_mirror_store(self, _full, state->vram_mirror);
+         texture_tracker_mirror_store(self, _full, state->vram_mirror, 0);
          texture_tracker_clear_palette_cache(self, _full);
       }
       /* Need to reload the hd textures, too */

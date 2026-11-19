@@ -111,6 +111,19 @@ struct NAME##_force_semicolon_
 #endif /* min_ */
 
 /* PSX VRAM geometry, shared by the tracker and both renderers. */
+/* The first pixel of row j of an upload's rectangle, and the row's first
+ * stretch before x wraps: VRAM rows wrap at 1024, a strided source's rows
+ * hold the rectangle's width. */
+#define RHI_SRC_ROW(src, stride, x, y, j) ((stride) \
+      ? (src) + (size_t)(j) * (stride) \
+      : (src) + (size_t)(((y) + (j)) & 511) * 1024 + ((x) & 1023))
+#define RHI_SRC_FIRST(stride, x, w) (((stride) || (unsigned)((x) & 1023) + (w) <= 1024) \
+      ? (unsigned)(w) : 1024u - ((x) & 1023))
+/* Pixels from one row's start to the next */
+#define RHI_SRC_PITCH(stride) ((stride) ? (stride) : 1024u)
+/* The start of row j's wrapped stretch (VRAM only) */
+#define RHI_SRC_WRAP(src, y, j) ((src) + (size_t)(((y) + (j)) & 511) * 1024)
+
 enum { FB_WIDTH = 1024 };
 enum { FB_HEIGHT = 512 };
 enum { BLOCK_WIDTH = 8 };
@@ -606,9 +619,10 @@ static INLINE void tt_replace_latch_toggle(struct tt_replace_latch *l, bool on)
 
 /* ---- VRAM mutation + frame hooks -------------------------------------- */
 
+/* src and stride as rhi_intf_load_image takes them */
 void texture_tracker_upload(TextureTracker *self,
       TTRect rect,
-      uint16_t *vram);
+      const uint16_t *src, uint32_t stride);
 void texture_tracker_blit(TextureTracker *self,
       TTRect dst,
       TTRect src);

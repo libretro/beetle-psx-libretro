@@ -216,7 +216,7 @@ static INLINE void PlotNativePixel_##SUFFIX(PS_GPU *gpu, int32_t x, int32_t y, u
       PlotPixelBlend_##BLENDMODE_TAG(bg_pix, &fore_pix); \
    } \
    if (!(MASKEVAL) || !(texel_fetch(gpu, x, y) & 0x8000)) \
-      texel_put(x, y, ((TEXTURED) ? fore_pix : (fore_pix & 0x7FFF)) | gpu->MaskSetOR); \
+      texel_put(gpu, x, y, ((TEXTURED) ? fore_pix : (fore_pix & 0x7FFF)) | gpu->MaskSetOR); \
 }
 
 DEFINE_PlotNativePixel(BMopaque_ME0_T0, BLEND_MODE_OPAQUE,     BMopaque, 0, 0)
@@ -287,6 +287,31 @@ void GPU_NoteModulate(int idx_r, int idx_g, int idx_b);
    ModTexelRaw(dither_offset, texel, r, g, b)
 #endif
 
+/* The rasterizer charges DrawTimeAvail itself only inline at 1x.  Inline
+ * at an upscale the native timing walk charges instead, and with the GPU
+ * thread the emulation thread's walk does, so the GPU thread's drawing
+ * never charges. */
+#define GPU_TIMING_NONE   0   /* FRONT walks, BACK draws without timing */
+#define GPU_TIMING_RASTER 1   /* inline at 1x */
+#define GPU_TIMING_WALK   2   /* inline at an upscale */
+#define GPU_RASTER_CHARGES(g) ((g)->timing == GPU_TIMING_RASTER)
+#define GPU_RASTER_WALKS(g)   ((g)->timing == GPU_TIMING_WALK)
+
+static INLINE void gpu_set_role(PS_GPU *g, uint8_t role)
+{
+   g->role   = role;
+   g->timing = (role != GPU_ROLE_INLINE) ? GPU_TIMING_NONE
+      : g->upscale_shift ? GPU_TIMING_WALK : GPU_TIMING_RASTER;
+}
+/* Whether a software renderer or framebuffer keeps VRAM.  The GPU thread
+ * runs only when one does, and does not read the renderer's settings,
+ * which the emulation thread may rewrite while it draws. */
+#define GPU_HAS_SW(g) ((g)->role == GPU_ROLE_BACK || rhi_intf_has_software_renderer())
+/* Renderer calls and display bookkeeping happen on the emulation thread. */
+#define GPU_ON_EMU_THREAD(g)  ((g)->role != GPU_ROLE_BACK)
+/* VRAM is read and written by the instance that draws. */
+#define GPU_TOUCHES_VRAM(g)   ((g)->role != GPU_ROLE_FRONT)
+
 /*
  * Refresh the per-PS_GPU CLUT (palette) cache if the new texture
  * page descriptor has changed since last update.
@@ -323,11 +348,12 @@ static INLINE void Update_CLUT_Cache_##SUFFIX(PS_GPU *g, uint16_t raw_clut) \
          const uint32_t count = ((TM_VAL) ? 256 : 16); \
          unsigned i; \
          g->DrawTimeAvail -= count; \
-         for (i = 0; i < count; i++) \
-         { \
-            uint16_t x = (cxo + i) & 0x3FF; \
-            g->CLUT_Cache[i] = texel_fetch(g, x, y); \
-         } \
+         if (GPU_TOUCHES_VRAM(g)) \
+            for (i = 0; i < count; i++) \
+            { \
+               uint16_t x = (cxo + i) & 0x3FF; \
+               g->CLUT_Cache[i] = texel_fetch(g, x, y); \
+            } \
          g->CLUT_Cache_VB = new_ccvb; \
       } \
    } \
@@ -411,9 +437,8 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
       if (MDFN_UNLIKELY(c->Tag != gro_line)) \
       { \
          uint32_t cache_x = fbtex_x & ~3; \
-         /* at an upscale the native timing tags charge instead \
-          * (TimingTexel) */ \
-         if (!g->upscale_shift) \
+         /* inline at 1x only: see GPU_RASTER_CHARGES */ \
+         if (GPU_RASTER_CHARGES(g)) \
             g->DrawTimeAvail -= 4; \
          c->Data[0] = texel_fetch(g, cache_x + 0, fbtex_y); \
          c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y); \
@@ -436,17 +461,15 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
    return fbw; \
 }
 
-/* The texture cache's timing at an upscale: the same tag and index as
- * GetTexel, against TexCacheTimingTag, charging DrawTimeAvail on a miss.
- * Called at native resolution by the polygon timing walk and by sprites,
- * so emulated GPU timing is the same at every internal resolution. */
-#define DEFINE_TimingTexel(SUFFIX, TM_VAL) \
-static INLINE void TimingTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg) \
+/* The texture cache's timing, apart from the drawing: the same tags and
+ * index as GetTexel, in TexCacheTimingTag, charging DrawTimeAvail on a
+ * miss.  The native timing walk and sprites charge through these, so
+ * emulated GPU timing is the same at every internal resolution and
+ * whichever thread draws.  TimingLine is one fetch from the cache line at
+ * gro_line. */
+#define DEFINE_TimingLine(SUFFIX, TM_VAL) \
+static INLINE void TimingLine_##SUFFIX(PS_GPU *g, uint32_t gro_line) \
 { \
-   uint32_t u_ext   = ((u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD); \
-   uint32_t fbtex_x = ((u_ext >> (2 - (TM_VAL)))) & 1023; \
-   uint32_t fbtex_y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD; \
-   uint32_t gro_line = (fbtex_y * 1024U + fbtex_x) & ~0x3U; \
    uint32_t idx; \
    if (g->last_timing_line == gro_line) \
       return; \
@@ -461,9 +484,113 @@ static INLINE void TimingTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg)
    } \
 }
 
+DEFINE_TimingLine(TM0, 0)
+DEFINE_TimingLine(TM1, 1)
+DEFINE_TimingLine(TM2, 2)
+
+#define TIMING_GRO_LINE(g, u_arg, v_arg, TM_VAL) \
+   (((((uint32_t)(v_arg) & (g)->SUCV.TWY_AND) + (g)->SUCV.TWY_ADD) * 1024U \
+     + (((((uint32_t)(u_arg) & (g)->SUCV.TWX_AND) + (g)->SUCV.TWX_ADD) \
+          >> (2 - (TM_VAL))) & 1023)) & ~0x3U)
+
+#define DEFINE_TimingTexel(SUFFIX, TM_VAL) \
+static INLINE void TimingTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg) \
+{ \
+   TimingLine_##SUFFIX(g, TIMING_GRO_LINE(g, u_arg, v_arg, TM_VAL)); \
+}
+
 DEFINE_TimingTexel(TM0, 0)
 DEFINE_TimingTexel(TM1, 1)
 DEFINE_TimingTexel(TM2, 2)
+
+/* The texture cache's timing along a run of w texels whose coordinates
+ * step linearly in 8.24 fixed point: texel k is at ((u + k * du) >> 24,
+ * (v + k * dv) >> 24), as an affine polygon span or a sprite row steps.
+ * The cache lines are worked out eight at a time and the tags checked
+ * where the line changes, which is what TimingTexel per texel does. */
+#if defined(__SSE2__)
+#define TIMING_SPAN_LINES(g, u, v, du, dv, TM_VAL, lines) \
+   do { \
+      const __m128i du4_ = _mm_set1_epi32((int)((du) * 4u)); \
+      const __m128i dv4_ = _mm_set1_epi32((int)((dv) * 4u)); \
+      const __m128i xa_  = _mm_set1_epi32((int)(g)->SUCV.TWX_AND); \
+      const __m128i xd_  = _mm_set1_epi32((int)(g)->SUCV.TWX_ADD); \
+      const __m128i ya_  = _mm_set1_epi32((int)(g)->SUCV.TWY_AND); \
+      const __m128i yd_  = _mm_set1_epi32((int)(g)->SUCV.TWY_ADD); \
+      const __m128i m10_ = _mm_set1_epi32(1023); \
+      const __m128i m4_  = _mm_set1_epi32(~3); \
+      __m128i uu_ = _mm_add_epi32(_mm_set1_epi32((int)(u)), \
+            _mm_set_epi32((int)((du) * 3u), (int)((du) * 2u), (int)(du), 0)); \
+      __m128i vv_ = _mm_add_epi32(_mm_set1_epi32((int)(v)), \
+            _mm_set_epi32((int)((dv) * 3u), (int)((dv) * 2u), (int)(dv), 0)); \
+      int h_; \
+      for (h_ = 0; h_ < 2; h_++) \
+      { \
+         __m128i fx_ = _mm_add_epi32(_mm_and_si128(_mm_srli_epi32(uu_, 24), xa_), xd_); \
+         __m128i fy_ = _mm_add_epi32(_mm_and_si128(_mm_srli_epi32(vv_, 24), ya_), yd_); \
+         fx_ = _mm_and_si128(_mm_srli_epi32(fx_, 2 - (TM_VAL)), m10_); \
+         _mm_storeu_si128((__m128i*)&(lines)[h_ * 4], \
+               _mm_and_si128(_mm_add_epi32(_mm_slli_epi32(fy_, 10), fx_), m4_)); \
+         uu_ = _mm_add_epi32(uu_, du4_); \
+         vv_ = _mm_add_epi32(vv_, dv4_); \
+      } \
+   } while (0)
+#elif defined(GPU_HAVE_NEON)
+#define TIMING_SPAN_LINES(g, u, v, du, dv, TM_VAL, lines) \
+   do { \
+      static const uint32_t k_lane_[4] = { 0, 1, 2, 3 }; \
+      const uint32x4_t k_   = vld1q_u32(k_lane_); \
+      const uint32x4_t xa_  = vdupq_n_u32((g)->SUCV.TWX_AND); \
+      const uint32x4_t xd_  = vdupq_n_u32((g)->SUCV.TWX_ADD); \
+      const uint32x4_t ya_  = vdupq_n_u32((g)->SUCV.TWY_AND); \
+      const uint32x4_t yd_  = vdupq_n_u32((g)->SUCV.TWY_ADD); \
+      const uint32x4_t m10_ = vdupq_n_u32(1023); \
+      const uint32x4_t m4_  = vdupq_n_u32(~3u); \
+      uint32x4_t uu_ = vmlaq_n_u32(vdupq_n_u32(u), k_, (du)); \
+      uint32x4_t vv_ = vmlaq_n_u32(vdupq_n_u32(v), k_, (dv)); \
+      int h_; \
+      for (h_ = 0; h_ < 2; h_++) \
+      { \
+         uint32x4_t fx_ = vaddq_u32(vandq_u32(vshrq_n_u32(uu_, 24), xa_), xd_); \
+         uint32x4_t fy_ = vaddq_u32(vandq_u32(vshrq_n_u32(vv_, 24), ya_), yd_); \
+         fx_ = vandq_u32(vshlq_u32(fx_, vdupq_n_s32(-(2 - (TM_VAL)))), m10_); \
+         vst1q_u32(&(lines)[h_ * 4], \
+               vandq_u32(vaddq_u32(vshlq_n_u32(fy_, 10), fx_), m4_)); \
+         uu_ = vaddq_u32(uu_, vdupq_n_u32((du) * 4u)); \
+         vv_ = vaddq_u32(vv_, vdupq_n_u32((dv) * 4u)); \
+      } \
+   } while (0)
+#else
+#define TIMING_SPAN_LINES(g, u, v, du, dv, TM_VAL, lines) \
+   do { \
+      int h_; \
+      for (h_ = 0; h_ < 8; h_++) \
+         (lines)[h_] = TIMING_GRO_LINE(g, ((u) + (uint32_t)h_ * (du)) >> 24, \
+               ((v) + (uint32_t)h_ * (dv)) >> 24, TM_VAL); \
+   } while (0)
+#endif
+
+#define DEFINE_TimingSpan(SUFFIX, TM_VAL) \
+static INLINE void TimingSpan_##SUFFIX(PS_GPU *g, uint32_t u, uint32_t v, \
+      uint32_t du, uint32_t dv, int32_t w) \
+{ \
+   uint32_t lines[8]; \
+   while (w > 0) \
+   { \
+      int32_t n = (w < 8) ? w : 8, k; \
+      TIMING_SPAN_LINES(g, u, v, du, dv, TM_VAL, lines); \
+      for (k = 0; k < n; k++) \
+         if (lines[k] != g->last_timing_line) \
+            TimingLine_##SUFFIX(g, lines[k]); \
+      u += du * 8u; \
+      v += dv * 8u; \
+      w -= 8; \
+   } \
+}
+
+DEFINE_TimingSpan(TM0, 0)
+DEFINE_TimingSpan(TM1, 1)
+DEFINE_TimingSpan(TM2, 2)
 
 /* PS_GPU_TexCache_t aliases the nested TexCache_t struct from
  * PS_GPU.  The nested struct is hoisted to file scope in C, so we

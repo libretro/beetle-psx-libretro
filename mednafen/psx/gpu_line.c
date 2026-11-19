@@ -214,7 +214,8 @@ DEFINE_DrawLine(g1_BMaddq_ME1,   1, BMaddq,   1)
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
 #define GPU_LINE_RHI_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT) \
    do { \
-      if (rhi_intf_is_type() == RHI_OPENGL || rhi_intf_is_type() == RHI_VULKAN) \
+      if (GPU_ON_EMU_THREAD(gpu) \
+            && (rhi_intf_is_type() == RHI_OPENGL || rhi_intf_is_type() == RHI_VULKAN)) \
       { \
          rhi_intf_push_line(  (points)[0].x, (points)[0].y, \
                (points)[1].x, (points)[1].y, \
@@ -303,7 +304,12 @@ static void Command_DrawLine_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    if (delta_y >= 512) \
       return; \
    GPU_LINE_RHI_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT); \
-   if (rhi_intf_has_software_renderer()) \
+   if (!GPU_HAS_SW(gpu)) \
+      return; \
+   /* A line costs two per step along its longer axis. */ \
+   if (gpu->role == GPU_ROLE_FRONT) \
+      gpu->DrawTimeAvail -= ((delta_x > delta_y) ? delta_x : delta_y) * 2; \
+   else \
       DrawLine_g##GOURAUD_LIT##_##BM_TAG##_ME##MASKEVAL_LIT(gpu, points); \
 }
 

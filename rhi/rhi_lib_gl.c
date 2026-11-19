@@ -2214,6 +2214,7 @@ static void gl_upload_scratch_free(void)
 }
 #endif
 
+/* sub_data is the rectangle's first pixel, its rows row_len apart. */
 static void gl_texture_set_sub_image_window(
       struct gl_texture *tex,
       uint16_t top_left[2],
@@ -2221,7 +2222,7 @@ static void gl_texture_set_sub_image_window(
       size_t row_len,
       GLenum format,
       GLenum ty,
-      uint16_t* data)
+      const uint16_t *sub_data)
 {
    uint16_t x         = top_left[0];
    uint16_t y         = top_left[1];
@@ -2229,8 +2230,6 @@ static void gl_texture_set_sub_image_window(
    /* Callers split wrap-around VRAM transfers at the 1024x512 seams,
     * so this function always receives a contiguous source and a
     * destination rectangle contained within the texture. */
-   size_t index       = ((size_t) y) * row_len + ((size_t) x);
-   uint16_t* sub_data = &( data[index] );
 
    glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint) row_len);
    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -4051,7 +4050,7 @@ static void gl_renderer_upload_textures(
 #else
          GL_UNSIGNED_SHORT_1_5_5_5_REV,
 #endif
-         pixel_buffer);
+         pixel_buffer + (size_t)top_left[1] * VRAM_WIDTH_PIXELS + top_left[0]);
 
    x_start    = top_left[0];
    x_end      = x_start + dimensions[0];
@@ -4544,7 +4543,7 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
       if (renderer->tracker)
       {
          TTRect _full = { 0, 0, (unsigned)VRAM_WIDTH_PIXELS, (unsigned)VRAM_HEIGHT };
-         texture_tracker_upload(renderer->tracker, _full, GPU_get_vram());
+         texture_tracker_upload(renderer->tracker, _full, GPU_get_vram(), 0);
       }
    }
 
@@ -7310,7 +7309,7 @@ static void gl_defer_dispatch(void *user, const rhi_defer_op_t *op)
                            op->u.load_image.y,
                            op->u.load_image.w,
                            op->u.load_image.h,
-                           op->u.load_image.vram,
+                           op->u.load_image.vram, 0,
                            op->u.load_image.mask_test,
                            op->u.load_image.set_mask);
          break;
@@ -8937,7 +8936,7 @@ void rhi_gl_push_line(
 void rhi_gl_load_image(
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
-      uint16_t *vram,
+      const uint16_t *src, uint32_t stride,
       bool mask_test, bool set_mask)
 {
    gl_renderer *renderer;
@@ -8964,10 +8963,11 @@ void rhi_gl_load_image(
        * appeared after a savestate-load (which replays the entire
        * 1MiB VRAM blob via GPU_RestoreStateP3()). Defer the upload;
        * gl_context_reset's drain will replay it on the live
-       * renderer. The captured `vram` pointer aliases GPU.vram,
-       * which lives for the whole core lifetime - safe to hold. */
+       * renderer. The replay reads GPU.vram, which lives for the
+       * whole core lifetime and by then holds the upload, so even a
+       * source lent for this call alone is not kept. */
       rhi_defer_push_load_image(&gl_defer_queue,
-            x, y, w, h, vram, mask_test, set_mask);
+            x, y, w, h, stride ? GPU_get_vram() : src, mask_test, set_mask);
       return;
    }
 
@@ -9001,7 +9001,9 @@ void rhi_gl_load_image(
                   yi ? 0 : y,
                   widths[xi],
                   heights[yi],
-                  vram,
+                  stride ? src + (size_t)(yi ? heights[0] : 0) * stride
+                        + (xi ? widths[0] : 0) : src,
+                  stride,
                   mask_test,
                   set_mask);
          }
@@ -9018,7 +9020,7 @@ void rhi_gl_load_image(
       TTRect _ntu_rect;
       _ntu_rect.x = x; _ntu_rect.y = y;
       _ntu_rect.width = w; _ntu_rect.height = h;
-      texture_tracker_upload(renderer->tracker, _ntu_rect, vram);
+      texture_tracker_upload(renderer->tracker, _ntu_rect, src, stride);
    }
 
    top_left[0]            = x;
@@ -9035,14 +9037,14 @@ void rhi_gl_load_image(
          &renderer->fb_texture,
          top_left,
          dimensions,
-         (size_t) VRAM_WIDTH_PIXELS,
+         (size_t) RHI_SRC_PITCH(stride),
          GL_RGBA,
 #ifdef HAVE_OPENGLES3
          GL_UNSIGNED_SHORT_5_5_5_1,
 #else
          GL_UNSIGNED_SHORT_1_5_5_5_REV,
 #endif
-         vram);
+         RHI_SRC_ROW(src, stride, x, y, 0));
 
    x_start    = top_left[0];
    x_end      = x_start + dimensions[0];
@@ -9095,7 +9097,7 @@ void rhi_gl_load_image(
     * 5-bit channel to float and the readback rounds it back, so a
     * correct stack returns the exact bytes; a mismatch localises the
     * corruption to the upload/redraw side and names the first pixel. */
-   if (GL_DIAG_ON() && !gl_diag_nested &&
+   if (GL_DIAG_ON() && !gl_diag_nested && !stride &&
        x == 0 && y == 0 && w == VRAM_WIDTH_PIXELS && h == VRAM_HEIGHT)
    {
       uint16_t *again = (uint16_t *)malloc(
@@ -9104,7 +9106,7 @@ void rhi_gl_load_image(
       {
          gl_diag_nested = 1;
          if (rhi_gl_read_vram(0, 0, VRAM_WIDTH_PIXELS, VRAM_HEIGHT, again))
-            gl_diag_compare_vram("RESTORE ROUNDTRIP", vram, again);
+            gl_diag_compare_vram("RESTORE ROUNDTRIP", src, again);
          gl_diag_nested = 0;
          free(again);
       }

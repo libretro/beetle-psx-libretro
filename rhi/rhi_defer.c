@@ -206,7 +206,7 @@ void rhi_defer_push_set_display_mode(rhi_defer_queue_t *q,
 void rhi_defer_push_load_image(rhi_defer_queue_t *q,
                                uint16_t x, uint16_t y,
                                uint16_t w, uint16_t h,
-                               uint16_t *vram,
+                               const uint16_t *vram,
                                bool mask_test, bool set_mask)
 {
    rhi_defer_op_t *op = rhi_defer_alloc_slot(q, RHI_DEFER_LOAD_IMAGE);

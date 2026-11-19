@@ -62,3 +62,8 @@ ever edited in this core.
 - `sh tools/gpu_span/run.sh` - the software rasterizer's textured spans
   against VRAM and frame hashes pinned from the scalar renderer, at 1x, 2x
   and 4x. Needs a built core; runs an ARM build under qemu too.
+- `sh tools/gpu_thread/run.sh` - the GPU thread against the inline
+  renderer: VRAM, pictures, GPUREAD and emulated GPU timing with the thread
+  off, on and switched mid-run, at 1x, 2x and 4x, with PGXP and the "Off"
+  deinterlacer. Needs a built core; build the core and the host with
+  `-fsanitize=thread` (`CC="cc -fsanitize=thread"`) to check the drains.

@@ -1207,7 +1207,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
    /* otherwise complex 480i scenes drop polygons when DrawTimeAvail */ \
    /* hits zero halfway through the frame. */ \
    /* Drawing at an upscale leaves timing to the native walk (COST_LIT). */ \
-   if (((COST_LIT) || !gpu->upscale_shift) \
+   if (((COST_LIT) || GPU_RASTER_CHARGES(gpu)) \
          && (y & ((1UL << POLY_US(gpu, COST_LIT)) - 1)) == 0 \
          && !DfeWouldSkip(gpu, y >> POLY_US(gpu, COST_LIT))) { \
       if ((GOURAUD_LIT) || (TEXTURED_LIT)) \
@@ -1221,7 +1221,9 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
     * cache's timing tags for every textured pixel, nothing drawn. */ \
    if (COST_LIT) \
    { \
-      if (TEXTURED_LIT) \
+      if (TEXTURED_LIT && !pct) \
+         TimingSpan_TM##MO_LIT(gpu, ig.u, ig.v, idl->du_dx, idl->dv_dx, w); \
+      else if (TEXTURED_LIT) \
       { \
          do \
          { \
@@ -1600,7 +1602,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
                break; \
             if (y > clipy1) \
             { \
-               if ((COST_LIT) || !gpu->upscale_shift) \
+               if ((COST_LIT) || GPU_RASTER_CHARGES(gpu)) \
                   gpu->DrawTimeAvail -= 2; \
                continue; \
             } \
@@ -1616,7 +1618,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
                break; \
             if (y < clipy0) \
             { \
-               if ((COST_LIT) || !gpu->upscale_shift) \
+               if ((COST_LIT) || GPU_RASTER_CHARGES(gpu)) \
                   gpu->DrawTimeAvail -= 2; \
                goto skipit_##SUFFIX; \
             } \
@@ -1849,7 +1851,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
           * whose CD byte the GTE carries). The accept rule guarantees a \
           * refused or absent shadow degrades to the architectural bytes, \
           * so the miss path below is today's picture exactly. */ \
-         if (PGXP_LIT && psx_pgxp_fog && psx_pgxp_color && \
+         if (PGXP_LIT && GPU_ON_EMU_THREAD(gpu) && psx_pgxp_fog && psx_pgxp_color && \
              PGXP_GetFog(cb - baseCB, cb, pgxp_pre, pgxp_fc, &pgxp_t)) \
          { \
             /* Depth cue recovered: redo the console's mix HERE, per vertex,
@@ -1886,7 +1888,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
               } \
             } \
          } \
-         else if (PGXP_LIT && PGXP_GetColor(cb - baseCB, cb, pgxp_rgb)) \
+         else if (PGXP_LIT && GPU_ON_EMU_THREAD(gpu) && PGXP_GetColor(cb - baseCB, cb, pgxp_rgb)) \
          { \
             vertices[v].cf[0] = (pgxp_rgb[0] > 0.0f ? pgxp_rgb[0] : 0.0f) / 255.0f; \
             vertices[v].cf[1] = (pgxp_rgb[1] > 0.0f ? pgxp_rgb[1] : 0.0f) / 255.0f; \
@@ -1916,7 +1918,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       if (PGXP_LIT) \
       { \
          OGLVertex vert; \
-         PGXP_GetVertex(cb - baseCB, cb, &vert, 0, 0); \
+         gpu_pgxp_vertex(gpu, cb - baseCB, cb, &vert); \
          vertices[v].precise[0] = ((vert.x + (float)gpu->OffsX) * UPSCALE(gpu)); \
          vertices[v].precise[1] = ((vert.y + (float)gpu->OffsY) * UPSCALE(gpu)); \
          vertices[v].precise[2] = vert.w; \
@@ -2062,6 +2064,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                Extend_UVLimits(gpu, first, 1); \
                Extend_UVLimits(gpu, vertices, 3); \
                Finalise_UVLimits(gpu); \
+               if (GPU_ON_EMU_THREAD(gpu)) \
                rhi_intf_push_quad(first->precise[0], \
                   first->precise[1], \
                   first->precise[2], \
@@ -2109,6 +2112,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             Extend_UVLimits(gpu, verts, 3); \
             Finalise_UVLimits(gpu); \
             /* Push a single triangle */ \
+            if (GPU_ON_EMU_THREAD(gpu)) \
             rhi_intf_push_triangle(verts[0].precise[0], \
                verts[0].precise[1], \
                verts[0].precise[2], \
@@ -2156,7 +2160,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             } \
          } \
       } \
-      if (rhi_intf_has_software_renderer()) \
+      if (GPU_HAS_SW(gpu)) \
       { \
          /* Perspective-correct texturing for the SW rasteriser. \
           * Eligible when this primitive came in through the PGXP \
@@ -2170,9 +2174,12 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          bool pct = (PGXP_LIT) && (TEXTURED_LIT) \
                     && !invalidW \
                     && PGXP_texture_correction_enabled(); \
-         if (gpu->upscale_shift) \
+         /* Timing from the native walk, drawing on whichever instance \
+          * draws: see GPU_RASTER_CHARGES. */ \
+         if (gpu->role == GPU_ROLE_FRONT || GPU_RASTER_WALKS(gpu)) \
             POLY_TIMING_WALK(gpu, vertices, pct, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, MO_LIT, ME_LIT); \
-         DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct); \
+         if (GPU_TOUCHES_VRAM(gpu)) \
+            DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct); \
       } \
       /* Line Render: Overwrite vertices with those of the second triangle */ \
       if ((lineFound) && (NV_LIT == 3) && (TEXTURED_LIT)) \

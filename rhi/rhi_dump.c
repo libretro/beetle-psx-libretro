@@ -37,11 +37,12 @@ static void write_f32(float value)
    filestream_write(file, &value, sizeof(value));
 }
 
-static void write_u16(const uint16_t *values, unsigned w, unsigned h)
+static void write_u16(const uint16_t *values, unsigned pitch,
+      unsigned w, unsigned h)
 {
    unsigned y;
    for (y = 0; y < h; y++)
-      filestream_write(file, values + y * 1024, sizeof(uint16_t) * w);
+      filestream_write(file, values + y * pitch, sizeof(uint16_t) * w);
 }
 
 static void write_i32(int32_t value)
@@ -216,7 +217,7 @@ void rhi_dump_line(const struct rhi_dump_line_data *line)
    write_u32(line->set_mask);
 }
 
-void rhi_dump_load_image(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *vram, bool mask_test, bool set_mask)
+void rhi_dump_load_image(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *src, uint32_t stride, bool mask_test, bool set_mask)
 {
    if (!file)
       return;
@@ -227,7 +228,10 @@ void rhi_dump_load_image(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const u
    write_u32(h);
    write_u32(mask_test);
    write_u32(set_mask);
-   write_u16(vram + y * 1024 + x, w, h);
+   if (stride)
+      write_u16(src, stride, w, h);
+   else
+      write_u16(src + y * 1024 + x, 1024, w, h);
 }
 
 void rhi_dump_fill_rect(uint32_t color, uint16_t x, uint16_t y, uint16_t w, uint16_t h)

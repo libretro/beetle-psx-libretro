@@ -274,10 +274,6 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
             if (T_LIT) \
             { \
                uint16_t fbw; \
-               /* sprites draw at native resolution; at an upscale their \
-                * fetches charge through the native timing tags */ \
-               if (gpu->upscale_shift) \
-                  TimingTexel_TM##MO_LIT(gpu, u_r, v); \
                fbw = GetTexel_TM##MO_LIT(gpu, u_r, v); \
                if (fbw) \
                { \
@@ -309,6 +305,79 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
  * inside `if (T_LIT)` which is dead code), but each named
  * specialisation must exist so the SpriteFlip switch in
  * Command_DrawSprite has a callable target. */
+
+/* What DrawSprite charges DrawTimeAvail, drawing nothing: the same rows,
+ * clipping and line skipping, and for a textured sprite the same texels
+ * through the native timing tags.  The emulation thread's half of a sprite
+ * while the GPU thread draws it; inline at an upscale, the texels alone
+ * (rows false), which DrawSprite charges at 1x through the texture cache
+ * it draws from.  mo is the texture mode, -1 untextured. */
+static void SpriteTiming(PS_GPU *gpu, int32_t x_arg, int32_t y_arg,
+      int32_t w, int32_t h, uint8_t u_arg, uint8_t v_arg, int mo,
+      bool blend_or_mask, bool rows)
+{
+   uint8_t u       = u_arg, v = v_arg;
+   int32_t u_inc   = 1, v_inc = 1;
+   int32_t x_start = x_arg, x_bound = x_arg + w;
+   int32_t y_start = y_arg, y_bound = y_arg + h;
+   int32_t y;
+
+   if (mo >= 0)
+   {
+      if (gpu->SpriteFlip & 0x1000)
+      {
+         u_inc = -1;
+         u    |= 1;
+      }
+      if (gpu->SpriteFlip & 0x2000)
+         v_inc = -1;
+   }
+   if (x_start < gpu->ClipX0)
+   {
+      if (mo >= 0)
+         u += (gpu->ClipX0 - x_start) * u_inc;
+      x_start = gpu->ClipX0;
+   }
+   if (y_start < gpu->ClipY0)
+   {
+      if (mo >= 0)
+         v += (gpu->ClipY0 - y_start) * v_inc;
+      y_start = gpu->ClipY0;
+   }
+   if (x_bound > (gpu->ClipX1 + 1))
+      x_bound = gpu->ClipX1 + 1;
+   if (y_bound > (gpu->ClipY1 + 1))
+      y_bound = gpu->ClipY1 + 1;
+
+   for (y = y_start; y < y_bound; y++)
+   {
+      if (!LineSkipTest(gpu, y))
+      {
+         if (rows && x_bound > x_start && !DfeWouldSkip(gpu, y))
+         {
+            int32_t suck_time = x_bound - x_start;
+            if (blend_or_mask)
+               suck_time += (((x_bound + 1) & ~1) - (x_start & ~1)) >> 1;
+            gpu->DrawTimeAvail -= suck_time;
+         }
+         if (mo >= 0 && x_bound > x_start)
+         {
+            /* u steps by u_inc in the top byte, wrapping as a uint8_t */
+            const uint32_t uf  = (uint32_t)u << 24;
+            const uint32_t vf  = (uint32_t)v << 24;
+            const uint32_t duf = (uint32_t)u_inc << 24;
+            switch (mo)
+            {
+               case 0:  TimingSpan_TM0(gpu, uf, vf, duf, 0, x_bound - x_start); break;
+               case 1:  TimingSpan_TM1(gpu, uf, vf, duf, 0, x_bound - x_start); break;
+               default: TimingSpan_TM2(gpu, uf, vf, duf, 0, x_bound - x_start); break;
+            }
+         }
+      }
+      if (mo >= 0)
+         v += v_inc;
+   }
+}
 
 #define DRAWSPRITE_T0_BMGROUP(FX, FY) \
    DEFINE_DrawSprite(T0_BMopaque_TM0_MO0_ME0_FX##FX##_FY##FY, 0, -1, BMopaque, 0, 0, 0, FX, FY) \
@@ -418,7 +487,8 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
          else \
             blend_mode = BLEND_MODE_ADD; \
       } \
-      if (rhi_intf_is_type() == RHI_OPENGL || rhi_intf_is_type() == RHI_VULKAN) \
+      if (GPU_ON_EMU_THREAD(gpu) \
+            && (rhi_intf_is_type() == RHI_OPENGL || rhi_intf_is_type() == RHI_VULKAN)) \
       { \
          rhi_intf_push_quad(  (x),                    /* p0x */ \
                               (y),                    /* p0y */ \
@@ -542,8 +612,16 @@ static void Command_DrawSprite_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    x = sign_x_to_s32(11, x + gpu->OffsX); \
    y = sign_x_to_s32(11, y + gpu->OffsY); \
    GPU_SPR_RHI_PUSH_HOOK(gpu, x, y, w, h, u, v, color, clut, T_LIT, TM_LIT, MO_LIT, BM_VAL, ME_LIT); \
-   if (!rhi_intf_has_software_renderer()) \
+   if (!GPU_HAS_SW(gpu)) \
       return; \
+   if (gpu->role == GPU_ROLE_FRONT) \
+   { \
+      SpriteTiming(gpu, x, y, w, h, u, v, (T_LIT) ? (MO_LIT) : -1, \
+            ((BM_VAL) >= 0) || (ME_LIT), true); \
+      return; \
+   } \
+   if ((T_LIT) && GPU_RASTER_WALKS(gpu)) \
+      SpriteTiming(gpu, x, y, w, h, u, v, (MO_LIT), false, false); \
    SPR_DISPATCH_DRAW(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT) \
 }
 

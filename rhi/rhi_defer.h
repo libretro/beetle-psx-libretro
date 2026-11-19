@@ -139,7 +139,8 @@ typedef struct
          uint16_t  y;
          uint16_t  w;
          uint16_t  h;
-         uint16_t *vram;
+         /* VRAM, read when the upload is replayed */
+         const uint16_t *vram;
          bool      mask_test;
          bool      set_mask;
       } load_image;
@@ -228,7 +229,7 @@ void rhi_defer_push_set_display_mode(rhi_defer_queue_t *q,
 void rhi_defer_push_load_image(rhi_defer_queue_t *q,
                                uint16_t x, uint16_t y,
                                uint16_t w, uint16_t h,
-                               uint16_t *vram,
+                               const uint16_t *vram,
                                bool mask_test, bool set_mask);
 
 void rhi_defer_push_toggle_display(rhi_defer_queue_t *q, bool status);
