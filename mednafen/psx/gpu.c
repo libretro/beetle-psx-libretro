@@ -382,13 +382,13 @@ static void texel_put(PS_GPU *g, uint32_t x, uint32_t y, uint16_t v)
  * reason as texel_put above. */
 static void GPU_set_upscale_shift(uint8_t factor)
 {
-   unsigned i;
-   /* Leaving 1x, timing takes over the tags the texture cache had */
-   if (factor && !GPU.upscale_shift)
-      for (i = 0; i < 256; i++)
-         GPU.TexCacheTimingTag[i] = GPU.TexCache[i].Tag;
-   GPU.last_timing_line = ~0U;
    GPU.upscale_shift = factor;
+   gpu_set_role(&GPU, GPU.role);
+}
+
+/* Who charges timing, after the renderer or PGXP changed */
+void GPU_RefreshTiming(void)
+{
    gpu_set_role(&GPU, GPU.role);
 }
 

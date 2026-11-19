@@ -443,6 +443,8 @@ int GPU_StateAction(StateMem *sm, int load, int data_only);
  * software renderer or framebuffer, and nothing reading the picture line
  * by line. */
 void     GPU_ThreadSelect(int lanes);
+/* Who charges emulated draw time, after the renderer or PGXP changed */
+void     GPU_RefreshTiming(void);
 /* After the frame's emulation: a software-rendered frame waits for its
  * picture; the GPU renderers' frames hand over what is pending. */
 void     GPU_ThreadFrameEnd(void);

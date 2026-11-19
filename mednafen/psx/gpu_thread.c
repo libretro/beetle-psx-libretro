@@ -961,7 +961,7 @@ void GPU_ThreadSelect(int lanes)
 {
    static int      cores = -1;
    static int      asked;
-   unsigned        i, want_lanes;
+   unsigned        want_lanes;
 
    /* Without a software renderer or framebuffer there is nothing to draw.
     * Fast physical cores: one for each thread; without the topology (the
@@ -993,11 +993,6 @@ void GPU_ThreadSelect(int lanes)
       if (!gpu_thread)
          return;
       gpu_lanes_forced = lanes > 0;
-      /* Inline at 1x the texture cache's own tags were the timing tags */
-      if (!GPU.upscale_shift)
-         for (i = 0; i < 256; i++)
-            GPU.TexCacheTimingTag[i] = GPU.TexCache[i].Tag;
-      GPU.last_timing_line = ~0U;
       gpu_set_role(&GPU, GPU_ROLE_FRONT);
       gpu_back_stale       = true;
    }

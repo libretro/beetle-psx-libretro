@@ -4,7 +4,8 @@
 # off, on, switched on and off mid-run, and with 2, 3 and 4 band lanes, at
 # 1x, 2x and 4x, with PGXP
 # off and on, with the 480i "Off" deinterlacer, and with light guns and
-# their crosshairs on both ports (see gpu_thread_test.c).
+# their crosshairs on both ports (see gpu_thread_test.c); and that PGXP,
+# which draws other vertices and texels, leaves the GPU's timing alone.
 # Runs against an already built core; for an ARM build,
 # CC=aarch64-linux-gnu-gcc RUN="qemu-aarch64 -L /usr/aarch64-linux-gnu".
 #
@@ -46,6 +47,18 @@ for cfg in "1x nopgxp" "2x nopgxp" "4x nopgxp" "1x pgxp" "2x pgxp" \
            "2x pgxp gun"; do
    set -- $cfg
    ref="$(cd "$WORK" && ${RUN:-} "$HOST" "$CORE" "$1" off $2 $3 $4)" || { fail=1; continue; }
+   # the waits for the GPU, without and with PGXP
+   if [ "$2 $3" = "nopgxp " ]; then
+      eval "waits_$1=\${ref##* }"
+   elif [ "$2 $3" = "pgxp " ]; then
+      eval "base=\$waits_$1"
+      if [ "${ref##* }" = "$base" ]; then
+         echo "[gpu_thread] $1 timing with PGXP: ${ref##* } OK"
+      else
+         echo "[gpu_thread] $1 timing with PGXP: ${ref##* }, without $base FAIL"
+         fail=1
+      fi
+   fi
    for mode in on toggle 2 3 4; do
       got="$(cd "$WORK" && ${RUN:-} "$HOST" "$CORE" "$1" $mode $2 $3 $4)" || got="(failed)"
       if [ "$got" = "$ref" ]; then

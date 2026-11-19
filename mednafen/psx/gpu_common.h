@@ -294,21 +294,43 @@ void GPU_NoteModulate(int idx_r, int idx_g, int idx_b);
    ModTexelRaw(dither_offset, texel, r, g, b)
 #endif
 
-/* The rasterizer charges DrawTimeAvail itself only inline at 1x.  Inline
- * at an upscale the native timing walk charges instead, and with the GPU
- * thread the emulation thread's walk does, so the GPU thread's drawing
+/* The rasterizer charges DrawTimeAvail itself only inline at 1x, drawing
+ * what the hardware draws.  Inline at an upscale, or drawing PGXP's
+ * sub-pixel vertices or perspective-correct texels, the native timing walk
+ * charges instead, of the vertices and texels the hardware gets; with the
+ * GPU thread the emulation thread's walk does, so the GPU thread's drawing
  * never charges. */
 #define GPU_TIMING_NONE   0   /* FRONT walks, BACK draws without timing */
-#define GPU_TIMING_RASTER 1   /* inline at 1x */
-#define GPU_TIMING_WALK   2   /* inline at an upscale */
+#define GPU_TIMING_RASTER 1   /* inline at 1x, drawing as the hardware */
+#define GPU_TIMING_WALK   2   /* inline otherwise */
 #define GPU_RASTER_CHARGES(g) ((g)->timing == GPU_TIMING_RASTER)
 #define GPU_RASTER_WALKS(g)   ((g)->timing == GPU_TIMING_WALK)
 
+/* Whether the software rasterizer draws other vertices or texels than the
+ * hardware: PGXP's under the software renderer, or perspective-correct */
+static INLINE bool gpu_draws_enhanced(void)
+{
+   return PGXP_enabled() && (rhi_intf_is_type() == RHI_SOFTWARE
+         || PGXP_texture_correction_enabled());
+}
+
+/* Role and, from it, the scale and PGXP, who charges timing.  The walk
+ * takes over the texture cache's tags as its timing tags when the
+ * rasterizer stops charging. */
 static INLINE void gpu_set_role(PS_GPU *g, uint8_t role)
 {
+   const uint8_t timing = (role != GPU_ROLE_INLINE) ? GPU_TIMING_NONE
+      : (g->upscale_shift || gpu_draws_enhanced()) ? GPU_TIMING_WALK
+      : GPU_TIMING_RASTER;
+   if (g->timing == GPU_TIMING_RASTER && timing != GPU_TIMING_RASTER)
+   {
+      unsigned i;
+      for (i = 0; i < 256; i++)
+         g->TexCacheTimingTag[i] = g->TexCache[i].Tag;
+      g->last_timing_line = ~0U;
+   }
    g->role   = role;
-   g->timing = (role != GPU_ROLE_INLINE) ? GPU_TIMING_NONE
-      : g->upscale_shift ? GPU_TIMING_WALK : GPU_TIMING_RASTER;
+   g->timing = timing;
 }
 /* Whether a software renderer or framebuffer keeps VRAM.  The GPU thread
  * runs only when one does, and does not read the renderer's settings,

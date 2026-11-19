@@ -2102,6 +2102,9 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    do \
    { \
       enum blending_modes blend_mode = BLEND_MODE_AVERAGE; \
+      /* The vertices the hardware gets, which timing walks */ \
+      tri_vertex  walk_vertices[3]; \
+      tri_vertex *walk = vertices; \
       if (TEXTURED_LIT) \
       { \
          if (TM_LIT) \
@@ -2222,6 +2225,8 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          if (PGXP_LIT) \
          { \
             uint32_t i; \
+            memcpy(walk_vertices, vertices, sizeof(walk_vertices)); \
+            walk = walk_vertices; \
             for (i = 0; i < 3; ++i) \
             { \
                vertices[i].x = vertices[i].precise[0]; \
@@ -2247,7 +2252,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
           * draws: see GPU_RASTER_CHARGES.  Without a software renderer \
           * nothing draws, and the walk charges what drawing would. */ \
          if (gpu->role == GPU_ROLE_FRONT || GPU_RASTER_WALKS(gpu) || !sw) \
-            POLY_TIMING_WALK(gpu, vertices, pct, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, MO_LIT, ME_LIT); \
+            POLY_TIMING_WALK(gpu, walk, false, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, MO_LIT, ME_LIT); \
          if (sw) \
          { \
             if (GPU_FP(gpu)) \

@@ -7139,6 +7139,7 @@ void retro_run(void)
    /* A light gun samples the picture line by line as it is scanned out:
     * each line it reads waits for the GPU thread, which costs more than the
     * thread gains unless a lane count is chosen */
+   GPU_RefreshTiming();
    GPU_ThreadSelect(psx_gpu_thread < 0 && FrontIO_ReadsScanout(PSX_FIO)
          ? 0 : psx_gpu_thread);
    GPU_StartFrame(espec);

@@ -1,14 +1,11 @@
 #!/bin/sh
-# Emulated GPU timing lanes for the hardware renderers: the GPU's busy time
-# a game sees does not depend on the renderer or on the Software
-# Framebuffer option. Content is the gpu_thread probe
-# (tools/gpu_thread/gpu_thread_test.c), which counts its waits for the
-# GPU's DMA into RAM; every lane must count what the software renderer
-# counts. With PGXP the software renderer draws, and charges, sub-pixel
-# geometry, so there the lanes must count what OpenGL with the software
-# framebuffer on counts.
+# Emulated GPU timing lanes: the GPU's busy time a game sees does not
+# depend on the renderer, the Software Framebuffer option or PGXP. Content
+# is the gpu_thread probe (tools/gpu_thread/gpu_thread_test.c), which
+# counts its waits for the GPU's DMA into RAM; every lane must count what
+# the software renderer without PGXP counts.
 #
-#   sw         software renderer
+#   sw         software renderer, without and with PGXP
 #   gl*, vk*   OpenGL and Vulkan, software framebuffer on and off, at 1x
 #              and 2x, with and without PGXP
 #
@@ -54,6 +51,7 @@ ON="${P}_renderer_software_fb=enabled"
 PGXP="${P}_pgxp_mode=memory only;${P}_pgxp_texture=enabled"
 X2="${P}_internal_resolution=2x"
 gl sw        "${P}_renderer=software"
+gl swpgxp    "${P}_renderer=software;$PGXP"
 gl gl_on     "$ON"
 gl gl_off    "$OFF"
 gl gl_off2x  "$OFF;$X2"
@@ -80,7 +78,7 @@ check()
       fi
    done
 }
-check sw gl_on gl_off gl_off2x vk_on vk_off vk_off2x
-check gl_onpgxp gl_offpgxp vk_offpgxp
+check sw swpgxp gl_on gl_off gl_off2x vk_on vk_off vk_off2x gl_onpgxp \
+   gl_offpgxp vk_offpgxp
 [ "$fail" = 0 ] && echo "timing_lanes: PASS" || echo "timing_lanes: FAIL"
 exit $fail
