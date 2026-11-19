@@ -570,6 +570,11 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
  * emulated GPU timing is the same at every internal resolution and
  * whichever thread draws.  TimingLine is one fetch from the cache line at
  * gro_line. */
+/* The texture cache entry a cache line maps to */
+#define TIMING_LINE_IDX(line, TM_VAL) (((TM_VAL) == 0) \
+   ? ((((line) >> 2) & 0x3) | (((line) >> 8) & 0xFC)) \
+   : ((((line) >> 2) & 0x7) | (((line) >> 7) & 0xF8)))
+
 #define DEFINE_TimingLine(SUFFIX, TM_VAL) \
 static INLINE void TimingLine_##SUFFIX(PS_GPU *g, uint32_t gro_line) \
 { \
@@ -577,9 +582,7 @@ static INLINE void TimingLine_##SUFFIX(PS_GPU *g, uint32_t gro_line) \
    if (g->last_timing_line == gro_line) \
       return; \
    g->last_timing_line = gro_line; \
-   idx = ((TM_VAL) == 0) \
-      ? (((gro_line >> 2) & 0x3) | ((gro_line >> 8) & 0xFC)) \
-      : (((gro_line >> 2) & 0x7) | ((gro_line >> 7) & 0xF8)); \
+   idx = TIMING_LINE_IDX(gro_line, TM_VAL); \
    if (g->TexCacheTimingTag[idx] != gro_line) \
    { \
       g->DrawTimeAvail -= 4; \
@@ -673,22 +676,111 @@ DEFINE_TimingTexel(TM2, 2)
    } while (0)
 #endif
 
+/* Bit k of the result is set where lines[k] differs from the line before
+ * it, prev for k = 0. */
+#if defined(__SSE2__)
+#define TIMING_SPAN_CHANGES(lines, prev, mask) \
+   do { \
+      const __m128i l0_ = _mm_loadu_si128((const __m128i*)&(lines)[0]); \
+      const __m128i l1_ = _mm_loadu_si128((const __m128i*)&(lines)[4]); \
+      const __m128i p0_ = _mm_or_si128(_mm_slli_si128(l0_, 4), \
+            _mm_cvtsi32_si128((int)(prev))); \
+      const __m128i p1_ = _mm_or_si128(_mm_slli_si128(l1_, 4), \
+            _mm_srli_si128(l0_, 12)); \
+      (mask) = 0xFFu ^ (uint32_t)(_mm_movemask_ps(_mm_castsi128_ps( \
+               _mm_cmpeq_epi32(l0_, p0_))) \
+            | (_mm_movemask_ps(_mm_castsi128_ps( \
+               _mm_cmpeq_epi32(l1_, p1_))) << 4)); \
+   } while (0)
+#elif defined(GPU_HAVE_NEON)
+#define TIMING_SPAN_CHANGES(lines, prev, mask) \
+   do { \
+      static const uint32_t b0_[4] = { 1, 2, 4, 8 }; \
+      static const uint32_t b1_[4] = { 16, 32, 64, 128 }; \
+      const uint32x4_t l0_ = vld1q_u32(&(lines)[0]); \
+      const uint32x4_t l1_ = vld1q_u32(&(lines)[4]); \
+      const uint32x4_t e0_ = vceqq_u32(l0_, \
+            vextq_u32(vdupq_n_u32(prev), l0_, 3)); \
+      const uint32x4_t e1_ = vceqq_u32(l1_, vextq_u32(l0_, l1_, 3)); \
+      const uint32x4_t b_  = vorrq_u32(vandq_u32(e0_, vld1q_u32(b0_)), \
+            vandq_u32(e1_, vld1q_u32(b1_))); \
+      const uint32x2_t s_  = vorr_u32(vget_low_u32(b_), vget_high_u32(b_)); \
+      (mask) = 0xFFu ^ (vget_lane_u32(s_, 0) | vget_lane_u32(s_, 1)); \
+   } while (0)
+#else
+#define TIMING_SPAN_CHANGES(lines, prev, mask) \
+   do { \
+      uint32_t p_ = (prev); \
+      int k_; \
+      (mask) = 0; \
+      for (k_ = 0; k_ < 8; k_++) \
+      { \
+         (mask) |= (uint32_t)((lines)[k_] != p_) << k_; \
+         p_ = (lines)[k_]; \
+      } \
+   } while (0)
+#endif
+
+/* The lowest set bit's index, for a bit of an 8-bit mask */
+#define TIMING_LOW_BIT(m) \
+   ("\0\1\2\4\7\3\6\5"[((((m) & (0u - (m))) * 0x17u) & 0xFFu) >> 5])
+
+/* Only the texels whose line differs from the one before look the tag up;
+ * misses are counted and charged once at the end of the span.  A span
+ * stepping half a texel down or half a cache line across per pixel changes
+ * line on most texels, so it checks every changed lane without branching;
+ * other spans visit the changed lanes only. */
 #define DEFINE_TimingSpan(SUFFIX, TM_VAL) \
 static INLINE void TimingSpan_##SUFFIX(PS_GPU *g, uint32_t u, uint32_t v, \
       uint32_t du, uint32_t dv, int32_t w) \
 { \
    uint32_t lines[8]; \
+   uint32_t last   = g->last_timing_line; \
+   int32_t  misses = 0; \
+   const uint32_t adu = ((int32_t)du < 0) ? 0u - du : du; \
+   const uint32_t adv = ((int32_t)dv < 0) ? 0u - dv : dv; \
+   const int dense = adv >= (1u << 23) || adu >= (1u << (27 - (TM_VAL))); \
    while (w > 0) \
    { \
-      int32_t n = (w < 8) ? w : 8, k; \
+      uint32_t mask; \
+      int32_t  n = (w < 8) ? w : 8; \
       TIMING_SPAN_LINES(g, u, v, du, dv, TM_VAL, lines); \
-      for (k = 0; k < n; k++) \
-         if (lines[k] != g->last_timing_line) \
-            TimingLine_##SUFFIX(g, lines[k]); \
+      TIMING_SPAN_CHANGES(lines, last, mask); \
+      mask &= (1u << n) - 1u; \
+      if (dense) \
+      { \
+         int32_t k; \
+         for (k = 0; k < n; k++) \
+         { \
+            const uint32_t line = lines[k]; \
+            const uint32_t idx  = TIMING_LINE_IDX(line, TM_VAL); \
+            const uint32_t t    = g->TexCacheTimingTag[idx]; \
+            const uint32_t d    = (t ^ line) & (0u - ((mask >> k) & 1u)); \
+            misses += (d != 0); \
+            g->TexCacheTimingTag[idx] = t ^ d; \
+         } \
+      } \
+      else \
+      { \
+         while (mask) \
+         { \
+            const uint32_t line = lines[(int)TIMING_LOW_BIT(mask)]; \
+            const uint32_t idx  = TIMING_LINE_IDX(line, TM_VAL); \
+            mask &= mask - 1u; \
+            if (g->TexCacheTimingTag[idx] != line) \
+            { \
+               misses++; \
+               g->TexCacheTimingTag[idx] = line; \
+            } \
+         } \
+      } \
+      last = lines[n - 1]; \
       u += du * 8u; \
       v += dv * 8u; \
       w -= 8; \
    } \
+   g->last_timing_line  = last; \
+   g->DrawTimeAvail    -= misses * 4; \
 }
 
 DEFINE_TimingSpan(TM0, 0)
