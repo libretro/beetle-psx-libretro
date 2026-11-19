@@ -20,9 +20,10 @@ typedef struct SimpleFIFO
    uint32_t in_count;
 } SimpleFIFO;
 
+/* Cleared: savestates save the whole ring, unwritten bytes included */
 static INLINE bool SimpleFIFO_Init(SimpleFIFO *f, uint32_t the_size)
 {
-   f->data = (uint8_t *)malloc(the_size * sizeof(uint8_t));
+   f->data = (uint8_t *)calloc(the_size, sizeof(uint8_t));
    if (!f->data)
    {
       f->size      = 0;

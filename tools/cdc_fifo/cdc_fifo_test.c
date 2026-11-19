@@ -5,6 +5,7 @@
  * sectors, byte reads through the data port, word reads by the DMA,
  * flushes - at every alignment and across the ring's wrap, and checks
  * each byte, each word and the ring's counters against a plain model.
+ * A new FIFO must hold zeros, whatever the heap held before.
  * Words whose top byte is 0x80 or more are read on both the one-load path
  * and the byte path; built with -fsanitize=undefined, a byte shifted as
  * an int into bit 31 fails the run.
@@ -75,8 +76,23 @@ int main(int argc, char **argv)
    unsigned long words = 0, slow_high = 0;
    uint32_t      i;
 
+   /* A new FIFO holds zeros: savestates save all of it, so what the heap
+    * held before must not show.  The allocator hands the block freed here
+    * back to the FIFO. */
+   {
+      volatile uint8_t *junk = (volatile uint8_t *)malloc(FIFO_SIZE);
+      if (junk)
+      {
+         for (i = 0; i < FIFO_SIZE; i++)
+            junk[i] = 0xAA;
+         free((void *)junk);
+      }
+   }
    if (!SimpleFIFO_Init(&f, FIFO_SIZE))
       return fail("init", 0);
+   for (i = 0; i < FIFO_SIZE; i++)
+      if (f.data[i])
+         return fail("new FIFO not cleared", 0);
 
    /* Directed: a sector of 0xFF bytes written three bytes short of the
     * wrap, read back as words across it */
