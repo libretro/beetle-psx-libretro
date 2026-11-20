@@ -444,6 +444,9 @@ static uint16_t SPUControl;
 extern bool psx_spu_silent_voice_opt;
 
 static uint32_t VoiceOn;
+/* Voices the silent-voice skip passed: nothing runs for them, so they stay
+ * as they are until a register write, a state or power changes them */
+static uint32_t SilentVoices;
 static uint32_t VoiceOff;
 
 static uint32_t BlockEnd;
@@ -481,6 +484,7 @@ static INLINE void SPU_WR_RVB(uint16_t raw_offs, int16_t sample);
 {
    int i;
    clock_divider = 768;
+   SilentVoices  = 0;
 
    memset(SPURAM, 0, sizeof(SPURAM));
 
@@ -1269,6 +1273,7 @@ static INLINE void SPU_RunNoise(void)
       int32_t reverb[2];
 
       uint32_t PhaseModCache;
+      uint32_t silent, pending;
       int voice_num;
       unsigned lr;
 
@@ -1283,6 +1288,8 @@ static INLINE void SPU_RunNoise(void)
        * one round-trip to that stack location per sample. */
 
       PhaseModCache = FM_Mode & ~ 1;
+      silent = (psx_spu_silent_voice_opt && !(SPUControl & 0x40))
+         ? SilentVoices : 0;
       /*
        **
        ** 0x1F801DAE Notes and Conjecture:
@@ -1315,12 +1322,24 @@ static INLINE void SPU_RunNoise(void)
       if(regs.Regs[0xD6] == 0x4)	/* TODO: Investigate more(case 0x2C in global regs r/w handler) */
          regs.s.global.s.SPUStatus |= (CWA & 0x100) ? 0x800 : 0x000;
 
-      for(voice_num = 0; voice_num < 24; voice_num++)
+      /* The voices with something to do: all but the silent ones, and the
+       * silent voices 1 and 3, whose capture buffers are still written,
+       * in voice order */
+      pending = (~silent & 0xFFFFFFu) | (silent & 0xAu);
+      for(voice_num = 0; pending; voice_num++, pending >>= 1)
       {
          SPU_Voice *voice = &Voices[voice_num];
          int32_t voice_pvs;
          int l, r;
          int lr;
+
+         if (!(pending & 1))
+            continue;
+         if (silent & (1U << voice_num))
+         {
+            SPU_WriteSPURAM(0x400 | ((voice_num >> 1) * 0x200) | CWA, 0);
+            continue;
+         }
 
          /* A voice whose envelope has fully released contributes zero
           * to every accumulator, so the decoder, the interpolation
@@ -1353,11 +1372,13 @@ static INLINE void SPU_RunNoise(void)
              !(Noise_Mode & (1 << voice_num)))
          {
             voice->PreLRSample = 0;
+            SilentVoices |= 1U << voice_num;
             if(voice_num == 1 || voice_num == 3)
                SPU_WriteSPURAM(0x400 | ((voice_num >> 1) * 0x200) | CWA, 0);
             continue;
          }
 
+         SilentVoices &= ~(1U << voice_num);
          voice->PreLRSample = 0;
 
 
@@ -1696,6 +1717,7 @@ void SPU_Init(void)
   void SPU_Write(int32_t timestamp, uint32_t A, uint16_t V)
 {
    A &= 0x3FF;
+   SilentVoices = 0;
 
    if(A >= 0x200)
    {
@@ -2057,6 +2079,7 @@ void SPU_Init(void)
    if(load)
    {
       unsigned i;
+      SilentVoices = 0;
       for(i = 0; i < 24; i++)
       {
          Voices[i].DecodeReadPos &= 0x1F;
