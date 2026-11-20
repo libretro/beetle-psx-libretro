@@ -69,6 +69,7 @@
 #include "dma.h"
 #include "psx_events.h"
 #include "FastFIFO.h"
+#include "mdec_idct.h"
 
 #if defined(__SSE2__)
 #include <xmmintrin.h>
@@ -105,6 +106,9 @@ static uint8_t QMatrix[2][64];
 static uint32_t QMIndex;
 
 MDFN_ALIGN(16) static int16_t IDCTMatrix[64];
+/* IDCTMatrix as the IDCT takes it, rebuilt when that changes */
+static mdec_idct_matrix IDCTPrepared;
+static bool IDCTStale = true;
 static uint32_t IDCTMIndex;
 
 static uint8_t QScale;
@@ -163,6 +167,7 @@ void MDEC_Power(void)
 
    memset(IDCTMatrix, 0, sizeof(IDCTMatrix));
    IDCTMIndex = 0;
+   IDCTStale  = true;
 
    QScale = 0;
 
@@ -236,6 +241,7 @@ int MDEC_StateAction(StateMem *sm, int load, int data_only)
    {
       FastFIFO_SaveStatePostLoad(&InFIFO);
       FastFIFO_SaveStatePostLoad(&OutFIFO);
+      IDCTStale = true;
 
       PixelBufferCount32 %= (sizeof(PixelBuffer.pix32) / sizeof(PixelBuffer.pix32[0])) + 1;
    }
@@ -256,85 +262,14 @@ static INLINE int8_t Mask9ClampS8(int32_t v)
    return v;
 }
 
-/* Two specialized IDCT 1-D pass functions.
- * The pass-1 (int16) variant writes the result transposed to feed pass-2;
- * pass-2 (int8) writes non-transposed and saturates through Mask9ClampS8. */
-static void IDCT_1D_Pass1(const int16_t *in_coeff, int16_t *out_coeff)
+static INLINE void IDCT(const int16_t *in_coeff, int8_t *out_coeff)
 {
-   unsigned col, x;
-
-   for (col = 0; col < 8; col++)
+   if (IDCTStale)
    {
-#if defined(__SSE2__)
-      __m128i c =  _mm_load_si128((const __m128i *)&in_coeff[(col * 8)]);
-#endif
-
-      for (x = 0; x < 8; x++)
-      {
-#ifdef __SSE2__
-         MDFN_ALIGN(16) int32_t tmp[4];
-         __m128i m   = _mm_load_si128((__m128i *)&IDCTMatrix[(x * 8)]);
-         __m128i sum = _mm_madd_epi16(m, c);
-         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (3 << 0) | (2 << 2) | (1 << 4) | (0 << 6)));
-         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (1 << 0) | (0 << 2)));
-
-         _mm_store_si128((__m128i*)tmp, sum);
-
-         out_coeff[(x * 8) + col] = (tmp[0] + 0x4000) >> 15;
-#else
-         int32_t sum = 0;
-         unsigned u;
-
-         for (u = 0; u < 8; u++)
-            sum += (in_coeff[(col * 8) + u] * IDCTMatrix[(x * 8) + u]);
-
-         out_coeff[(x * 8) + col] = (sum + 0x4000) >> 15;
-#endif
-      }
+      mdec_idct_prepare(&IDCTPrepared, IDCTMatrix);
+      IDCTStale = false;
    }
-}
-
-static void IDCT_1D_Pass2(const int16_t *in_coeff, int8_t *out_coeff)
-{
-   unsigned col, x;
-
-   for (col = 0; col < 8; col++)
-   {
-#if defined(__SSE2__)
-      __m128i c =  _mm_load_si128((const __m128i *)&in_coeff[(col * 8)]);
-#endif
-
-      for (x = 0; x < 8; x++)
-      {
-#ifdef __SSE2__
-         MDFN_ALIGN(16) int32_t tmp[4];
-         __m128i m   = _mm_load_si128((__m128i *)&IDCTMatrix[(x * 8)]);
-         __m128i sum = _mm_madd_epi16(m, c);
-         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (3 << 0) | (2 << 2) | (1 << 4) | (0 << 6)));
-         sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (1 << 0) | (0 << 2)));
-
-         _mm_store_si128((__m128i*)tmp, sum);
-
-         out_coeff[(col * 8) + x] = Mask9ClampS8((tmp[0] + 0x4000) >> 15);
-#else
-         int32_t sum = 0;
-         unsigned u;
-
-         for (u = 0; u < 8; u++)
-            sum += (in_coeff[(col * 8) + u] * IDCTMatrix[(x * 8) + u]);
-
-         out_coeff[(col * 8) + x] = Mask9ClampS8((sum + 0x4000) >> 15);
-#endif
-      }
-   }
-}
-
-static void IDCT(int16_t *in_coeff, int8_t *out_coeff)
-{
-   MDFN_ALIGN(16) int16_t tmpbuf[64];
-
-   IDCT_1D_Pass1(in_coeff, tmpbuf);
-   IDCT_1D_Pass2(tmpbuf, out_coeff);
+   mdec_idct(&IDCTPrepared, in_coeff, out_coeff);
 }
 
 static INLINE void YCbCr_to_RGB(const int8_t y, const int8_t cb, const int8_t cr, int *r, int *g, int *b)
@@ -869,6 +804,7 @@ void MDEC_Run(int32_t clocks)
                for(i = 0; i < 2; i++)
                {
                   IDCTMatrix[((IDCTMIndex & 0x7) << 3) | ((IDCTMIndex >> 3) & 0x7)] = (int16_t)(tfr & 0xFFFF) >> 3;
+                  IDCTStale = true;
                   IDCTMIndex = (IDCTMIndex + 1) & 0x3F;
 
                   tfr >>= 16;
