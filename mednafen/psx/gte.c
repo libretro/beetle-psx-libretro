@@ -1372,54 +1372,10 @@ static INLINE void TransformDQ(int64_t h_div_sz)
    SET_IR(0, Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12));
 }
 
-/* Turn the raw 44-bit Z accumulator into the float W the PGXP shadow uses
- * for perspective correction.
- *
- * The architectural SZ3 is Lm_D(acc >> 12) stored through a uint16_t, i.e.
- * integer-truncated and saturated to [0, 0xFFFF].  Reading W back out of
- * Z_FIFO(3), as this code used to, therefore threw away every fractional bit
- * of the transform for no reason: the exact value is still sitting in the
- * accumulator one line above the store.  This is not a new deviation from
- * the integer pipeline either - precise_h_div_sz has always been a true
- * divide rather than the GTE's reciprocal table, so precise_x/y already
- * depart from the architectural result deliberately.  All this does is make
- * x, y and w derive from one exact Z instead of a truncated one.
- *
- * Scope, measured rather than assumed.  Both ends of the range are pinned by
- * clamps that this patch leaves alone, so the affected band is exactly
- * z in (H/2, 0xFFFF):
- *
- *   - Below H/2 the float_max floor dominates and the result is bit-identical
- *     to before.  The floor mirrors Divide()'s own overflow behaviour, so the
- *     near-camera case people usually reach for as the motivating example is
- *     in fact a strict no-op here.
- *   - Above 0xFFFF the ceiling is kept on purpose.  Lifting it is a separate
- *     and genuinely behavioural change: past saturation the shadow would stop
- *     disagreeing with the architectural screen coordinates by fractions of a
- *     pixel and start disagreeing by tens of pixels, which is a different risk
- *     class (the 2D-tolerance heuristic, and any game that clipped against its
- *     own saturated result).  That wants its own patch and its own per-game
- *     testing.
- *
- * Inside the band the recovered fraction is worth at most 2/H in relative W
- * error, peaking just past the floor and decaying as 1/z.  For H = 320 that
- * is 0.62% at z ~ 161, which is about one screen pixel of vertex placement
- * error at the edge of a 320-wide frame; by z = 1000 it is under a tenth of
- * a pixel.  Modest, but sub-pixel vertex placement is the entire point of
- * PGXP, so a whole pixel near the clip plane is on-mission.
- *
- * acc is sign-extended to 44 bits by A_MV, so (double)acc is exact (44 < 53
- * mantissa bits) and scaling by 2^-12 is exact as well - verified over 40M
- * random 44-bit accumulators.  The conversion introduces no rounding of its
- * own and is bit-identical across arch, FPU mode and optimisation level; it
- * cannot become a determinism divergence the way a recomputed floating-point
- * transform could.  W moves by at most one SZ3 unit at any vertex (the bound
- * is 1.0 and is attained, not approached: a z just under an integer can round
- * up to it in the narrowing to float).
- *
- * Pre-existing and untouched: H == 0 with a non-positive Z still yields
- * precise_z == 0 and a non-finite precise_h_div_sz downstream, exactly as
- * before.  Fixing that is orthogonal to this patch. */
+/* W retains the raw 44-bit depth for perspective interpolation.
+ * Screen placement selects its divisor separately below. Binary64
+ * represents the signed accumulator and its scale exactly before
+ * narrowing to float. */
 static INLINE float pgxp_precise_z(int64_t acc)
 {
    double z = (double)acc * (1.0 / 4096.0);
@@ -1440,26 +1396,8 @@ static INLINE float pgxp_precise_z(int64_t acc)
    }
 #endif
 
-   /* No 0xFFFF ceiling. The architectural SZ3 saturates there because it
-    * is a uint16_t, and the shadow used to be clamped to match. Matching
-    * it was wrong: past saturation the integer path places a vertex
-    * (z / 65535) times too far from the projection centre, so the error
-    * is proportional rather than bounded - 1% past the clamp is half a
-    * pixel, twice past it is 80 pixels for a vertex 80 pixels out, and it
-    * grows without limit. Reproducing that in the shadow discards the one
-    * correct answer PGXP has.
-    *
-    * Removing it cannot regress anything: for z <= 65535 the clamp never
-    * fired, so the result is bit-identical to before, and the only inputs
-    * whose behaviour changes are the ones the old code got wrong. The 2D
-    * tolerance heuristic is self-limiting here rather than a hazard - if
-    * it is enabled and the corrected position lands far from the integer
-    * one, it substitutes the integer coordinate, which is exactly the old
-    * behaviour.
-    *
-    * The float_max floor stays. That one mirrors Divide()'s own overflow
-    * behaviour rather than a storage width, so it is not the same kind of
-    * artefact. */
+   /* The H/2 floor mirrors native divide overflow. W retains the
+    * extended far range beyond architectural SZ3 saturation. */
    return float_max(H/2.f, (float)z);
 }
 
@@ -1498,6 +1436,17 @@ static INLINE float pgxp_precise_h_div_sz(float precise_z)
    return (float)0x1FFFF / 65536.0f;
 }
 
+/* Keep screen placement consistent with the quantized IR and SZ3
+ * values while retaining subpixel X/Y and fractional W. Above the
+ * architectural SZ3 range, keep the existing extended projection. */
+static INLINE float pgxp_screen_h_div_sz(int64_t raw_z, float precise_z)
+{
+   if (raw_z < (INT64_C(65536) << 12))
+      precise_z = float_max(H / 2.f, (float)Z_FIFO(3));
+
+   return pgxp_precise_h_div_sz(precise_z);
+}
+
 static int32_t RTPS(uint32_t instr)
 {
  int64_t h_div_sz;
@@ -1510,7 +1459,7 @@ static int32_t RTPS(uint32_t instr)
  h_div_sz = Divide(H, Z_FIFO(3));
 
  precise_z = pgxp_precise_z(precise_z_acc);
- precise_h_div_sz  = pgxp_precise_h_div_sz(precise_z);
+ precise_h_div_sz  = pgxp_screen_h_div_sz(precise_z_acc, precise_z);
 
  TransformXY(h_div_sz, precise_h_div_sz, precise_z);
  TransformDQ(h_div_sz);
@@ -1534,7 +1483,7 @@ static int32_t RTPT(uint32_t instr)
   h_div_sz = Divide(H, Z_FIFO(3));
 
   precise_z = pgxp_precise_z(precise_z_acc);
-  precise_h_div_sz  = pgxp_precise_h_div_sz(precise_z);
+  precise_h_div_sz  = pgxp_screen_h_div_sz(precise_z_acc, precise_z);
 
   TransformXY(h_div_sz, precise_h_div_sz, precise_z);
 

@@ -10,7 +10,7 @@ PGXP_SRC := $(ROOT)/pgxp/pgxp_gpu.c $(ROOT)/pgxp/pgxp_gte.c \
             $(ROOT)/pgxp/pgxp_cpu.c $(ROOT)/pgxp/pgxp_mem.c \
             $(ROOT)/pgxp/pgxp_main.c $(ROOT)/pgxp/pgxp_value.c
 
-all: oracle transport range
+all: oracle transport range gte_projection
 
 oracle: oracle.c $(PGXP_SRC)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ oracle.c $(PGXP_SRC) stub_log.c -lm
@@ -21,14 +21,19 @@ range: range.c $(PGXP_SRC)
 transport: transport.c $(PGXP_SRC)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ transport.c $(PGXP_SRC) stub_log.c -lm
 
-check: oracle transport range
+gte_projection: gte_projection.c $(PGXP_SRC) $(ROOT)/mednafen/psx/gte.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -iquote$(ROOT)/mednafen/psx -iquote$(ROOT)/mednafen -o $@ gte_projection.c $(PGXP_SRC) $(ROOT)/mednafen/psx/gte.c -lm
+
+check: oracle transport range gte_projection
 	./oracle
 	@echo
 	./transport
 	@echo
 	./range
+	@echo
+	./gte_projection
 
 clean:
-	rm -f oracle transport range
+	rm -f oracle transport range gte_projection
 
 .PHONY: all check clean
