@@ -4535,7 +4535,6 @@ struct InputDevice_GunCon
          uint8_t transmit_buffer[16];
          uint32_t transmit_pos;
          uint32_t transmit_count;
-         bool prev_vsync;
          int line_counter;
 };
 
@@ -4580,7 +4579,6 @@ static void InputDevice_GunCon_Power(InputDevice *self_)
    self->transmit_pos = 0;
    self->transmit_count = 0;
 
-   self->prev_vsync = 0;
    self->line_counter = 0;
 }
 
@@ -4613,7 +4611,6 @@ static int InputDevice_GunCon_StateAction(InputDevice *self_, StateMem* sm, int 
       SFVAR(self->transmit_pos),
       SFVAR(self->transmit_count),
 
-      SFVAR(self->prev_vsync),
       SFVAR(self->line_counter),
 
       SFEND
@@ -4668,7 +4665,7 @@ static int32_t InputDevice_GunCon_GPULineHook(InputDevice *self_, const int32_t 
 {
    InputDevice_GunCon *self = (InputDevice_GunCon *)self_;
 
-   if(vsync && !self->prev_vsync)
+   if(vsync)
       self->line_counter = 0;
 
    if(pixels && pix_clock)
@@ -4880,7 +4877,6 @@ struct InputDevice_Justifier
          uint8_t transmit_buffer[16];
          uint32_t transmit_pos;
          uint32_t transmit_count;
-         bool prev_vsync;
          int line_counter;
 };
 
@@ -4925,7 +4921,6 @@ static void InputDevice_Justifier_Power(InputDevice *self_)
    self->transmit_pos = 0;
    self->transmit_count = 0;
 
-   self->prev_vsync = 0;
    self->line_counter = 0;
 }
 
@@ -4990,7 +4985,6 @@ static int InputDevice_Justifier_StateAction(InputDevice *self_, StateMem* sm, i
       SFVAR(self->transmit_pos),
       SFVAR(self->transmit_count),
 
-      SFVAR(self->prev_vsync),
       SFVAR(self->line_counter),
 
       SFEND
@@ -5015,7 +5009,7 @@ static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32
 
    int32_t ret = PSX_EVENT_MAXTS;
 
-   if(vsync && !self->prev_vsync)
+   if(vsync)
       self->line_counter = 0;
 
    if(pixels && pix_clock)
@@ -5055,11 +5049,10 @@ static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32
 /* Whether a gun reads or draws on the line its next GPULineHook gets: it
  * samples rows near its aim (GunCon 8 from it, Justifier one either side)
  * and draws its crosshair at most 8 rows from it. */
-static bool gun_line_near(bool vsync, bool prev_vsync, int line_counter,
-      int16_t nom_y)
+static bool gun_line_near(bool vsync, int line_counter, int16_t nom_y)
 {
    const int avs  = 16;
-   const int line = (vsync && !prev_vsync) ? 0 : line_counter;
+   const int line = vsync ? 0 : line_counter;
    return line >= avs + nom_y - 8 && line <= avs + nom_y + 8;
 }
 
@@ -5072,13 +5065,13 @@ bool FrontIO_LineNeedsPixels(const FrontIO *self, bool vsync)
       if (d->vt->GPULineHook == InputDevice_GunCon_GPULineHook)
       {
          const InputDevice_GunCon *g = (const InputDevice_GunCon *)d;
-         if (gun_line_near(vsync, g->prev_vsync, g->line_counter, g->nom_y))
+         if (gun_line_near(vsync, g->line_counter, g->nom_y))
             return true;
       }
       else if (d->vt->GPULineHook == InputDevice_Justifier_GPULineHook)
       {
          const InputDevice_Justifier *j = (const InputDevice_Justifier *)d;
-         if (gun_line_near(vsync, j->prev_vsync, j->line_counter, j->nom_y))
+         if (gun_line_near(vsync, j->line_counter, j->nom_y))
             return true;
       }
    }
