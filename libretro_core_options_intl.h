@@ -172,6 +172,14 @@ extern "C" {
 #define OPTION_VAL_SOFTWARE_AR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_AR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_AR NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_AR NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_AR NULL
+#define OPTION_VAL_1_AR NULL
+#define OPTION_VAL_2_AR NULL
+#define OPTION_VAL_3_AR NULL
+#define OPTION_VAL_4_AR NULL
+#define OPTION_VAL_6_AR NULL
+#define OPTION_VAL_8_AR NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_AR NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_AR NULL
 #define OPTION_VAL_24BIT_AR NULL
@@ -260,9 +268,9 @@ extern "C" {
 #define OPTION_VAL_VERYHIGH_AR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_AR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_AR NULL
-#define OPTION_VAL_4_AR NULL
-#define OPTION_VAL_6_AR NULL
-#define OPTION_VAL_8_AR NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_AR NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_AR NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_AR NULL
 #define OPTION_VAL_10_AR NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_AR NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_AR NULL
@@ -444,9 +452,9 @@ extern "C" {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_AR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_AR NULL
 #define OPTION_VAL_0_AR NULL
-#define OPTION_VAL_1_AR NULL
-#define OPTION_VAL_2_AR NULL
-#define OPTION_VAL_3_AR NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_AR NULL
@@ -933,6 +941,26 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_AR,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_AR,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_AR },
+         { "2",        OPTION_VAL_2_AR },
+         { "3",        OPTION_VAL_3_AR },
+         { "4",        OPTION_VAL_4_AR },
+         { "6",        OPTION_VAL_6_AR },
+         { "8",        OPTION_VAL_8_AR },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_AR,
       NULL,
@@ -1139,9 +1167,9 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_AR },
-         { "6", OPTION_VAL_6_AR },
-         { "8", OPTION_VAL_8_AR },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_AR },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_AR },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_AR },
          { "10", OPTION_VAL_10_AR },
          { NULL, NULL },
       },
@@ -1877,9 +1905,9 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       "input",
       {
          { "0", OPTION_VAL_0_AR },
-         { "1", OPTION_VAL_1_AR },
-         { "2", OPTION_VAL_2_AR },
-         { "3", OPTION_VAL_3_AR },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AR },
          { NULL, NULL },
@@ -3046,7 +3074,7 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_REGION_LABEL_AST "Rexón del sistema"
 #define BEETLE_OPT_REGION_INFO_0_AST NULL
 #define OPTION_VAL_AUTO_AST NULL
-#define OPTION_VAL_NTSC_J_AST NULL
+#define OPTION_VAL_NTSC_J_AST "NTSC-J (Xapón)"
 #define OPTION_VAL_NTSC_U_AST NULL
 #define OPTION_VAL_PAL_AST NULL
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_AST NULL
@@ -3059,6 +3087,14 @@ struct retro_core_options_v2 options_ar = {
 #define OPTION_VAL_SOFTWARE_AST NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_AST NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_AST NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_AST NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_AST NULL
+#define OPTION_VAL_1_AST NULL
+#define OPTION_VAL_2_AST NULL
+#define OPTION_VAL_3_AST NULL
+#define OPTION_VAL_4_AST NULL
+#define OPTION_VAL_6_AST NULL
+#define OPTION_VAL_8_AST NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_AST NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_AST NULL
 #define OPTION_VAL_24BIT_AST NULL
@@ -3147,9 +3183,9 @@ struct retro_core_options_v2 options_ar = {
 #define OPTION_VAL_VERYHIGH_AST NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_AST NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_AST NULL
-#define OPTION_VAL_4_AST NULL
-#define OPTION_VAL_6_AST NULL
-#define OPTION_VAL_8_AST NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_AST NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_AST NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_AST NULL
 #define OPTION_VAL_10_AST NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_AST NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_AST NULL
@@ -3331,9 +3367,9 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_AST NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_AST NULL
 #define OPTION_VAL_0_AST NULL
-#define OPTION_VAL_1_AST NULL
-#define OPTION_VAL_2_AST NULL
-#define OPTION_VAL_3_AST NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_AST NULL
@@ -3350,7 +3386,7 @@ struct retro_core_options_v2 options_ar = {
 #define OPTION_VAL_DOT_AST NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_AST NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_AST NULL
-#define OPTION_VAL_RED_AST "Coloráu"
+#define OPTION_VAL_RED_AST "Bermeyu"
 #define OPTION_VAL_BLUE_AST "Azul"
 #define OPTION_VAL_GREEN_AST "Verde"
 #define OPTION_VAL_ORANGE_AST "Naranxa"
@@ -3820,6 +3856,26 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_AST,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_AST,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_AST },
+         { "2",        OPTION_VAL_2_AST },
+         { "3",        OPTION_VAL_3_AST },
+         { "4",        OPTION_VAL_4_AST },
+         { "6",        OPTION_VAL_6_AST },
+         { "8",        OPTION_VAL_8_AST },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_AST,
       NULL,
@@ -4026,9 +4082,9 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_AST },
-         { "6", OPTION_VAL_6_AST },
-         { "8", OPTION_VAL_8_AST },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_AST },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_AST },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_AST },
          { "10", OPTION_VAL_10_AST },
          { NULL, NULL },
       },
@@ -4764,9 +4820,9 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       "input",
       {
          { "0", OPTION_VAL_0_AST },
-         { "1", OPTION_VAL_1_AST },
-         { "2", OPTION_VAL_2_AST },
-         { "3", OPTION_VAL_3_AST },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_AST },
          { NULL, NULL },
@@ -5945,7 +6001,15 @@ struct retro_core_options_v2 options_ast = {
 #define OPTION_VAL_HARDWARE_VK_BE "Апаратны (Vulkan)"
 #define OPTION_VAL_SOFTWARE_BE "Праграмнае забеспячэнне"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_BE "Праграмны фрэймбуфер"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_BE "Уключае для апаратных рэндэраў дакладную эмуляцыю эфектаў фрэймбуфера (напрыклад размыццё руху, закручванне перад боем у FF7), запускаючы фонам копію праграмнага рэндэру ў натыўным раздзяленні. Пры адключэнні налады эфектаў прапускаюцца (OpenGL) або рэалізуюцца сродкамі GPU (Vulkan). Адключэнне падвышае прадукцыйнасць, але прыводзіць да з'яўлення мноства графічных багаў. Калі не ўпэўненыя, пакіньце уключанай."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_BE NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_BE NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_BE NULL
+#define OPTION_VAL_1_BE NULL
+#define OPTION_VAL_2_BE NULL
+#define OPTION_VAL_3_BE NULL
+#define OPTION_VAL_4_BE NULL
+#define OPTION_VAL_6_BE NULL
+#define OPTION_VAL_8_BE NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_BE NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_BE NULL
 #define OPTION_VAL_24BIT_BE NULL
@@ -6034,9 +6098,9 @@ struct retro_core_options_v2 options_ast = {
 #define OPTION_VAL_VERYHIGH_BE NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_BE NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_BE NULL
-#define OPTION_VAL_4_BE NULL
-#define OPTION_VAL_6_BE NULL
-#define OPTION_VAL_8_BE NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_BE NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_BE NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_BE NULL
 #define OPTION_VAL_10_BE NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_BE NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_BE NULL
@@ -6218,9 +6282,9 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_BE "Затрымка націску для змены рэжыму DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_BE NULL
 #define OPTION_VAL_0_BE "Затрымка 0 секунд"
-#define OPTION_VAL_1_BE "Затрымка 1 секунда"
-#define OPTION_VAL_2_BE "Затрымка 2 секунды"
-#define OPTION_VAL_3_BE "Затрымка 3 секунды"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_BE NULL
@@ -6707,6 +6771,26 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_BE,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_BE,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_BE },
+         { "2",        OPTION_VAL_2_BE },
+         { "3",        OPTION_VAL_3_BE },
+         { "4",        OPTION_VAL_4_BE },
+         { "6",        OPTION_VAL_6_BE },
+         { "8",        OPTION_VAL_8_BE },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_BE,
       NULL,
@@ -6913,9 +6997,9 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_BE },
-         { "6", OPTION_VAL_6_BE },
-         { "8", OPTION_VAL_8_BE },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_BE },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_BE },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_BE },
          { "10", OPTION_VAL_10_BE },
          { NULL, NULL },
       },
@@ -7651,9 +7735,9 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       "input",
       {
          { "0", OPTION_VAL_0_BE },
-         { "1", OPTION_VAL_1_BE },
-         { "2", OPTION_VAL_2_BE },
-         { "3", OPTION_VAL_3_BE },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BE },
          { NULL, NULL },
@@ -8833,6 +8917,14 @@ struct retro_core_options_v2 options_be = {
 #define OPTION_VAL_SOFTWARE_BG NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_BG NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_BG NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_BG NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_BG NULL
+#define OPTION_VAL_1_BG NULL
+#define OPTION_VAL_2_BG NULL
+#define OPTION_VAL_3_BG NULL
+#define OPTION_VAL_4_BG NULL
+#define OPTION_VAL_6_BG NULL
+#define OPTION_VAL_8_BG NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_BG NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_BG NULL
 #define OPTION_VAL_24BIT_BG NULL
@@ -8921,9 +9013,9 @@ struct retro_core_options_v2 options_be = {
 #define OPTION_VAL_VERYHIGH_BG NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_BG NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_BG NULL
-#define OPTION_VAL_4_BG NULL
-#define OPTION_VAL_6_BG NULL
-#define OPTION_VAL_8_BG NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_BG NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_BG NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_BG NULL
 #define OPTION_VAL_10_BG NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_BG NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_BG NULL
@@ -9105,9 +9197,9 @@ struct retro_core_options_v2 options_be = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_BG NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_BG NULL
 #define OPTION_VAL_0_BG NULL
-#define OPTION_VAL_1_BG NULL
-#define OPTION_VAL_2_BG NULL
-#define OPTION_VAL_3_BG NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_BG NULL
@@ -9594,6 +9686,26 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_BG,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_BG,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_BG },
+         { "2",        OPTION_VAL_2_BG },
+         { "3",        OPTION_VAL_3_BG },
+         { "4",        OPTION_VAL_4_BG },
+         { "6",        OPTION_VAL_6_BG },
+         { "8",        OPTION_VAL_8_BG },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_BG,
       NULL,
@@ -9800,9 +9912,9 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_BG },
-         { "6", OPTION_VAL_6_BG },
-         { "8", OPTION_VAL_8_BG },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_BG },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_BG },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_BG },
          { "10", OPTION_VAL_10_BG },
          { NULL, NULL },
       },
@@ -10538,9 +10650,9 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       "input",
       {
          { "0", OPTION_VAL_0_BG },
-         { "1", OPTION_VAL_1_BG },
-         { "2", OPTION_VAL_2_BG },
-         { "3", OPTION_VAL_3_BG },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_BG },
          { NULL, NULL },
@@ -11719,7 +11831,15 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_HARDWARE_VK_CA "Maquinari (Vulkan)"
 #define OPTION_VAL_SOFTWARE_CA "Programari"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CA "Memòria intermèdia per programari"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CA "Permet emular amb precisió els efectes de la memòria intermèdia de fotogrames (desenfocament de moviment, les batalles de FF7) en utilitzar els renderitzadors per maquinari executant una còpia del renderitzador per programari a resolució nativa en segon pla. En desactivar aquesta opció, s'ometran aquestes operacions (OpenGL) o es renderitzadaran a la GPU (Vulkan). Desactivar aquesta opció pot millorar el rendiment a costa de generar errors gràfics greus. En cas de dubte, deixa activada aquesta opció."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CA NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_CA NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_CA NULL
+#define OPTION_VAL_1_CA NULL
+#define OPTION_VAL_2_CA NULL
+#define OPTION_VAL_3_CA NULL
+#define OPTION_VAL_4_CA NULL
+#define OPTION_VAL_6_CA NULL
+#define OPTION_VAL_8_CA NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_CA "Format del color"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_CA "Selecciona la profunditat de color de la sortida. «24 bits (estàndard)» correspon a la sortida clàssica de 8 bits per canal. «Color de 30 bits (HDR)» genera una sortida de 10 bits per canal, en format Rec.2020 codificat amb PQ (HDR10), per a la visualització en pantalles compatibles amb HDR: com que el motor de renderització ja utilitza una precisió interna superior als 8 bits, això permet reduir l'efecte de bandes («banding») en degradats escalats i fer que el contingut emissiu superi el nivell del blanc SDR. «Color de 64 bits (HDR, scRGB)» utilitza coma flotant de 16 bits en l'espai de color lineal Rec.709 (scRGB): ofereix la mateixa imatge que l'HDR de 30 bits, però sense la quantificació PQ de 10 bits, i els colors situats fora de l'espai Rec.709 es representen mitjançant valors negatius en lloc d'emprar un contenidor Rec.2020. Si la interfície no admet l'entrada scRGB, el sistema recorre automàticament a l'HDR de 30 bits. Aquesta opció funciona amb els motors de renderització per maquinari Vulkan i OpenGL, i requereix que la interfície sigui compatible amb HDR; en cas d'utilitzar el renderitzador per programari («software»), o si la interfície no pot mostrar contingut HDR, el sistema torna al mode de 24 bits. Cal reiniciar l'aplicació."
 #define OPTION_VAL_24BIT_CA "24 bits (Estàndard)"
@@ -11808,9 +11928,9 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_VERYHIGH_CA NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_CA NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_CA NULL
-#define OPTION_VAL_4_CA NULL
-#define OPTION_VAL_6_CA NULL
-#define OPTION_VAL_8_CA NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CA NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CA NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CA NULL
 #define OPTION_VAL_10_CA NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_CA NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_CA NULL
@@ -11992,9 +12112,9 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CA "Temps d'espera per a les combinacions de botons en el mode analògic"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CA "Estableix el temps que cal mantenir premuts els botons de la combinació del mode analògic."
 #define OPTION_VAL_0_CA "Espera de 0 segons"
-#define OPTION_VAL_1_CA "Espera de 1 segon"
-#define OPTION_VAL_2_CA "Espera de 2 segons"
-#define OPTION_VAL_3_CA "Espera de 3 segons"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA "Espera de 5 segons"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CA "Toc múltiple en el port 1"
@@ -12481,6 +12601,26 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_CA,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_CA,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_CA },
+         { "2",        OPTION_VAL_2_CA },
+         { "3",        OPTION_VAL_3_CA },
+         { "4",        OPTION_VAL_4_CA },
+         { "6",        OPTION_VAL_6_CA },
+         { "8",        OPTION_VAL_8_CA },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_CA,
       NULL,
@@ -12687,9 +12827,9 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_CA },
-         { "6", OPTION_VAL_6_CA },
-         { "8", OPTION_VAL_8_CA },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CA },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CA },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CA },
          { "10", OPTION_VAL_10_CA },
          { NULL, NULL },
       },
@@ -13425,9 +13565,9 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       "input",
       {
          { "0", OPTION_VAL_0_CA },
-         { "1", OPTION_VAL_1_CA },
-         { "2", OPTION_VAL_2_CA },
-         { "3", OPTION_VAL_3_CA },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA },
          { NULL, NULL },
@@ -14606,7 +14746,15 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_HARDWARE_VK_CHS "硬件（Vulkan）"
 #define OPTION_VAL_SOFTWARE_CHS "软件"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CHS "软件帧缓冲区"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CHS "当使用硬件渲染器时，通过在后台以原生分辨率运行一份软件渲染器副本，来实现对帧缓冲区效果（例如运动模糊、FF7 战斗漩涡）的精确模拟。如果禁用，这些操作会被省略（OpenGL）或在 GPU 上渲染（Vulkan）。禁用可以提升性能，但可能导致严重的图形错误。如果不确定，请保持启用状态。"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CHS "在硬件渲染器运行的同时，在条件允许时通过 GPU 线程维护一份由软件渲染器绘制的原生分辨率显存 (VRAM) 副本。随后游戏对 VRAM 的读取以及即时存档 (savestate) 均来自该副本，与真实硬件的输出完全一致。禁用此项时，将从 GPU 回读数据，这会阻塞模拟进程，并在提升内部分辨率的情况下向游戏返回缩小后的像素，从而可能引发画面错误。仅在 GPU 线程不运行的场景下禁用才有意义（例如单颗高频核心、连接了光枪，或 CPU 核心数未上报且未指定通道数时）。若不确定，请保持启用。"
+#define BEETLE_OPT_GPU_THREAD_LABEL_CHS "GPU 线程"
+#define BEETLE_OPT_GPU_THREAD_INFO_0_CHS "当 CPU 拥有两颗或更多高频核心时，在独立线程上绘制软件渲染器画面，以及硬件渲染器模式下的软件帧缓冲 (Software Framebuffer)。“启用”还会按行分条带，将放大后的画面分配给剩余的高频核心处理；指定具体通道数（lanes）则会按对应线程数拆分每一帧画面。连接光枪或 CPU 核心数未上报时，“启用”会继续在模拟线程上绘制，而指定通道数仍会照常启动线程。无论哪种方式，画面表现与模拟时序均保持一致。"
+#define OPTION_VAL_1_CHS "1路"
+#define OPTION_VAL_2_CHS "2路"
+#define OPTION_VAL_3_CHS "3路"
+#define OPTION_VAL_4_CHS "4路"
+#define OPTION_VAL_6_CHS "6路"
+#define OPTION_VAL_8_CHS "8路"
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_CHS "色彩格式"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_CHS "选择输出色彩深度。“24位（标准）”是历史上的每通道 8 位输出。“30位色彩 (HDR)”输出每通道 10 位、采用 PQ 编码的 Rec.2020 (HDR10)，用于在支持 HDR 的屏幕上显示：渲染器在内部已经具有高于 8 位的精度，因此这既减少了放大渐变中的色带，又允许自发光内容超越 SDR 白色。“64位色彩 (HDR, scRGB)”输出 16 位浮点、线性 Rec.709 (sRGB)：它呈现与 30 位 HDR 相同的画面，但没有 10 位 PQ 量化，超出 Rec.709 的色彩作为负值传输，而不是通过 Rec.2020 容器；当前端不支持 scRGB 输入时，它会回退至 30 位 HDR。在 Vulkan 和 OpenGL 硬件渲染器下生效，且需要前端提供 HDR 支持；在软件渲染器上或前端无法呈现 HDR 时，会自动回退至 24 位。需要重新启动。"
 #define OPTION_VAL_24BIT_CHS "24 位（标准）"
@@ -14695,9 +14843,9 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_VERYHIGH_CHS "极高（阴影压得最死）"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_CHS "胶片曲线: 高光范围"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_CHS "在达到饱和之前，“Filmic (Sobotka)”显示转换的对数编码能够覆盖中灰色上方多少档的动态范围。更多的档数能够让极高亮度的内容保持可分辨，代价是画面整体会显得更平缓（低对比）。仅对 Filmic (Sobotka) 显示转换生效。"
-#define OPTION_VAL_4_CHS "4 档 (Blender 默认)"
-#define OPTION_VAL_6_CHS "6 档 (在 64 处饱和)   "
-#define OPTION_VAL_8_CHS "8 档 (在 256 处饱和)"
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHS "4 档 (Blender 默认)"
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHS "6 档 (在 64 处饱和)"
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHS "8 档 (在 256 处饱和)"
 #define OPTION_VAL_10_CHS "10 档 (在 1024 处饱和)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_CHS "HDR 泛光 (Bloom)   "
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_CHS "针对 HDR 输出（硬件渲染器、30 位 HDR 或 16 位 scRGB 色彩格式）的多频段泛光效果。高亮内容在线性光下提取，采用两种尺度进行模糊——紧凑的核心与宽广的光晕——并在显示转换之前添加，因此发光效果能够真正超越纸白并落入 HDR 动态余量中。在提取时经过萤火虫压缩处理，确保单个高亮纹理像素不会导致光晕闪烁。“禁用”（默认）则保持画面不变。"
@@ -14879,9 +15027,9 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CHS "DualShock 模拟模式组合按键保持时长"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CHS "切换模拟模式组合键的按住（长按）时间。"
 #define OPTION_VAL_0_CHS "0 秒延迟"
-#define OPTION_VAL_1_CHS "1 秒延迟"
-#define OPTION_VAL_2_CHS "2 秒延迟"
-#define OPTION_VAL_3_CHS "3 秒延迟"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS "1 秒延迟"
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS "2 秒延迟"
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS "3 秒延迟"
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS "4 秒延迟"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS "5 秒延迟"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CHS "端口 1 多人联机分接器 (Multitap)"
@@ -15012,7 +15160,7 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_BOB_OFFSET_CHS "Bob (带行偏移)"
 #define OPTION_VAL_FASTMAD_CHS "FastMAD（运动自适应）"
 #define BEETLE_OPT_FRAME_DUPING_LABEL_CHS "帧复制"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_CHS NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_CHS "当游戏没有新画面需要显示时，由前端重复上一帧，而不是由核心重新发送。配合前端的“跳过重复帧”使用时，这些重复帧不会被呈现，从而使显示器接收游戏自身的实际帧率（适用于补帧与插值工具）。"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_CHS "覆盖 PAL 视频时序"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_CHS "由于标准不同，PAL 制式游戏通常比美版或日版的 NTSC 游戏运行得更慢。此选项可用于覆盖 PAL 时序，尝试以 NTSC 的帧率运行这些游戏。"
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_CHS "核心宽高比"
@@ -15368,6 +15516,26 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_CHS,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_CHS,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_CHS },
+         { "2",        OPTION_VAL_2_CHS },
+         { "3",        OPTION_VAL_3_CHS },
+         { "4",        OPTION_VAL_4_CHS },
+         { "6",        OPTION_VAL_6_CHS },
+         { "8",        OPTION_VAL_8_CHS },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_CHS,
       NULL,
@@ -15574,9 +15742,9 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_CHS },
-         { "6", OPTION_VAL_6_CHS },
-         { "8", OPTION_VAL_8_CHS },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHS },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHS },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHS },
          { "10", OPTION_VAL_10_CHS },
          { NULL, NULL },
       },
@@ -16312,9 +16480,9 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       "input",
       {
          { "0", OPTION_VAL_0_CHS },
-         { "1", OPTION_VAL_1_CHS },
-         { "2", OPTION_VAL_2_CHS },
-         { "3", OPTION_VAL_3_CHS },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHS },
          { NULL, NULL },
@@ -17494,6 +17662,14 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_SOFTWARE_CHT "軟體渲染"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CHT NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CHT NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_CHT NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_CHT NULL
+#define OPTION_VAL_1_CHT NULL
+#define OPTION_VAL_2_CHT NULL
+#define OPTION_VAL_3_CHT NULL
+#define OPTION_VAL_4_CHT NULL
+#define OPTION_VAL_6_CHT NULL
+#define OPTION_VAL_8_CHT NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_CHT NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_CHT NULL
 #define OPTION_VAL_24BIT_CHT NULL
@@ -17582,9 +17758,9 @@ struct retro_core_options_v2 options_chs = {
 #define OPTION_VAL_VERYHIGH_CHT NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_CHT NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_CHT NULL
-#define OPTION_VAL_4_CHT NULL
-#define OPTION_VAL_6_CHT NULL
-#define OPTION_VAL_8_CHT NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHT NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHT NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHT NULL
 #define OPTION_VAL_10_CHT NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_CHT NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_CHT NULL
@@ -17766,9 +17942,9 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CHT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CHT NULL
 #define OPTION_VAL_0_CHT NULL
-#define OPTION_VAL_1_CHT NULL
-#define OPTION_VAL_2_CHT NULL
-#define OPTION_VAL_3_CHT NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CHT NULL
@@ -18255,6 +18431,26 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_CHT,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_CHT,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_CHT },
+         { "2",        OPTION_VAL_2_CHT },
+         { "3",        OPTION_VAL_3_CHT },
+         { "4",        OPTION_VAL_4_CHT },
+         { "6",        OPTION_VAL_6_CHT },
+         { "8",        OPTION_VAL_8_CHT },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_CHT,
       NULL,
@@ -18461,9 +18657,9 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_CHT },
-         { "6", OPTION_VAL_6_CHT },
-         { "8", OPTION_VAL_8_CHT },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHT },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHT },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CHT },
          { "10", OPTION_VAL_10_CHT },
          { NULL, NULL },
       },
@@ -19199,9 +19395,9 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       "input",
       {
          { "0", OPTION_VAL_0_CHT },
-         { "1", OPTION_VAL_1_CHT },
-         { "2", OPTION_VAL_2_CHT },
-         { "3", OPTION_VAL_3_CHT },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CHT },
          { NULL, NULL },
@@ -20380,7 +20576,15 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_HARDWARE_VK_CS NULL
 #define OPTION_VAL_SOFTWARE_CS NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CS NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CS "Umožňuje přesnou emulaci efektů framebufferu (např. motion blur, FF7 battle swirl) při použití hardwarových rendererů spuštěním kopie softwarového rendereru v nativním rozlišení na pozadí. Jsou-li tyto operace zakázány, jsou vynechány (OpenGL) nebo vykreslovány na GPU (Vulkan). Zakázání může zvýšit výkon, ale může způsobit závažné grafické chyby. Pokud si nejste jisti, ponechte povoleno."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CS NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_CS NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_CS NULL
+#define OPTION_VAL_1_CS NULL
+#define OPTION_VAL_2_CS NULL
+#define OPTION_VAL_3_CS NULL
+#define OPTION_VAL_4_CS NULL
+#define OPTION_VAL_6_CS NULL
+#define OPTION_VAL_8_CS NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_CS NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_CS NULL
 #define OPTION_VAL_24BIT_CS NULL
@@ -20469,9 +20673,9 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_VERYHIGH_CS NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_CS NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_CS NULL
-#define OPTION_VAL_4_CS NULL
-#define OPTION_VAL_6_CS NULL
-#define OPTION_VAL_8_CS NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CS NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CS NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CS NULL
 #define OPTION_VAL_10_CS NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_CS NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_CS NULL
@@ -20653,9 +20857,9 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CS "Zpoždění podržení analogového režimu DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CS NULL
 #define OPTION_VAL_0_CS "0 sekundové zpoždění"
-#define OPTION_VAL_1_CS "1 sekundové zpoždění"
-#define OPTION_VAL_2_CS "2 sekundové zpoždění"
-#define OPTION_VAL_3_CS "3 sekundové zpoždění"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CS NULL
@@ -21142,6 +21346,26 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_CS,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_CS,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_CS },
+         { "2",        OPTION_VAL_2_CS },
+         { "3",        OPTION_VAL_3_CS },
+         { "4",        OPTION_VAL_4_CS },
+         { "6",        OPTION_VAL_6_CS },
+         { "8",        OPTION_VAL_8_CS },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_CS,
       NULL,
@@ -21348,9 +21572,9 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_CS },
-         { "6", OPTION_VAL_6_CS },
-         { "8", OPTION_VAL_8_CS },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CS },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CS },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CS },
          { "10", OPTION_VAL_10_CS },
          { NULL, NULL },
       },
@@ -22086,9 +22310,9 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       "input",
       {
          { "0", OPTION_VAL_0_CS },
-         { "1", OPTION_VAL_1_CS },
-         { "2", OPTION_VAL_2_CS },
-         { "3", OPTION_VAL_3_CS },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CS },
          { NULL, NULL },
@@ -23268,6 +23492,14 @@ struct retro_core_options_v2 options_cs = {
 #define OPTION_VAL_SOFTWARE_CY NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CY NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CY NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_CY NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_CY NULL
+#define OPTION_VAL_1_CY NULL
+#define OPTION_VAL_2_CY NULL
+#define OPTION_VAL_3_CY NULL
+#define OPTION_VAL_4_CY NULL
+#define OPTION_VAL_6_CY NULL
+#define OPTION_VAL_8_CY NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_CY NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_CY NULL
 #define OPTION_VAL_24BIT_CY NULL
@@ -23356,9 +23588,9 @@ struct retro_core_options_v2 options_cs = {
 #define OPTION_VAL_VERYHIGH_CY NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_CY NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_CY NULL
-#define OPTION_VAL_4_CY NULL
-#define OPTION_VAL_6_CY NULL
-#define OPTION_VAL_8_CY NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CY NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CY NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CY NULL
 #define OPTION_VAL_10_CY NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_CY NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_CY NULL
@@ -23540,9 +23772,9 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CY NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CY NULL
 #define OPTION_VAL_0_CY NULL
-#define OPTION_VAL_1_CY NULL
-#define OPTION_VAL_2_CY NULL
-#define OPTION_VAL_3_CY NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CY NULL
@@ -24029,6 +24261,26 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_CY,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_CY,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_CY },
+         { "2",        OPTION_VAL_2_CY },
+         { "3",        OPTION_VAL_3_CY },
+         { "4",        OPTION_VAL_4_CY },
+         { "6",        OPTION_VAL_6_CY },
+         { "8",        OPTION_VAL_8_CY },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_CY,
       NULL,
@@ -24235,9 +24487,9 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_CY },
-         { "6", OPTION_VAL_6_CY },
-         { "8", OPTION_VAL_8_CY },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_CY },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_CY },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_CY },
          { "10", OPTION_VAL_10_CY },
          { NULL, NULL },
       },
@@ -24973,9 +25225,9 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       "input",
       {
          { "0", OPTION_VAL_0_CY },
-         { "1", OPTION_VAL_1_CY },
-         { "2", OPTION_VAL_2_CY },
-         { "3", OPTION_VAL_3_CY },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CY },
          { NULL, NULL },
@@ -26155,6 +26407,14 @@ struct retro_core_options_v2 options_cy = {
 #define OPTION_VAL_SOFTWARE_DA NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_DA NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_DA NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_DA NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_DA NULL
+#define OPTION_VAL_1_DA NULL
+#define OPTION_VAL_2_DA NULL
+#define OPTION_VAL_3_DA NULL
+#define OPTION_VAL_4_DA NULL
+#define OPTION_VAL_6_DA NULL
+#define OPTION_VAL_8_DA NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_DA NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_DA NULL
 #define OPTION_VAL_24BIT_DA NULL
@@ -26243,9 +26503,9 @@ struct retro_core_options_v2 options_cy = {
 #define OPTION_VAL_VERYHIGH_DA NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_DA NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_DA NULL
-#define OPTION_VAL_4_DA NULL
-#define OPTION_VAL_6_DA NULL
-#define OPTION_VAL_8_DA NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_DA NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_DA NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_DA NULL
 #define OPTION_VAL_10_DA NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_DA NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_DA NULL
@@ -26427,9 +26687,9 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_DA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DA NULL
 #define OPTION_VAL_0_DA NULL
-#define OPTION_VAL_1_DA NULL
-#define OPTION_VAL_2_DA NULL
-#define OPTION_VAL_3_DA NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_DA NULL
@@ -26916,6 +27176,26 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_DA,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_DA,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_DA },
+         { "2",        OPTION_VAL_2_DA },
+         { "3",        OPTION_VAL_3_DA },
+         { "4",        OPTION_VAL_4_DA },
+         { "6",        OPTION_VAL_6_DA },
+         { "8",        OPTION_VAL_8_DA },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_DA,
       NULL,
@@ -27122,9 +27402,9 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_DA },
-         { "6", OPTION_VAL_6_DA },
-         { "8", OPTION_VAL_8_DA },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_DA },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_DA },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_DA },
          { "10", OPTION_VAL_10_DA },
          { NULL, NULL },
       },
@@ -27860,9 +28140,9 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       "input",
       {
          { "0", OPTION_VAL_0_DA },
-         { "1", OPTION_VAL_1_DA },
-         { "2", OPTION_VAL_2_DA },
-         { "3", OPTION_VAL_3_DA },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DA },
          { NULL, NULL },
@@ -29041,7 +29321,15 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_HARDWARE_VK_DE NULL
 #define OPTION_VAL_SOFTWARE_DE NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_DE "Software-Framebuffer"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_DE "Aktiviere genaue Emulation von Bildspeicher-Effekten (z. Motion Blur, FF7 Battle swirl), wenn Sie Hardware-Renderer verwenden, indem Sie eine Kopie des Software-Renderer mit nativer Auflösung im Hintergrund ausführen. Falls deaktiviert, werden diese Operationen (OpenGL) ausgelassen oder auf der GPU (Vulkan) gerendert. Das Deaktivieren kann die Leistung verbessern, kann aber schwerwiegende graphische Fehler verursachen. Aktiviert lassen wenn unsicher."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_DE NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_DE NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_DE NULL
+#define OPTION_VAL_1_DE NULL
+#define OPTION_VAL_2_DE NULL
+#define OPTION_VAL_3_DE NULL
+#define OPTION_VAL_4_DE NULL
+#define OPTION_VAL_6_DE NULL
+#define OPTION_VAL_8_DE NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_DE "Farbformat"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_DE "Legt die Ausgabefarbtiefe fest. „24 Bit (Standard)“ ist die herkömmliche Ausgabe mit 8 Bit pro Kanal. „30-Bit-Farbe (HDR)“ gibt ein PQ-kodiertes Rec.2020-Signal (HDR10) mit 10 Bit pro Kanal zur Anzeige auf einem HDR-fähigen Bildschirm aus: Da der Renderer intern bereits mit mehr als 8 Bit Präzision arbeitet, werden dadurch sowohl Abstufungen in hochskalierten Farbverläufen reduziert als auch selbstleuchtende Inhalte oberhalb von SDR-Weiß dargestellt. „64-Bit-Farbe (HDR, scRGB)“ gibt ein lineares Rec.709-Signal (scRGB) mit 16-Bit-Gleitkommawerten aus: dasselbe Bild wie bei 30-Bit-HDR, jedoch ohne die 10-Bit-PQ-Quantisierung; Farben außerhalb von Rec.709 werden als negative Werte statt in einem Rec.2020-Farbraumcontainer dargestellt. Wird auf 30-Bit-HDR zurückgesetzt, wenn das Frontend keine scRGB-Eingabe unterstützt. Wird mit den Vulkan- und OpenGL-Hardware-Renderern wirksam und erfordert HDR-Unterstützung durch das Frontend; wird beim Software-Renderer oder wenn das Frontend keine HDR-Ausgabe unterstützt auf 24 Bit zurückgesetzt. Neustart erforderlich."
 #define OPTION_VAL_24BIT_DE "24-Bit (Standard)"
@@ -29130,9 +29418,9 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_VERYHIGH_DE "Sehr hoch (stärkste Absenkung)"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_DE "Filmic: Spitzlichtbereich"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_DE "Wie viele Blendenstufen über Mittelgrau die logarithmische Kodierung der Displaytransformation „Filmic (Sobotka)“ erreicht, bevor sie gesättigt ist. Mehr Blendenstufen halten sehr helle Bildinhalte besser unterscheidbar, führen aber zu einem flacheren Bild. Wirkt sich nur auf die Displaytransformation „Filmic (Sobotka)“ aus."
-#define OPTION_VAL_4_DE "4 Blendenstufen (Blender-Standard)"
-#define OPTION_VAL_6_DE "6 Blendenstufen (Sättigung bei 64)"
-#define OPTION_VAL_8_DE "8 Blendenstufen (Sättigung bei 256)"
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE NULL
 #define OPTION_VAL_10_DE "10 Blendenstufen (Sättigung bei 1024)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_DE "HDR-Bloom"
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_DE "Mehrbandiger Bloom-Effekt für HDR-Ausgaben (Hardware-Renderer, 30-Bit-HDR oder 16-Bit-scRGB-Farbformat). Helle Bildinhalte werden im linearen Farbraum extrahiert, mit zwei unterschiedlichen Radien weichgezeichnet – einem engen Kern und einem breiten Schleier – und vor der Displaytransformation hinzugefügt. Dadurch reicht der Leuchteffekt tatsächlich über das Papierweiß hinaus und nutzt den zusätzlichen HDR-Helligkeitsbereich. Extrem helle Einzelpixel werden bei der Extraktion komprimiert, damit ein einzelner heller Texel kein Flackern des Leuchthofs verursacht. „Deaktiviert“ (Standard) lässt das Bild unverändert."
@@ -29314,9 +29602,9 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_DE "DualShock Analogmodus-Combo Halteverzögerung"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DE "Haltezeit für die Kombitasten im Analogmodus."
 #define OPTION_VAL_0_DE "0 Sekunden Verzögerung"
-#define OPTION_VAL_1_DE "1 Sekunde Verzögerung"
-#define OPTION_VAL_2_DE "2 Sekunden Verzögerung"
-#define OPTION_VAL_3_DE "3 Sekunden Verzögerung"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE "4-Sekunden-Verzögerung"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE "5-Sekunden-Verzögerung"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_DE "MultiTap auf Port 1"
@@ -29803,6 +30091,26 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_DE,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_DE,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_DE },
+         { "2",        OPTION_VAL_2_DE },
+         { "3",        OPTION_VAL_3_DE },
+         { "4",        OPTION_VAL_4_DE },
+         { "6",        OPTION_VAL_6_DE },
+         { "8",        OPTION_VAL_8_DE },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_DE,
       NULL,
@@ -30009,9 +30317,9 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_DE },
-         { "6", OPTION_VAL_6_DE },
-         { "8", OPTION_VAL_8_DE },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE },
          { "10", OPTION_VAL_10_DE },
          { NULL, NULL },
       },
@@ -30747,9 +31055,9 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       "input",
       {
          { "0", OPTION_VAL_0_DE },
-         { "1", OPTION_VAL_1_DE },
-         { "2", OPTION_VAL_2_DE },
-         { "3", OPTION_VAL_3_DE },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE },
          { NULL, NULL },
@@ -31929,6 +32237,14 @@ struct retro_core_options_v2 options_de = {
 #define OPTION_VAL_SOFTWARE_EL NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_EL NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_EL NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_EL NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_EL NULL
+#define OPTION_VAL_1_EL NULL
+#define OPTION_VAL_2_EL NULL
+#define OPTION_VAL_3_EL NULL
+#define OPTION_VAL_4_EL NULL
+#define OPTION_VAL_6_EL NULL
+#define OPTION_VAL_8_EL NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_EL NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_EL NULL
 #define OPTION_VAL_24BIT_EL NULL
@@ -32017,9 +32333,9 @@ struct retro_core_options_v2 options_de = {
 #define OPTION_VAL_VERYHIGH_EL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_EL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_EL NULL
-#define OPTION_VAL_4_EL NULL
-#define OPTION_VAL_6_EL NULL
-#define OPTION_VAL_8_EL NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_EL NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_EL NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_EL NULL
 #define OPTION_VAL_10_EL NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_EL NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_EL NULL
@@ -32201,9 +32517,9 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EL NULL
 #define OPTION_VAL_0_EL NULL
-#define OPTION_VAL_1_EL NULL
-#define OPTION_VAL_2_EL NULL
-#define OPTION_VAL_3_EL NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EL NULL
@@ -32690,6 +33006,26 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_EL,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_EL,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_EL },
+         { "2",        OPTION_VAL_2_EL },
+         { "3",        OPTION_VAL_3_EL },
+         { "4",        OPTION_VAL_4_EL },
+         { "6",        OPTION_VAL_6_EL },
+         { "8",        OPTION_VAL_8_EL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_EL,
       NULL,
@@ -32896,9 +33232,9 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_EL },
-         { "6", OPTION_VAL_6_EL },
-         { "8", OPTION_VAL_8_EL },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_EL },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_EL },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_EL },
          { "10", OPTION_VAL_10_EL },
          { NULL, NULL },
       },
@@ -33634,9 +33970,9 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       "input",
       {
          { "0", OPTION_VAL_0_EL },
-         { "1", OPTION_VAL_1_EL },
-         { "2", OPTION_VAL_2_EL },
-         { "3", OPTION_VAL_3_EL },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EL },
          { NULL, NULL },
@@ -34815,7 +35151,15 @@ struct retro_core_options_v2 options_el = {
 #define OPTION_VAL_HARDWARE_VK_EN NULL
 #define OPTION_VAL_SOFTWARE_EN NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_EN "Software Frame-buffer"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_EN "Enable accurate emulation of frame-buffer effects (e.g. motion blur, FF7 battle swirl) when using hardware renderers by running a copy of the software renderer at native resolution in the background. If disabled, these operations are omitted (OpenGL) or rendered on the GPU (Vulkan). Disabling can improve performance but may cause severe graphical errors. Leave enabled if unsure."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_EN NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_EN NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_EN NULL
+#define OPTION_VAL_1_EN NULL
+#define OPTION_VAL_2_EN NULL
+#define OPTION_VAL_3_EN NULL
+#define OPTION_VAL_4_EN NULL
+#define OPTION_VAL_6_EN NULL
+#define OPTION_VAL_8_EN NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_EN NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_EN NULL
 #define OPTION_VAL_24BIT_EN NULL
@@ -34904,9 +35248,9 @@ struct retro_core_options_v2 options_el = {
 #define OPTION_VAL_VERYHIGH_EN NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_EN NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_EN NULL
-#define OPTION_VAL_4_EN NULL
-#define OPTION_VAL_6_EN NULL
-#define OPTION_VAL_8_EN NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_EN NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_EN NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_EN NULL
 #define OPTION_VAL_10_EN NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_EN NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_EN NULL
@@ -35088,9 +35432,9 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EN NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EN NULL
 #define OPTION_VAL_0_EN NULL
-#define OPTION_VAL_1_EN NULL
-#define OPTION_VAL_2_EN NULL
-#define OPTION_VAL_3_EN NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EN NULL
@@ -35577,6 +35921,26 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_EN,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_EN,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_EN },
+         { "2",        OPTION_VAL_2_EN },
+         { "3",        OPTION_VAL_3_EN },
+         { "4",        OPTION_VAL_4_EN },
+         { "6",        OPTION_VAL_6_EN },
+         { "8",        OPTION_VAL_8_EN },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_EN,
       NULL,
@@ -35783,9 +36147,9 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_EN },
-         { "6", OPTION_VAL_6_EN },
-         { "8", OPTION_VAL_8_EN },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_EN },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_EN },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_EN },
          { "10", OPTION_VAL_10_EN },
          { NULL, NULL },
       },
@@ -36521,9 +36885,9 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       "input",
       {
          { "0", OPTION_VAL_0_EN },
-         { "1", OPTION_VAL_1_EN },
-         { "2", OPTION_VAL_2_EN },
-         { "3", OPTION_VAL_3_EN },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EN },
          { NULL, NULL },
@@ -37702,7 +38066,15 @@ struct retro_core_options_v2 options_en = {
 #define OPTION_VAL_HARDWARE_VK_EO "Aparatara (Vulkan)"
 #define OPTION_VAL_SOFTWARE_EO "Programara"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_EO "Programara filmerbufrilo"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_EO "Ebligi precizan imitadon de filmerbufrilajn efikojn (ekz. movmalklareco, la batala kirlo de FF7) kiam uzante aparatarajn bildigilojn per rulante kopion de la programara bildigilo ĉe indiĝena distingivo fone. Se malebligite, ĉi tiuj operacioj estas malkonsiderataj (OpenGL) aŭ bildigataj ĉe la grafika procesoro (Vulkan). Malebligo povas plibonigi rendimenton sed povas kaŭzi gravajn grafikajn erarojn. Lasu ebligite se necerta."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_EO NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_EO NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_EO NULL
+#define OPTION_VAL_1_EO NULL
+#define OPTION_VAL_2_EO NULL
+#define OPTION_VAL_3_EO NULL
+#define OPTION_VAL_4_EO NULL
+#define OPTION_VAL_6_EO NULL
+#define OPTION_VAL_8_EO NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_EO "Kolorformato"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_EO NULL
 #define OPTION_VAL_24BIT_EO "24-bita (norma)"
@@ -37791,9 +38163,9 @@ struct retro_core_options_v2 options_en = {
 #define OPTION_VAL_VERYHIGH_EO NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_EO NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_EO NULL
-#define OPTION_VAL_4_EO NULL
-#define OPTION_VAL_6_EO NULL
-#define OPTION_VAL_8_EO NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_EO NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_EO NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_EO NULL
 #define OPTION_VAL_10_EO NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_EO NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_EO NULL
@@ -37975,9 +38347,9 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_EO "Tena prokrasto de kombino de analoga reĝimo de DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_EO "Tempo teni la kombinajn butonojn por analoga reĝimo"
 #define OPTION_VAL_0_EO "0-sekunda prokrasto"
-#define OPTION_VAL_1_EO "1-sekunda prokrasto"
-#define OPTION_VAL_2_EO "2-sekunda prokrasto"
-#define OPTION_VAL_3_EO "3-sekunda prokrasto"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_EO "Plurtuŝeto de konektejo 1"
@@ -38464,6 +38836,26 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_EO,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_EO,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_EO },
+         { "2",        OPTION_VAL_2_EO },
+         { "3",        OPTION_VAL_3_EO },
+         { "4",        OPTION_VAL_4_EO },
+         { "6",        OPTION_VAL_6_EO },
+         { "8",        OPTION_VAL_8_EO },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_EO,
       NULL,
@@ -38670,9 +39062,9 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_EO },
-         { "6", OPTION_VAL_6_EO },
-         { "8", OPTION_VAL_8_EO },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_EO },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_EO },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_EO },
          { "10", OPTION_VAL_10_EO },
          { NULL, NULL },
       },
@@ -39408,9 +39800,9 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       "input",
       {
          { "0", OPTION_VAL_0_EO },
-         { "1", OPTION_VAL_1_EO },
-         { "2", OPTION_VAL_2_EO },
-         { "3", OPTION_VAL_3_EO },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_EO },
          { NULL, NULL },
@@ -40589,7 +40981,15 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_HARDWARE_VK_ES NULL
 #define OPTION_VAL_SOFTWARE_ES NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_ES "Búfer de fotogramas por software"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_ES "Permite emular con precisión los efectos del búfer de fotogramas (p. ej.: desenfoque de movimiento, la espiral de batallas de FF7) al utilizar los renderizadores por hardware ejecutando una copia del renderizador por software a resolución nativa en un segundo plano. Al desactivar esta opción se omitirán estas operaciones (OpenGL) o se renderizarán en la GPU (Vulkan). Desactivar esta opción puede mejorar el rendimiento a costa de generar errores gráficos graves. En caso de duda, deja esta opción activada."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_ES NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_ES NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_ES NULL
+#define OPTION_VAL_1_ES NULL
+#define OPTION_VAL_2_ES NULL
+#define OPTION_VAL_3_ES NULL
+#define OPTION_VAL_4_ES NULL
+#define OPTION_VAL_6_ES NULL
+#define OPTION_VAL_8_ES NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_ES "Formato de color"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_ES "Selecciona la profundidad de colores de salida. 24 bits (estándar) es la señal histórica a 8 bits por canal. Color de 30 bits (HDR) renderiza una imagen de salida a 10 bits por canal, en formato Rec.2020 codificado con PQ (HDR10) para pantallas compatibles con HDR: el renderizador ya tiene una precisión interna superior a 8 bits, así que esta opción reducirá el efecto de bandas de color en los gradientes reescalados y permitirá que los contenidos irradiantes se muestren por encima de los blancos del SDR. Color de 64 bits (HDR, scRGB) emitirá una señal de coma flotante a 16 bits con el estándar Rec.709 (scRGB) lineal: la misma imagen que la del HDR a 30 bits sin la cuantización PQ a 10 bits con los colores superiores al estándar Rec.709 transmitidos como valores negativos en lugar de usar un contenedor Rec.2020; si el front-end no ofrece soporte de salida scRGB, se pasará a usar HDR de 30 bits. Solo funciona con los renderizadores de Vulkan y OpenGL y requiere soporte de HDR en el front-end, la imagen pasará a mostrarse a 24 bits si se utiliza el renderizador por software o cuando el front-end no sea compatible con HDR10. Es necesario reiniciar."
 #define OPTION_VAL_24BIT_ES "24 bits (estándar)"
@@ -40678,9 +41078,9 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_VERYHIGH_ES "Muy alto (más pérdidas)"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_ES "Fílmica: rango de brillos"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_ES "Indica la cantidad de paradas por encima del gris medio hará la codificación de la transformación de imagen Fílmica (Sobotka) antes de empezar a saturar. A mayor cantidad de paradas, mejor se separarán los contenidos más brillantes, pero la imagen será más plana. Solo afecta a la transformación de imagen Fílmica (Sobotka)."
-#define OPTION_VAL_4_ES "4 paradas (valor predet. de Blender)"
-#define OPTION_VAL_6_ES "6 paradas (saturación en 64)"
-#define OPTION_VAL_8_ES "8 paradas (saturación en 256)"
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_ES NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_ES NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_ES NULL
 #define OPTION_VAL_10_ES "10 paradas (saturación en 1024)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_ES "Bloom (resplandores) de HDR"
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_ES "Bloom (resplandor) multibanda para las salidas de imagen HDR (renderizadores por hardware, formatos de color HDR de 30 bits o scRGB de 16 bits). Los contenidos más brillantes se extraerán como luz lineal, se difuminarán en dos escalas (un núcleo compacto y una neblina más amplia) y se sumarán antes de la transformación de imagen para que el resplandor supere debidamente el color blanco \"papel\" y alcance los márgenes HDR. Comprimido con Firefly durante la extración para que un solo texel brillante no haga que el halo parpadee. Desactiva esta opción (el valor predeterminado) para que la imagen se mantenga como estaba."
@@ -40862,9 +41262,9 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_ES "Tiempo de espera para la combinación del modo analógico"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_ES "El tiempo que se deben mantener pulsados los botones de la combinación del modo analógico."
 #define OPTION_VAL_0_ES "Espera de 0 segundos"
-#define OPTION_VAL_1_ES "Espera de 1 segundo"
-#define OPTION_VAL_2_ES "Espera de 2 segundos"
-#define OPTION_VAL_3_ES "Espera de 3 segundos"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES "Espera de 4 segundos"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES "Espera de 5 segundos"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_ES "Multitap del puerto 1"
@@ -40995,7 +41395,7 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_BOB_OFFSET_ES "Bob (compensado)"
 #define OPTION_VAL_FASTMAD_ES "FastMAD (adaptativo a movimientos)"
 #define BEETLE_OPT_FRAME_DUPING_LABEL_ES "Duplicado de fotogramas"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_ES NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_ES "Permite que el front-end repita el fotograma anterior si el juego no tiene nada nuevo que mostrar en vez de hacer que lo vuelva a enviar el núcleo. Al usar la opción Omitir fotogramas duplicados del front-end, no se presentarán dichos duplicados y la imagen recibirá la velocidad de fotogramas del propio juego (para usar con herramientas de generación e interpolación de fotogramas)."
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_ES "Anular velocidad de vídeo PAL"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_ES "Debido a la diferencia entre estándares, los juegos PAL suelen parecer más lentos que sus versiones NTSC, tanto estadounidenses como japonesas. Esta opción puede anular la velocidad de vídeo PAL para intentar ejecutar dichos juegos con la velocidad de fotogramas NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_ES "Relación de aspecto del núcleo"
@@ -41351,6 +41751,26 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_ES,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_ES,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_ES },
+         { "2",        OPTION_VAL_2_ES },
+         { "3",        OPTION_VAL_3_ES },
+         { "4",        OPTION_VAL_4_ES },
+         { "6",        OPTION_VAL_6_ES },
+         { "8",        OPTION_VAL_8_ES },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_ES,
       NULL,
@@ -41557,9 +41977,9 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_ES },
-         { "6", OPTION_VAL_6_ES },
-         { "8", OPTION_VAL_8_ES },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_ES },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_ES },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_ES },
          { "10", OPTION_VAL_10_ES },
          { NULL, NULL },
       },
@@ -42295,9 +42715,9 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       "input",
       {
          { "0", OPTION_VAL_0_ES },
-         { "1", OPTION_VAL_1_ES },
-         { "2", OPTION_VAL_2_ES },
-         { "3", OPTION_VAL_3_ES },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ES },
          { NULL, NULL },
@@ -43477,6 +43897,14 @@ struct retro_core_options_v2 options_es = {
 #define OPTION_VAL_SOFTWARE_FA NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_FA NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_FA NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_FA NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_FA NULL
+#define OPTION_VAL_1_FA NULL
+#define OPTION_VAL_2_FA NULL
+#define OPTION_VAL_3_FA NULL
+#define OPTION_VAL_4_FA NULL
+#define OPTION_VAL_6_FA NULL
+#define OPTION_VAL_8_FA NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_FA NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_FA NULL
 #define OPTION_VAL_24BIT_FA NULL
@@ -43565,9 +43993,9 @@ struct retro_core_options_v2 options_es = {
 #define OPTION_VAL_VERYHIGH_FA NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_FA NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_FA NULL
-#define OPTION_VAL_4_FA NULL
-#define OPTION_VAL_6_FA NULL
-#define OPTION_VAL_8_FA NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_FA NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_FA NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_FA NULL
 #define OPTION_VAL_10_FA NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_FA NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_FA NULL
@@ -43749,9 +44177,9 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FA NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FA NULL
 #define OPTION_VAL_0_FA NULL
-#define OPTION_VAL_1_FA NULL
-#define OPTION_VAL_2_FA NULL
-#define OPTION_VAL_3_FA NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FA NULL
@@ -44238,6 +44666,26 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_FA,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_FA,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_FA },
+         { "2",        OPTION_VAL_2_FA },
+         { "3",        OPTION_VAL_3_FA },
+         { "4",        OPTION_VAL_4_FA },
+         { "6",        OPTION_VAL_6_FA },
+         { "8",        OPTION_VAL_8_FA },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_FA,
       NULL,
@@ -44444,9 +44892,9 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_FA },
-         { "6", OPTION_VAL_6_FA },
-         { "8", OPTION_VAL_8_FA },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_FA },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_FA },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_FA },
          { "10", OPTION_VAL_10_FA },
          { NULL, NULL },
       },
@@ -45182,9 +45630,9 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       "input",
       {
          { "0", OPTION_VAL_0_FA },
-         { "1", OPTION_VAL_1_FA },
-         { "2", OPTION_VAL_2_FA },
-         { "3", OPTION_VAL_3_FA },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FA },
          { NULL, NULL },
@@ -46363,7 +46811,15 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_HARDWARE_VK_FI "Laitteisto (Vulkan)"
 #define OPTION_VAL_SOFTWARE_FI "Ohjelmisto"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_FI "Ohjelmisto kehyspuskuri"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_FI "Ota käyttöön kehyspuskuri-tehosteiden (esim. liikkeen hämärtyminen, FF7-taistelun pyörre) tarkka emulointi laitteistopohjaista renderöijöitää käytettäessä ajamalla taustalla ohjelmistopohjaisen renderöijän kopio alkuperäisellä tarkkuudella. Jos tämä asetus on pois käytöstä, nämä toiminnot ohitetaan (OpenGL) tai renderöidään näytönohjaimella (Vulkan). Asetuksen poistaminen käytöstä voi parantaa suorituskykyä, mutta se voi aiheuttaa vakavia graafisia virheitä. Jätä asetus käyttöön, jos et ole varma."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_FI NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_FI NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_FI NULL
+#define OPTION_VAL_1_FI NULL
+#define OPTION_VAL_2_FI NULL
+#define OPTION_VAL_3_FI NULL
+#define OPTION_VAL_4_FI NULL
+#define OPTION_VAL_6_FI NULL
+#define OPTION_VAL_8_FI NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_FI NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_FI NULL
 #define OPTION_VAL_24BIT_FI NULL
@@ -46452,9 +46908,9 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_VERYHIGH_FI NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_FI NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_FI NULL
-#define OPTION_VAL_4_FI NULL
-#define OPTION_VAL_6_FI NULL
-#define OPTION_VAL_8_FI NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_FI NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_FI NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_FI NULL
 #define OPTION_VAL_10_FI NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_FI NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_FI NULL
@@ -46636,9 +47092,9 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FI "DualShockin analogisen tilan combon pitämisen viive"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FI NULL
 #define OPTION_VAL_0_FI "0 sekunnin viive"
-#define OPTION_VAL_1_FI "1 sekunnin viive"
-#define OPTION_VAL_2_FI "2 sekunnin viive"
-#define OPTION_VAL_3_FI "3 sekunnin viive"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FI NULL
@@ -47125,6 +47581,26 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_FI,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_FI,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_FI },
+         { "2",        OPTION_VAL_2_FI },
+         { "3",        OPTION_VAL_3_FI },
+         { "4",        OPTION_VAL_4_FI },
+         { "6",        OPTION_VAL_6_FI },
+         { "8",        OPTION_VAL_8_FI },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_FI,
       NULL,
@@ -47331,9 +47807,9 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_FI },
-         { "6", OPTION_VAL_6_FI },
-         { "8", OPTION_VAL_8_FI },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_FI },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_FI },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_FI },
          { "10", OPTION_VAL_10_FI },
          { NULL, NULL },
       },
@@ -48069,9 +48545,9 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       "input",
       {
          { "0", OPTION_VAL_0_FI },
-         { "1", OPTION_VAL_1_FI },
-         { "2", OPTION_VAL_2_FI },
-         { "3", OPTION_VAL_3_FI },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FI },
          { NULL, NULL },
@@ -49250,7 +49726,15 @@ struct retro_core_options_v2 options_fi = {
 #define OPTION_VAL_HARDWARE_VK_FR "Matériel (Vulkan)"
 #define OPTION_VAL_SOFTWARE_FR "Logiciel"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_FR "Tampon d'image logiciel"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_FR "Activer l'émulation précise des effets de tampon d'image (flou de mouvement, tourbillon de combat dans FF7 par exemple) lors de l'utilisation des moteurs de rendu matériels en exécutant une copie du rendu logiciel à la résolution native en arrière-plan. Si cette option est désactivée, ces opérations sont omises (OpenGL) ou rendues par le processeur graphique (Vulkan). La désactivation peut améliorer les performances mais peut causer des erreurs graphiques graves. Laisser activé si vous n'êtes pas sûr."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_FR NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_FR NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_FR NULL
+#define OPTION_VAL_1_FR NULL
+#define OPTION_VAL_2_FR NULL
+#define OPTION_VAL_3_FR NULL
+#define OPTION_VAL_4_FR NULL
+#define OPTION_VAL_6_FR NULL
+#define OPTION_VAL_8_FR NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_FR "Format de sortie couleur"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_FR NULL
 #define OPTION_VAL_24BIT_FR "24 bits (standard)"
@@ -49339,9 +49823,9 @@ struct retro_core_options_v2 options_fi = {
 #define OPTION_VAL_VERYHIGH_FR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_FR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_FR NULL
-#define OPTION_VAL_4_FR NULL
-#define OPTION_VAL_6_FR NULL
-#define OPTION_VAL_8_FR NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_FR NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_FR NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_FR NULL
 #define OPTION_VAL_10_FR NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_FR NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_FR NULL
@@ -49523,9 +50007,9 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_FR "Délai de maintien de la combinaison de touches du mode analogique DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_FR "Temps de maintien de la combinaison de touches pour le mode analogique."
 #define OPTION_VAL_0_FR "Retard de 0 seconde"
-#define OPTION_VAL_1_FR "Retard de 1 seconde"
-#define OPTION_VAL_2_FR "Retard de 2 secondes"
-#define OPTION_VAL_3_FR "Retard de 3 secondes"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_FR "Multitap sur le port 1"
@@ -50012,6 +50496,26 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_FR,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_FR,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_FR },
+         { "2",        OPTION_VAL_2_FR },
+         { "3",        OPTION_VAL_3_FR },
+         { "4",        OPTION_VAL_4_FR },
+         { "6",        OPTION_VAL_6_FR },
+         { "8",        OPTION_VAL_8_FR },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_FR,
       NULL,
@@ -50218,9 +50722,9 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_FR },
-         { "6", OPTION_VAL_6_FR },
-         { "8", OPTION_VAL_8_FR },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_FR },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_FR },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_FR },
          { "10", OPTION_VAL_10_FR },
          { NULL, NULL },
       },
@@ -50956,9 +51460,9 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       "input",
       {
          { "0", OPTION_VAL_0_FR },
-         { "1", OPTION_VAL_1_FR },
-         { "2", OPTION_VAL_2_FR },
-         { "3", OPTION_VAL_3_FR },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_FR },
          { NULL, NULL },
@@ -52137,7 +52641,15 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_HARDWARE_VK_GA "Crua-earraí (Vulkan)"
 #define OPTION_VAL_SOFTWARE_GA "Bogearraí"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_GA "Maolán Fráma Bogearraí"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GA "Cumasaigh aithris chruinn ar éifeachtaí maolán fráma (m.sh. doiléire gluaisne, corraíl chatha FF7) agus rindreálaithe crua-earraí in úsáid trí chóip den rindreálaí bogearraí a rith ag réiteach dúchasach sa chúlra. Má tá sé díchumasaithe, fágtar na hoibríochtaí seo ar lár (OpenGL) nó rindreáiltear iad ar an GPU (Vulkan). Is féidir le díchumasú feidhmíocht a fheabhsú ach d'fhéadfadh earráidí grafacha tromchúiseacha a bheith mar thoradh air. Fág cumasaithe mura bhfuil tú cinnte."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GA NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_GA "Snáithe GPU"
+#define BEETLE_OPT_GPU_THREAD_INFO_0_GA NULL
+#define OPTION_VAL_1_GA "1 Lána"
+#define OPTION_VAL_2_GA "2 Lána"
+#define OPTION_VAL_3_GA "3 Lána"
+#define OPTION_VAL_4_GA "4 Lána"
+#define OPTION_VAL_6_GA "6 Lána"
+#define OPTION_VAL_8_GA "8 Lána"
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_GA "Formáid Dath"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_GA "Roghnaítear doimhneacht datha an aschuir. Is é '24-giotán (Caighdeánach)' an t-aschur traidisiúnta, ina mbíonn 8 ngiotán in aghaidh an chainéil. Cuireann 'Dath 30-giotán (HDR)' aschur ar fáil le 10 ngiotán in aghaidh an chainéil, i bhformáid Rec.2020 (HDR10) atá ionchódaithe le PQ, chun é a thaispeáint ar scáileán a thacaíonn le HDR: ós rud é go n-úsáideann an t-inneall rindreála cruinneas inmheánach atá níos mó ná 8 ngiotán, laghdaítear an bhandáil ar ghrádáin a mhéadaítear i scála, agus is féidir le hábhar solas-astaíoch a bheith níos gile ná an bán caighdeánach (SDR). Cuireann 'Dath 64-giotán (HDR, scRGB)' aschur ar fáil i bhformáid Rec.709 líneach le pointí ar snámh 16-giotán (scRGB): is í an íomhá chéanna í agus atá i gcás HDR 30-giotán, ach gan an chandúchán PQ 10-giotán; ina theannta sin, léirítear dathanna atá lasmuigh de raon Rec.709 mar luachanna diúltacha, seachas iad a chur laistigh de choimeádán Rec.2020. Má tharlaíonn nach dtacaíonn an comhéadan tosaigh le hionchur scRGB, aistríonn an córas go HDR 30-giotán go huathoibríoch. Tá feidhm leis seo nuair a úsáidtear innill rindreála crua-earraí Vulkan nó OpenGL, agus teastaíonn tacaíocht HDR ón gcomhéadan tosaigh; má úsáidtear an t-inneall rindreála bogearraí, nó mura féidir leis an gcomhéadan tosaigh HDR a thaispeáint, aistrítear go mód 24-giotán. Teastaíonn atosaigh."
 #define OPTION_VAL_24BIT_GA "24-giotán (Caighdeánach)"
@@ -52226,9 +52738,9 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_VERYHIGH_GA "An-ard (is mó atá brúite)"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_GA "Scannánúil: Raon na Soilse"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_GA "An líon céimeanna stops os cionn an liath mheáin a shroicheann ionchódú logartamach an 'Filmic (Sobotka) Display Transform' sula dtarlaíonn sáithiú. Trí níos mó céimeanna a bheith ann, fanann ábhar an-gheal in-idirdhealaithe, ach bíonn íomhá níos cothroime níos lú codarsnachta mar thoradh air sin. Ní bhaineann sé seo ach leis an 'Filmic (Sobotka) Display Transform'."
-#define OPTION_VAL_4_GA "4 chéim (réamhshocrú Blender)"
-#define OPTION_VAL_6_GA "6 chéim (sáithíonn ag 64)"
-#define OPTION_VAL_8_GA "8 gcéim (sáithíonn ag 256)"
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_GA "4 chéim (réamhshocrú Blender)"
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_GA "6 chéim (sáithíonn ag 64)"
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_GA "8 stad (sáithíonn ag 256)"
 #define OPTION_VAL_10_GA "10 gcéim (sáithíonn ag 1024)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_GA "Bláthú HDR"
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_GA "Bláth ilbhanda do na haschuir HDR (rindreálaithe crua-earraí, formáid datha HDR 30-giotán nó scRGB 16-giotán). Déantar ábhar geal a bhaint amach i solas líneach, a dhoiléiriú ag dhá scála - croí daingean agus ceo leathan - agus a chur leis roimh an gClaochlú Taispeána, ionas go sáraíonn an lonrú bán páipéir i ndáiríre agus go dtiteann sé i spás ceann HDR. Comhbhrúite le Firefly ag an eastóscadh ionas nach féidir le texel geal aonair an hala a chur ag splancadh. Fágann 'Díchumasaithe' (réamhshocraithe) an pictiúr mar a bhí roimhe."
@@ -52410,9 +52922,9 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_GA "Moill Shealbhaíochta i Mód Analógach DualShock Combo"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_GA "Coinnigh am do na cnaipí teaglama mód analógach."
 #define OPTION_VAL_0_GA "Moill 0 Soicind"
-#define OPTION_VAL_1_GA "Moill 1 Soicind"
-#define OPTION_VAL_2_GA "Moill 2 Shoicind"
-#define OPTION_VAL_3_GA "Moill 3 Shoicind"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA "Moill Soicind Amháin"
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA "Moill Dhá Shoicind"
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA "Moill Trí Shoicind"
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA "Moill 4 soicind"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA "Moill 5 Soicind"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_GA "Il-thapáil ar Port 1"
@@ -52543,7 +53055,7 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_BOB_OFFSET_GA "Bob (Fritháireamh)"
 #define OPTION_VAL_FASTMAD_GA "FastMAD (Oiriúnaitheach Gluaiseachta)"
 #define BEETLE_OPT_FRAME_DUPING_LABEL_GA "Dupáil Fráma"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_GA NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_GA "Lig don chomhéadan an fráma roimhe seo a athdhéanamh nuair nach bhfuil aon rud nua le taispeáint ag an gcluiche, in áit go seolfadh an croíleacán arís é. Leis an ngné 'Skip Duplicate Frames' (Scipeáil Frámaí Dúblacha) sa chomhéadan, ní thaispeántar na hathdhéamhanna sin; dá bhrí sin, faigheann an taispeáint ráta frámaí an chluiche féin (rud atá úsáideach do ghiniúint frámaí agus d'uirlisí idirshuímh)."
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_GA "Sáraigh Ama Físe PAL"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_GA "Mar gheall ar chaighdeáin éagsúla, is minic a bhíonn cuma mhoillithe ar chluichí PAL i gcomparáid leis na heisiúintí NTSC Meiriceánacha nó Seapánacha. Is féidir an rogha seo a úsáid chun amanna PAL a shárú d’fhonn iarracht a dhéanamh na cluichí seo a rith leis an ráta fráma NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_GA "Cóimheas Gné Croí"
@@ -52899,6 +53411,26 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_GA,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_GA,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_GA },
+         { "2",        OPTION_VAL_2_GA },
+         { "3",        OPTION_VAL_3_GA },
+         { "4",        OPTION_VAL_4_GA },
+         { "6",        OPTION_VAL_6_GA },
+         { "8",        OPTION_VAL_8_GA },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_GA,
       NULL,
@@ -53105,9 +53637,9 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_GA },
-         { "6", OPTION_VAL_6_GA },
-         { "8", OPTION_VAL_8_GA },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_GA },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_GA },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_GA },
          { "10", OPTION_VAL_10_GA },
          { NULL, NULL },
       },
@@ -53843,9 +54375,9 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
       "input",
       {
          { "0", OPTION_VAL_0_GA },
-         { "1", OPTION_VAL_1_GA },
-         { "2", OPTION_VAL_2_GA },
-         { "3", OPTION_VAL_3_GA },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GA },
          { NULL, NULL },
@@ -55024,7 +55556,15 @@ struct retro_core_options_v2 options_ga = {
 #define OPTION_VAL_HARDWARE_VK_GL NULL
 #define OPTION_VAL_SOFTWARE_GL NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_GL NULL
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GL "Activa a emulación precisa dos efectos do framebuffer (por exemplo, desenfoque de movemento, remolino de batalla FF7) ao utilizar renderizadores de hardware executando unha copia do renderizador de software con resolución nativa en segundo plano. Se está desactivada, estas operacións omítense (OpenGL) ou represéntanse na GPU (Vulkan). A desactivación pode mellorar o rendemento, pero pode provocar erros gráficos graves. Deixa activado se non está seguro."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GL NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_GL NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_GL NULL
+#define OPTION_VAL_1_GL NULL
+#define OPTION_VAL_2_GL NULL
+#define OPTION_VAL_3_GL NULL
+#define OPTION_VAL_4_GL NULL
+#define OPTION_VAL_6_GL NULL
+#define OPTION_VAL_8_GL NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_GL "Formato de cor"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_GL NULL
 #define OPTION_VAL_24BIT_GL "24 bits (estándar)"
@@ -55113,9 +55653,9 @@ struct retro_core_options_v2 options_ga = {
 #define OPTION_VAL_VERYHIGH_GL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_GL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_GL NULL
-#define OPTION_VAL_4_GL NULL
-#define OPTION_VAL_6_GL NULL
-#define OPTION_VAL_8_GL NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_GL NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_GL NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_GL NULL
 #define OPTION_VAL_10_GL NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_GL NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_GL NULL
@@ -55297,9 +55837,9 @@ struct retro_core_options_v2 options_ga = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_GL "Retardo de retención combinado de modo analóxico DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_GL "Tempo de mantemento para os botóns da combinación do modo analóxico."
 #define OPTION_VAL_0_GL "Retraso de 0 segundos"
-#define OPTION_VAL_1_GL "Retraso de 1 segundo"
-#define OPTION_VAL_2_GL "Retraso de 2 segundos"
-#define OPTION_VAL_3_GL "Retraso de 3 segundos"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_GL "Multitap no Porto 1"
@@ -55786,6 +56326,26 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_GL,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_GL,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_GL },
+         { "2",        OPTION_VAL_2_GL },
+         { "3",        OPTION_VAL_3_GL },
+         { "4",        OPTION_VAL_4_GL },
+         { "6",        OPTION_VAL_6_GL },
+         { "8",        OPTION_VAL_8_GL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_GL,
       NULL,
@@ -55992,9 +56552,9 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_GL },
-         { "6", OPTION_VAL_6_GL },
-         { "8", OPTION_VAL_8_GL },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_GL },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_GL },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_GL },
          { "10", OPTION_VAL_10_GL },
          { NULL, NULL },
       },
@@ -56730,9 +57290,9 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       "input",
       {
          { "0", OPTION_VAL_0_GL },
-         { "1", OPTION_VAL_1_GL },
-         { "2", OPTION_VAL_2_GL },
-         { "3", OPTION_VAL_3_GL },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_GL },
          { NULL, NULL },
@@ -57912,6 +58472,14 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_SOFTWARE_HE NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_HE NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_HE NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_HE NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_HE NULL
+#define OPTION_VAL_1_HE NULL
+#define OPTION_VAL_2_HE NULL
+#define OPTION_VAL_3_HE NULL
+#define OPTION_VAL_4_HE NULL
+#define OPTION_VAL_6_HE NULL
+#define OPTION_VAL_8_HE NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_HE NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_HE NULL
 #define OPTION_VAL_24BIT_HE NULL
@@ -58000,9 +58568,9 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_VERYHIGH_HE NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_HE NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_HE NULL
-#define OPTION_VAL_4_HE NULL
-#define OPTION_VAL_6_HE NULL
-#define OPTION_VAL_8_HE NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_HE NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_HE NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_HE NULL
 #define OPTION_VAL_10_HE NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_HE NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_HE NULL
@@ -58184,9 +58752,9 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HE NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HE NULL
 #define OPTION_VAL_0_HE NULL
-#define OPTION_VAL_1_HE NULL
-#define OPTION_VAL_2_HE NULL
-#define OPTION_VAL_3_HE NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HE NULL
@@ -58673,6 +59241,26 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_HE,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_HE,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_HE },
+         { "2",        OPTION_VAL_2_HE },
+         { "3",        OPTION_VAL_3_HE },
+         { "4",        OPTION_VAL_4_HE },
+         { "6",        OPTION_VAL_6_HE },
+         { "8",        OPTION_VAL_8_HE },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_HE,
       NULL,
@@ -58879,9 +59467,9 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_HE },
-         { "6", OPTION_VAL_6_HE },
-         { "8", OPTION_VAL_8_HE },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_HE },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_HE },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_HE },
          { "10", OPTION_VAL_10_HE },
          { NULL, NULL },
       },
@@ -59617,9 +60205,9 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       "input",
       {
          { "0", OPTION_VAL_0_HE },
-         { "1", OPTION_VAL_1_HE },
-         { "2", OPTION_VAL_2_HE },
-         { "3", OPTION_VAL_3_HE },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HE },
          { NULL, NULL },
@@ -60799,6 +61387,14 @@ struct retro_core_options_v2 options_he = {
 #define OPTION_VAL_SOFTWARE_HR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_HR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_HR NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_HR NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_HR NULL
+#define OPTION_VAL_1_HR NULL
+#define OPTION_VAL_2_HR NULL
+#define OPTION_VAL_3_HR NULL
+#define OPTION_VAL_4_HR NULL
+#define OPTION_VAL_6_HR NULL
+#define OPTION_VAL_8_HR NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_HR NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_HR NULL
 #define OPTION_VAL_24BIT_HR NULL
@@ -60887,9 +61483,9 @@ struct retro_core_options_v2 options_he = {
 #define OPTION_VAL_VERYHIGH_HR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_HR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_HR NULL
-#define OPTION_VAL_4_HR NULL
-#define OPTION_VAL_6_HR NULL
-#define OPTION_VAL_8_HR NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_HR NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_HR NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_HR NULL
 #define OPTION_VAL_10_HR NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_HR NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_HR NULL
@@ -61071,9 +61667,9 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HR NULL
 #define OPTION_VAL_0_HR NULL
-#define OPTION_VAL_1_HR NULL
-#define OPTION_VAL_2_HR NULL
-#define OPTION_VAL_3_HR NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HR NULL
@@ -61560,6 +62156,26 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_HR,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_HR,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_HR },
+         { "2",        OPTION_VAL_2_HR },
+         { "3",        OPTION_VAL_3_HR },
+         { "4",        OPTION_VAL_4_HR },
+         { "6",        OPTION_VAL_6_HR },
+         { "8",        OPTION_VAL_8_HR },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_HR,
       NULL,
@@ -61766,9 +62382,9 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_HR },
-         { "6", OPTION_VAL_6_HR },
-         { "8", OPTION_VAL_8_HR },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_HR },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_HR },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_HR },
          { "10", OPTION_VAL_10_HR },
          { NULL, NULL },
       },
@@ -62504,9 +63120,9 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       "input",
       {
          { "0", OPTION_VAL_0_HR },
-         { "1", OPTION_VAL_1_HR },
-         { "2", OPTION_VAL_2_HR },
-         { "3", OPTION_VAL_3_HR },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HR },
          { NULL, NULL },
@@ -63685,7 +64301,15 @@ struct retro_core_options_v2 options_hr = {
 #define OPTION_VAL_HARDWARE_VK_HU "Hardveres (Vulkan)"
 #define OPTION_VAL_SOFTWARE_HU "Szoftveres"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_HU "Szoftveres framebuffer"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_HU "A framebuffer effektek (mozgási elmosódás, FF7 csata örvény) pontos emulálása hardveres megjelenítőknél is, egy normál felbontású szoftveres megjelenítő futtatásával a háttérben. Kikapcsolva ezek a műveletek elmaradnak (OpenGL) vagy a GPU számolja őket (Vulkan). A kikapcsolás javíthatja a teljesítményt, de súlyos grafikus hibákat okozhat. Kétség esetén maradjon bekapcsolva."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_HU NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_HU NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_HU NULL
+#define OPTION_VAL_1_HU NULL
+#define OPTION_VAL_2_HU NULL
+#define OPTION_VAL_3_HU NULL
+#define OPTION_VAL_4_HU NULL
+#define OPTION_VAL_6_HU NULL
+#define OPTION_VAL_8_HU NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_HU NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_HU NULL
 #define OPTION_VAL_24BIT_HU NULL
@@ -63774,9 +64398,9 @@ struct retro_core_options_v2 options_hr = {
 #define OPTION_VAL_VERYHIGH_HU NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_HU NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_HU NULL
-#define OPTION_VAL_4_HU NULL
-#define OPTION_VAL_6_HU NULL
-#define OPTION_VAL_8_HU NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_HU NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_HU NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_HU NULL
 #define OPTION_VAL_10_HU NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_HU NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_HU NULL
@@ -63958,9 +64582,9 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_HU "DualShock analóg mód gombkombináció késleltetés"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_HU NULL
 #define OPTION_VAL_0_HU "0 másodperc"
-#define OPTION_VAL_1_HU "1 másodperc"
-#define OPTION_VAL_2_HU "2 másodperc"
-#define OPTION_VAL_3_HU "3 másodperc"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_HU NULL
@@ -64447,6 +65071,26 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_HU,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_HU,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_HU },
+         { "2",        OPTION_VAL_2_HU },
+         { "3",        OPTION_VAL_3_HU },
+         { "4",        OPTION_VAL_4_HU },
+         { "6",        OPTION_VAL_6_HU },
+         { "8",        OPTION_VAL_8_HU },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_HU,
       NULL,
@@ -64653,9 +65297,9 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_HU },
-         { "6", OPTION_VAL_6_HU },
-         { "8", OPTION_VAL_8_HU },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_HU },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_HU },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_HU },
          { "10", OPTION_VAL_10_HU },
          { NULL, NULL },
       },
@@ -65391,9 +66035,9 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       "input",
       {
          { "0", OPTION_VAL_0_HU },
-         { "1", OPTION_VAL_1_HU },
-         { "2", OPTION_VAL_2_HU },
-         { "3", OPTION_VAL_3_HU },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_HU },
          { NULL, NULL },
@@ -66573,6 +67217,14 @@ struct retro_core_options_v2 options_hu = {
 #define OPTION_VAL_SOFTWARE_ID NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_ID "Dapar Bingkai Digital"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_ID NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_ID NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_ID NULL
+#define OPTION_VAL_1_ID NULL
+#define OPTION_VAL_2_ID NULL
+#define OPTION_VAL_3_ID NULL
+#define OPTION_VAL_4_ID NULL
+#define OPTION_VAL_6_ID NULL
+#define OPTION_VAL_8_ID NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_ID NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_ID NULL
 #define OPTION_VAL_24BIT_ID NULL
@@ -66661,9 +67313,9 @@ struct retro_core_options_v2 options_hu = {
 #define OPTION_VAL_VERYHIGH_ID NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_ID NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_ID NULL
-#define OPTION_VAL_4_ID NULL
-#define OPTION_VAL_6_ID NULL
-#define OPTION_VAL_8_ID NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_ID NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_ID NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_ID NULL
 #define OPTION_VAL_10_ID NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_ID NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_ID NULL
@@ -66845,9 +67497,9 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_ID "Tahan Penundaan Mode Kombo Analog DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_ID NULL
 #define OPTION_VAL_0_ID "Bertunda 0 Detik"
-#define OPTION_VAL_1_ID "Bertunda 1 Detik"
-#define OPTION_VAL_2_ID "Bertunda 2 Detik"
-#define OPTION_VAL_3_ID "Bertunda 3 Detik"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_ID NULL
@@ -67334,6 +67986,26 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_ID,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_ID,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_ID },
+         { "2",        OPTION_VAL_2_ID },
+         { "3",        OPTION_VAL_3_ID },
+         { "4",        OPTION_VAL_4_ID },
+         { "6",        OPTION_VAL_6_ID },
+         { "8",        OPTION_VAL_8_ID },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_ID,
       NULL,
@@ -67540,9 +68212,9 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_ID },
-         { "6", OPTION_VAL_6_ID },
-         { "8", OPTION_VAL_8_ID },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_ID },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_ID },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_ID },
          { "10", OPTION_VAL_10_ID },
          { NULL, NULL },
       },
@@ -68278,9 +68950,9 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       "input",
       {
          { "0", OPTION_VAL_0_ID },
-         { "1", OPTION_VAL_1_ID },
-         { "2", OPTION_VAL_2_ID },
-         { "3", OPTION_VAL_3_ID },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_ID },
          { NULL, NULL },
@@ -69459,7 +70131,15 @@ struct retro_core_options_v2 options_id = {
 #define OPTION_VAL_HARDWARE_VK_IT NULL
 #define OPTION_VAL_SOFTWARE_IT NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_IT "Framebuffer Software"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_IT "Abilita l'emulazione accurata di effetti framebuffer (es: motion blur, FF7 battle swirl) quando si utilizza renderer hardware usando una copia del renderer software a risoluzione nativa in sottofondo. Se disabilitato, le operazioni precedenti sono tralasciate (OpenGL) oppure renderizzate dalla GPU (Vulkan). Disabilitare questa impostazione può migliorare le performance ma potrebbe causare errori grafici gravi. In caso di incertezza lasciare 'Abilitato'."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_IT NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_IT NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_IT NULL
+#define OPTION_VAL_1_IT NULL
+#define OPTION_VAL_2_IT NULL
+#define OPTION_VAL_3_IT NULL
+#define OPTION_VAL_4_IT NULL
+#define OPTION_VAL_6_IT NULL
+#define OPTION_VAL_8_IT NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_IT NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_IT NULL
 #define OPTION_VAL_24BIT_IT NULL
@@ -69548,9 +70228,9 @@ struct retro_core_options_v2 options_id = {
 #define OPTION_VAL_VERYHIGH_IT NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_IT NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_IT NULL
-#define OPTION_VAL_4_IT NULL
-#define OPTION_VAL_6_IT NULL
-#define OPTION_VAL_8_IT NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_IT NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_IT NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_IT NULL
 #define OPTION_VAL_10_IT NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_IT NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_IT NULL
@@ -69732,9 +70412,9 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_IT "Tempo di attesa per la combinazione della Modalità Dualshock Analogica"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_IT NULL
 #define OPTION_VAL_0_IT "0 Secondi"
-#define OPTION_VAL_1_IT "1 Secondi"
-#define OPTION_VAL_2_IT "2 Secondi"
-#define OPTION_VAL_3_IT "3 Secondi"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_IT "Multitap sulla porta 1"
@@ -70221,6 +70901,26 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_IT,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_IT,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_IT },
+         { "2",        OPTION_VAL_2_IT },
+         { "3",        OPTION_VAL_3_IT },
+         { "4",        OPTION_VAL_4_IT },
+         { "6",        OPTION_VAL_6_IT },
+         { "8",        OPTION_VAL_8_IT },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_IT,
       NULL,
@@ -70427,9 +71127,9 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_IT },
-         { "6", OPTION_VAL_6_IT },
-         { "8", OPTION_VAL_8_IT },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_IT },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_IT },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_IT },
          { "10", OPTION_VAL_10_IT },
          { NULL, NULL },
       },
@@ -71165,9 +71865,9 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       "input",
       {
          { "0", OPTION_VAL_0_IT },
-         { "1", OPTION_VAL_1_IT },
-         { "2", OPTION_VAL_2_IT },
-         { "3", OPTION_VAL_3_IT },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_IT },
          { NULL, NULL },
@@ -72346,7 +73046,15 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_HARDWARE_VK_JA "ハードウェア (Vulkan)"
 #define OPTION_VAL_SOFTWARE_JA "ソフトウェア"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_JA "ソフトウェアフレームバッファ"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_JA "ソフトウェアレンダラーのコピー (ネイティブ解像度) をバックグラウンドで実行することで、ハードウェアレンダラーを使用中にフレームバッファ効果の正確なエミュレーションを有効にします。無効にすると、これらの操作は省略される (OpenGL) か、GPU でレンダリング (Vulkan) されます。不明な場合は有効のままにしてください。"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_JA NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_JA NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_JA NULL
+#define OPTION_VAL_1_JA NULL
+#define OPTION_VAL_2_JA NULL
+#define OPTION_VAL_3_JA NULL
+#define OPTION_VAL_4_JA NULL
+#define OPTION_VAL_6_JA NULL
+#define OPTION_VAL_8_JA NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_JA NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_JA NULL
 #define OPTION_VAL_24BIT_JA NULL
@@ -72435,9 +73143,9 @@ struct retro_core_options_v2 options_it = {
 #define OPTION_VAL_VERYHIGH_JA NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_JA NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_JA NULL
-#define OPTION_VAL_4_JA NULL
-#define OPTION_VAL_6_JA NULL
-#define OPTION_VAL_8_JA NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_JA NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_JA NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_JA NULL
 #define OPTION_VAL_10_JA NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_JA NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_JA NULL
@@ -72619,9 +73327,9 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_JA "DUALSHOCK アナログモード切り替えコンボの長押し遅延"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_JA NULL
 #define OPTION_VAL_0_JA "0 秒遅延"
-#define OPTION_VAL_1_JA "1 秒遅延"
-#define OPTION_VAL_2_JA "2 秒遅延"
-#define OPTION_VAL_3_JA "3 秒遅延"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_JA NULL
@@ -73108,6 +73816,26 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_JA,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_JA,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_JA },
+         { "2",        OPTION_VAL_2_JA },
+         { "3",        OPTION_VAL_3_JA },
+         { "4",        OPTION_VAL_4_JA },
+         { "6",        OPTION_VAL_6_JA },
+         { "8",        OPTION_VAL_8_JA },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_JA,
       NULL,
@@ -73314,9 +74042,9 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_JA },
-         { "6", OPTION_VAL_6_JA },
-         { "8", OPTION_VAL_8_JA },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_JA },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_JA },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_JA },
          { "10", OPTION_VAL_10_JA },
          { NULL, NULL },
       },
@@ -74052,9 +74780,9 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       "input",
       {
          { "0", OPTION_VAL_0_JA },
-         { "1", OPTION_VAL_1_JA },
-         { "2", OPTION_VAL_2_JA },
-         { "3", OPTION_VAL_3_JA },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_JA },
          { NULL, NULL },
@@ -75233,7 +75961,15 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_HARDWARE_VK_KO "하드웨어 (Vulkan)"
 #define OPTION_VAL_SOFTWARE_KO "소프트웨어"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_KO "소프트웨어 프레임버퍼"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_KO "하드웨어 렌더러 사용 시 1배 해상도의 소프트웨어 렌더러를 백그라운드에서 함께 구동하여 프레임버퍼 효과(모션 블러, FF7 전투 개시 효과 등)를 정확하게 에뮬레이트합니다. 비활성화할 경우, 이러한 효과는 무시되거나(OpenGL) GPU에서 렌더됩니다(Vulkan). 비활성화 시 성능이 개선되지만 심각한 그래픽 오류를 일으킬 수 있습니다. 불확실할 경우 활성으로 설정하십시오."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_KO NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_KO NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_KO NULL
+#define OPTION_VAL_1_KO NULL
+#define OPTION_VAL_2_KO NULL
+#define OPTION_VAL_3_KO NULL
+#define OPTION_VAL_4_KO NULL
+#define OPTION_VAL_6_KO NULL
+#define OPTION_VAL_8_KO NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_KO "색상 형식"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_KO NULL
 #define OPTION_VAL_24BIT_KO "24비트 (표준)"
@@ -75322,9 +76058,9 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_VERYHIGH_KO NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_KO NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_KO NULL
-#define OPTION_VAL_4_KO NULL
-#define OPTION_VAL_6_KO NULL
-#define OPTION_VAL_8_KO NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_KO NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_KO NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_KO NULL
 #define OPTION_VAL_10_KO NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_KO NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_KO NULL
@@ -75506,9 +76242,9 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_KO "DualShock 아날로그 모드 버튼 조합 홀드 지연"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_KO "아날로그 모드 버튼 조합을 누르고 있어야 할 시간입니다."
 #define OPTION_VAL_0_KO "0 초 지연"
-#define OPTION_VAL_1_KO "1 초 지연"
-#define OPTION_VAL_2_KO "2 초 지연"
-#define OPTION_VAL_3_KO "3 초 지연"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_KO "1번 포트에서 멀티탭 사용"
@@ -75995,6 +76731,26 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_KO,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_KO,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_KO },
+         { "2",        OPTION_VAL_2_KO },
+         { "3",        OPTION_VAL_3_KO },
+         { "4",        OPTION_VAL_4_KO },
+         { "6",        OPTION_VAL_6_KO },
+         { "8",        OPTION_VAL_8_KO },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_KO,
       NULL,
@@ -76201,9 +76957,9 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_KO },
-         { "6", OPTION_VAL_6_KO },
-         { "8", OPTION_VAL_8_KO },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_KO },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_KO },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_KO },
          { "10", OPTION_VAL_10_KO },
          { NULL, NULL },
       },
@@ -76939,9 +77695,9 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       "input",
       {
          { "0", OPTION_VAL_0_KO },
-         { "1", OPTION_VAL_1_KO },
-         { "2", OPTION_VAL_2_KO },
-         { "3", OPTION_VAL_3_KO },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_KO },
          { NULL, NULL },
@@ -78121,6 +78877,14 @@ struct retro_core_options_v2 options_ko = {
 #define OPTION_VAL_SOFTWARE_NL NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_NL NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_NL NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_NL NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_NL NULL
+#define OPTION_VAL_1_NL NULL
+#define OPTION_VAL_2_NL NULL
+#define OPTION_VAL_3_NL NULL
+#define OPTION_VAL_4_NL NULL
+#define OPTION_VAL_6_NL NULL
+#define OPTION_VAL_8_NL NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_NL NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_NL NULL
 #define OPTION_VAL_24BIT_NL NULL
@@ -78209,9 +78973,9 @@ struct retro_core_options_v2 options_ko = {
 #define OPTION_VAL_VERYHIGH_NL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_NL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_NL NULL
-#define OPTION_VAL_4_NL NULL
-#define OPTION_VAL_6_NL NULL
-#define OPTION_VAL_8_NL NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_NL NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_NL NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_NL NULL
 #define OPTION_VAL_10_NL NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_NL NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_NL NULL
@@ -78393,9 +79157,9 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_NL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_NL NULL
 #define OPTION_VAL_0_NL NULL
-#define OPTION_VAL_1_NL NULL
-#define OPTION_VAL_2_NL NULL
-#define OPTION_VAL_3_NL NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_NL NULL
@@ -78882,6 +79646,26 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_NL,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_NL,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_NL },
+         { "2",        OPTION_VAL_2_NL },
+         { "3",        OPTION_VAL_3_NL },
+         { "4",        OPTION_VAL_4_NL },
+         { "6",        OPTION_VAL_6_NL },
+         { "8",        OPTION_VAL_8_NL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_NL,
       NULL,
@@ -79088,9 +79872,9 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_NL },
-         { "6", OPTION_VAL_6_NL },
-         { "8", OPTION_VAL_8_NL },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_NL },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_NL },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_NL },
          { "10", OPTION_VAL_10_NL },
          { NULL, NULL },
       },
@@ -79826,9 +80610,9 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       "input",
       {
          { "0", OPTION_VAL_0_NL },
-         { "1", OPTION_VAL_1_NL },
-         { "2", OPTION_VAL_2_NL },
-         { "3", OPTION_VAL_3_NL },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NL },
          { NULL, NULL },
@@ -81008,6 +81792,14 @@ struct retro_core_options_v2 options_nl = {
 #define OPTION_VAL_SOFTWARE_NO NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_NO NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_NO NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_NO NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_NO NULL
+#define OPTION_VAL_1_NO NULL
+#define OPTION_VAL_2_NO NULL
+#define OPTION_VAL_3_NO NULL
+#define OPTION_VAL_4_NO NULL
+#define OPTION_VAL_6_NO NULL
+#define OPTION_VAL_8_NO NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_NO NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_NO NULL
 #define OPTION_VAL_24BIT_NO NULL
@@ -81096,9 +81888,9 @@ struct retro_core_options_v2 options_nl = {
 #define OPTION_VAL_VERYHIGH_NO NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_NO NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_NO NULL
-#define OPTION_VAL_4_NO NULL
-#define OPTION_VAL_6_NO NULL
-#define OPTION_VAL_8_NO NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_NO NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_NO NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_NO NULL
 #define OPTION_VAL_10_NO NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_NO NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_NO NULL
@@ -81280,9 +82072,9 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_NO NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_NO NULL
 #define OPTION_VAL_0_NO NULL
-#define OPTION_VAL_1_NO NULL
-#define OPTION_VAL_2_NO NULL
-#define OPTION_VAL_3_NO NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_NO NULL
@@ -81769,6 +82561,26 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_NO,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_NO,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_NO },
+         { "2",        OPTION_VAL_2_NO },
+         { "3",        OPTION_VAL_3_NO },
+         { "4",        OPTION_VAL_4_NO },
+         { "6",        OPTION_VAL_6_NO },
+         { "8",        OPTION_VAL_8_NO },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_NO,
       NULL,
@@ -81975,9 +82787,9 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_NO },
-         { "6", OPTION_VAL_6_NO },
-         { "8", OPTION_VAL_8_NO },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_NO },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_NO },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_NO },
          { "10", OPTION_VAL_10_NO },
          { NULL, NULL },
       },
@@ -82713,9 +83525,9 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       "input",
       {
          { "0", OPTION_VAL_0_NO },
-         { "1", OPTION_VAL_1_NO },
-         { "2", OPTION_VAL_2_NO },
-         { "3", OPTION_VAL_3_NO },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_NO },
          { NULL, NULL },
@@ -83895,6 +84707,14 @@ struct retro_core_options_v2 options_no = {
 #define OPTION_VAL_SOFTWARE_OR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_OR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_OR NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_OR NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_OR NULL
+#define OPTION_VAL_1_OR NULL
+#define OPTION_VAL_2_OR NULL
+#define OPTION_VAL_3_OR NULL
+#define OPTION_VAL_4_OR NULL
+#define OPTION_VAL_6_OR NULL
+#define OPTION_VAL_8_OR NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_OR NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_OR NULL
 #define OPTION_VAL_24BIT_OR NULL
@@ -83983,9 +84803,9 @@ struct retro_core_options_v2 options_no = {
 #define OPTION_VAL_VERYHIGH_OR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_OR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_OR NULL
-#define OPTION_VAL_4_OR NULL
-#define OPTION_VAL_6_OR NULL
-#define OPTION_VAL_8_OR NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_OR NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_OR NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_OR NULL
 #define OPTION_VAL_10_OR NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_OR NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_OR NULL
@@ -84167,9 +84987,9 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_OR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_OR NULL
 #define OPTION_VAL_0_OR NULL
-#define OPTION_VAL_1_OR NULL
-#define OPTION_VAL_2_OR NULL
-#define OPTION_VAL_3_OR NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_OR NULL
@@ -84656,6 +85476,26 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_OR,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_OR,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_OR },
+         { "2",        OPTION_VAL_2_OR },
+         { "3",        OPTION_VAL_3_OR },
+         { "4",        OPTION_VAL_4_OR },
+         { "6",        OPTION_VAL_6_OR },
+         { "8",        OPTION_VAL_8_OR },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_OR,
       NULL,
@@ -84862,9 +85702,9 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_OR },
-         { "6", OPTION_VAL_6_OR },
-         { "8", OPTION_VAL_8_OR },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_OR },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_OR },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_OR },
          { "10", OPTION_VAL_10_OR },
          { NULL, NULL },
       },
@@ -85600,9 +86440,9 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       "input",
       {
          { "0", OPTION_VAL_0_OR },
-         { "1", OPTION_VAL_1_OR },
-         { "2", OPTION_VAL_2_OR },
-         { "3", OPTION_VAL_3_OR },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_OR },
          { NULL, NULL },
@@ -86781,7 +87621,15 @@ struct retro_core_options_v2 options_or = {
 #define OPTION_VAL_HARDWARE_VK_PL "Sprzętowy (Vulkan)"
 #define OPTION_VAL_SOFTWARE_PL "Programowy"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_PL "Programy framebuffer"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_PL "Włącz dokładną emulację efektów framebufora (np. ruch rozmyty, wir bitwy FF7) podczas używania sprzętowego renderowania poprzez uruchomienie kopii software render w natywnej rozdzielczości w tle. Jeśli wyłączone, te operacje są pomijane (OpenGL) lub renderowane na GPU (Vulkan). Wyłączenie może poprawić wydajność, ale może powodować poważne błędy graficzne. Pozostaw włączone, jeśli nie ma pewności."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_PL NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_PL NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_PL NULL
+#define OPTION_VAL_1_PL NULL
+#define OPTION_VAL_2_PL NULL
+#define OPTION_VAL_3_PL NULL
+#define OPTION_VAL_4_PL NULL
+#define OPTION_VAL_6_PL NULL
+#define OPTION_VAL_8_PL NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_PL "Format kolorów"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_PL NULL
 #define OPTION_VAL_24BIT_PL "24-bitowy (standardowy)"
@@ -86870,9 +87718,9 @@ struct retro_core_options_v2 options_or = {
 #define OPTION_VAL_VERYHIGH_PL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_PL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_PL NULL
-#define OPTION_VAL_4_PL NULL
-#define OPTION_VAL_6_PL NULL
-#define OPTION_VAL_8_PL NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_PL NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_PL NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_PL NULL
 #define OPTION_VAL_10_PL NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_PL NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_PL NULL
@@ -87054,9 +87902,9 @@ struct retro_core_options_v2 options_or = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PL "Opóźnienie przytrzymania kombinacji trybu Analog DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PL "Czas przytrzymania przyciskow kombinacji trybu analog."
 #define OPTION_VAL_0_PL "0 sekund opóźnienia"
-#define OPTION_VAL_1_PL "1 sekunda opóźnienia"
-#define OPTION_VAL_2_PL "2 sekundy opóźnienia"
-#define OPTION_VAL_3_PL "3 sekundy opóźnienia"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PL "Multitap na porcie 1"
@@ -87543,6 +88391,26 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_PL,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_PL,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_PL },
+         { "2",        OPTION_VAL_2_PL },
+         { "3",        OPTION_VAL_3_PL },
+         { "4",        OPTION_VAL_4_PL },
+         { "6",        OPTION_VAL_6_PL },
+         { "8",        OPTION_VAL_8_PL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_PL,
       NULL,
@@ -87749,9 +88617,9 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_PL },
-         { "6", OPTION_VAL_6_PL },
-         { "8", OPTION_VAL_8_PL },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_PL },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_PL },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_PL },
          { "10", OPTION_VAL_10_PL },
          { NULL, NULL },
       },
@@ -88487,9 +89355,9 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       "input",
       {
          { "0", OPTION_VAL_0_PL },
-         { "1", OPTION_VAL_1_PL },
-         { "2", OPTION_VAL_2_PL },
-         { "3", OPTION_VAL_3_PL },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PL },
          { NULL, NULL },
@@ -89668,7 +90536,15 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_HARDWARE_VK_PT_BR NULL
 #define OPTION_VAL_SOFTWARE_PT_BR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_PT_BR "Quadro de buffer por software"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_PT_BR "Permite emular com precisão os efeitos de quadro de buffer (por exemplo, desfoque de movimento, espiral de batalha FF7) ao usar renderizadores de hardware, executando uma cópia do renderizador de software com resolução nativa em segundo plano. A desativação desta opção irá omitir estas operações (OpenGL) ou serão renderizadas na GPU (Vulkan). A desativação desta opção pode melhorar o desempenho ao custo de erros gráficos graves. Em caso de dúvida, deixe esta opção ativada."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_PT_BR NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_PT_BR NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_PT_BR NULL
+#define OPTION_VAL_1_PT_BR NULL
+#define OPTION_VAL_2_PT_BR NULL
+#define OPTION_VAL_3_PT_BR NULL
+#define OPTION_VAL_4_PT_BR NULL
+#define OPTION_VAL_6_PT_BR NULL
+#define OPTION_VAL_8_PT_BR NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_PT_BR "Formato de cor"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_PT_BR NULL
 #define OPTION_VAL_24BIT_PT_BR "24 bits (padrão)"
@@ -89757,9 +90633,9 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_VERYHIGH_PT_BR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_PT_BR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_PT_BR NULL
-#define OPTION_VAL_4_PT_BR NULL
-#define OPTION_VAL_6_PT_BR NULL
-#define OPTION_VAL_8_PT_BR NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_BR NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_BR NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_BR NULL
 #define OPTION_VAL_10_PT_BR NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_PT_BR NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_PT_BR NULL
@@ -89941,9 +90817,9 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_BR "Tempo de espera para a combinação de botões do modo analógico do DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_BR "Tempo necessário para manter pressionada a combinação de botões do modo analógico."
 #define OPTION_VAL_0_PT_BR "0 segundos"
-#define OPTION_VAL_1_PT_BR "1 segundo"
-#define OPTION_VAL_2_PT_BR "2 segundos"
-#define OPTION_VAL_3_PT_BR "3 segundos"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PT_BR "Multitap na Porta 1"
@@ -90430,6 +91306,26 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_PT_BR,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_PT_BR,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_PT_BR },
+         { "2",        OPTION_VAL_2_PT_BR },
+         { "3",        OPTION_VAL_3_PT_BR },
+         { "4",        OPTION_VAL_4_PT_BR },
+         { "6",        OPTION_VAL_6_PT_BR },
+         { "8",        OPTION_VAL_8_PT_BR },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_PT_BR,
       NULL,
@@ -90636,9 +91532,9 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_PT_BR },
-         { "6", OPTION_VAL_6_PT_BR },
-         { "8", OPTION_VAL_8_PT_BR },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_BR },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_BR },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_BR },
          { "10", OPTION_VAL_10_PT_BR },
          { NULL, NULL },
       },
@@ -91374,9 +92270,9 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       "input",
       {
          { "0", OPTION_VAL_0_PT_BR },
-         { "1", OPTION_VAL_1_PT_BR },
-         { "2", OPTION_VAL_2_PT_BR },
-         { "3", OPTION_VAL_3_PT_BR },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_BR },
          { NULL, NULL },
@@ -92556,6 +93452,14 @@ struct retro_core_options_v2 options_pt_br = {
 #define OPTION_VAL_SOFTWARE_PT_PT NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_PT_PT NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_PT_PT NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_PT_PT NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_PT_PT NULL
+#define OPTION_VAL_1_PT_PT NULL
+#define OPTION_VAL_2_PT_PT NULL
+#define OPTION_VAL_3_PT_PT NULL
+#define OPTION_VAL_4_PT_PT NULL
+#define OPTION_VAL_6_PT_PT NULL
+#define OPTION_VAL_8_PT_PT NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_PT_PT NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_PT_PT NULL
 #define OPTION_VAL_24BIT_PT_PT NULL
@@ -92644,9 +93548,9 @@ struct retro_core_options_v2 options_pt_br = {
 #define OPTION_VAL_VERYHIGH_PT_PT NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_PT_PT NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_PT_PT NULL
-#define OPTION_VAL_4_PT_PT NULL
-#define OPTION_VAL_6_PT_PT NULL
-#define OPTION_VAL_8_PT_PT NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_PT NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_PT NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_PT NULL
 #define OPTION_VAL_10_PT_PT NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_PT_PT NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_PT_PT NULL
@@ -92828,9 +93732,9 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_PT_PT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_PT_PT NULL
 #define OPTION_VAL_0_PT_PT NULL
-#define OPTION_VAL_1_PT_PT NULL
-#define OPTION_VAL_2_PT_PT NULL
-#define OPTION_VAL_3_PT_PT NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_PT_PT NULL
@@ -93317,6 +94221,26 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_PT_PT,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_PT_PT,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_PT_PT },
+         { "2",        OPTION_VAL_2_PT_PT },
+         { "3",        OPTION_VAL_3_PT_PT },
+         { "4",        OPTION_VAL_4_PT_PT },
+         { "6",        OPTION_VAL_6_PT_PT },
+         { "8",        OPTION_VAL_8_PT_PT },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_PT_PT,
       NULL,
@@ -93523,9 +94447,9 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_PT_PT },
-         { "6", OPTION_VAL_6_PT_PT },
-         { "8", OPTION_VAL_8_PT_PT },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_PT },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_PT },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_PT_PT },
          { "10", OPTION_VAL_10_PT_PT },
          { NULL, NULL },
       },
@@ -94261,9 +95185,9 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       "input",
       {
          { "0", OPTION_VAL_0_PT_PT },
-         { "1", OPTION_VAL_1_PT_PT },
-         { "2", OPTION_VAL_2_PT_PT },
-         { "3", OPTION_VAL_3_PT_PT },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_PT_PT },
          { NULL, NULL },
@@ -95442,7 +96366,15 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_HARDWARE_VK_RU "Аппаратный (Vulkan)"
 #define OPTION_VAL_SOFTWARE_RU "Программный"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_RU "Программный фреймбуфер"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_RU "Обеспечивает для аппаратных рендеров точную эмуляцию эффектов фреймбуфера (напр. размытие движения, закручивание перед боем в FF7), запуская фоном копию программного рендера в исходном разрешении. При откл. данные эффекты пропускаются (OpenGL) или выполняются посредством GPU (Vulkan). Отключение повышает скорость, но вызывает ошибки графики. Если не уверены, оставьте вкл."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_RU NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_RU NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_RU NULL
+#define OPTION_VAL_1_RU NULL
+#define OPTION_VAL_2_RU NULL
+#define OPTION_VAL_3_RU NULL
+#define OPTION_VAL_4_RU NULL
+#define OPTION_VAL_6_RU NULL
+#define OPTION_VAL_8_RU NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_RU NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_RU NULL
 #define OPTION_VAL_24BIT_RU NULL
@@ -95531,9 +96463,9 @@ struct retro_core_options_v2 options_pt_pt = {
 #define OPTION_VAL_VERYHIGH_RU NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_RU NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_RU NULL
-#define OPTION_VAL_4_RU NULL
-#define OPTION_VAL_6_RU NULL
-#define OPTION_VAL_8_RU NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_RU NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_RU NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_RU NULL
 #define OPTION_VAL_10_RU NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_RU NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_RU NULL
@@ -95715,9 +96647,9 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_RU "Задержка нажатия для смены режима DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_RU "Период удержания комбинации кнопок для смены режима."
 #define OPTION_VAL_0_RU "0 секунд"
-#define OPTION_VAL_1_RU "1 секунда"
-#define OPTION_VAL_2_RU "2 секунды"
-#define OPTION_VAL_3_RU "3 секунды"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_RU "Multitap в Порт 1"
@@ -96204,6 +97136,26 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_RU,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_RU,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_RU },
+         { "2",        OPTION_VAL_2_RU },
+         { "3",        OPTION_VAL_3_RU },
+         { "4",        OPTION_VAL_4_RU },
+         { "6",        OPTION_VAL_6_RU },
+         { "8",        OPTION_VAL_8_RU },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_RU,
       NULL,
@@ -96410,9 +97362,9 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_RU },
-         { "6", OPTION_VAL_6_RU },
-         { "8", OPTION_VAL_8_RU },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_RU },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_RU },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_RU },
          { "10", OPTION_VAL_10_RU },
          { NULL, NULL },
       },
@@ -97148,9 +98100,9 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       "input",
       {
          { "0", OPTION_VAL_0_RU },
-         { "1", OPTION_VAL_1_RU },
-         { "2", OPTION_VAL_2_RU },
-         { "3", OPTION_VAL_3_RU },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_RU },
          { NULL, NULL },
@@ -98329,7 +99281,15 @@ struct retro_core_options_v2 options_ru = {
 #define OPTION_VAL_HARDWARE_VK_SK "Hardvér (Vulkan)"
 #define OPTION_VAL_SOFTWARE_SK "Softvér"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SK "Softvérový framebuffer"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SK "Povolí presnú emuláciu efektov framebuffera (napr. motion blur, battle swirl vo FF7) pri použití hardvérových rendererov tak, že na pozadí beží kópia softvérového rendereru v natívnom rozlíšení. Pri vypnutí sa tieto operácie vynechajú (OpenGL) alebo vykreslia na GPU (Vulkan). Vypnutie môže zlepšiť výkon, ale môže spôsobiť závažné grafické chyby. Pri pochybnostiach nechajte zapnuté."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SK NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_SK NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_SK NULL
+#define OPTION_VAL_1_SK NULL
+#define OPTION_VAL_2_SK NULL
+#define OPTION_VAL_3_SK NULL
+#define OPTION_VAL_4_SK NULL
+#define OPTION_VAL_6_SK NULL
+#define OPTION_VAL_8_SK NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_SK "Formát farieb"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_SK "Vyberá farebnú hĺbku výstupu. '24 bitov (štandard)' je historický výstup s 8 bitmi na kanál. '30 bitové farby (HDR)' vydáva 10 bitov na kanál, Rec.2020 kódované PQ (HDR10) na zobrazenie na obrazovke s HDR: vykresľovač už interne pracuje s presnosťou vyššou ako 8 bitov, takže sa tým zmenšia farebné pásy na zväčšených prechodoch a samosvietiaci obsah môže byť nad bielou SDR. '64 bitové farby (HDR, scRGB)' vydáva 16-bitové čísla s pohyblivou čiarkou, lineárne Rec.709 (scRGB): ten istý obraz ako 30-bitové HDR bez 10-bitovej kvantizácie PQ a farby mimo Rec.709 sa prenášajú ako záporné hodnoty, nie cez kontajner Rec.2020; ak frontend neponúka vstup scRGB, použije sa 30-bitové HDR. Platí pre hardvérové vykresľovače Vulkan a OpenGL a vyžaduje podporu HDR vo frontende; so softvérovým vykresľovačom alebo keď frontend nevie zobraziť HDR, použije sa 24 bitov. Vyžaduje reštart."
 #define OPTION_VAL_24BIT_SK "24 bitov (štandard)"
@@ -98418,9 +99378,9 @@ struct retro_core_options_v2 options_ru = {
 #define OPTION_VAL_VERYHIGH_SK "Veľmi vysoký (najviac zatlačené)"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_SK "Filmic: Rozsah svetiel"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_SK "Koľko stupňov expozície nad strednou šedou dosiahne logaritmické kódovanie Transformácie displeja 'Filmic (Sobotka)', kým sa nasýti. Viac stupňov ponechá rozlíšiteľný aj veľmi jasný obsah za cenu plochejšieho obrazu. Ovplyvňuje iba Transformáciu displeja Filmic (Sobotka)."
-#define OPTION_VAL_4_SK "4 stupne (predvolené v Blenderi)"
-#define OPTION_VAL_6_SK "6 stupňov (nasýti sa pri 64)"
-#define OPTION_VAL_8_SK "8 stupňov (nasýti sa pri 256)"
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_SK NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_SK NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_SK NULL
 #define OPTION_VAL_10_SK "10 stupňov (nasýti sa pri 1024)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_SK "HDR bloom"
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_SK "Viacpásmový bloom pre HDR výstupy (hardvérové renderery, formát farieb 30-bit HDR alebo 16-bit scRGB). Jasný obsah sa vyberie v lineárnom svetle, rozmaže v dvoch mierkach – úzke jadro a široký opar – a pridá sa pred Transformáciou displeja, takže žiara naozaj presahuje papierovú bielu a dostane sa do HDR rezervy. Pri výbere sa stláčajú ojedinelé jasné body, aby jediný jasný texel nerozblikal halo. 'Vypnuté' (predvolené) ponechá obraz ako predtým."
@@ -98602,9 +99562,9 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SK "Oneskorenie podržania DualShock analóg kombinácie"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SK "Čas podržania tlačidiel kombinácie analógového režimu."
 #define OPTION_VAL_0_SK "Trvanie 0 sekúnd"
-#define OPTION_VAL_1_SK "Trvanie 1 sekunda"
-#define OPTION_VAL_2_SK "Trvanie 2 sekundy"
-#define OPTION_VAL_3_SK "Trvanie 3 sekundy"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK "Oneskorenie 4 sekundy"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK "Oneskorenie 5 sekúnd"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SK "Multitap na porte 1"
@@ -99091,6 +100051,26 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_SK,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_SK,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_SK },
+         { "2",        OPTION_VAL_2_SK },
+         { "3",        OPTION_VAL_3_SK },
+         { "4",        OPTION_VAL_4_SK },
+         { "6",        OPTION_VAL_6_SK },
+         { "8",        OPTION_VAL_8_SK },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_SK,
       NULL,
@@ -99297,9 +100277,9 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_SK },
-         { "6", OPTION_VAL_6_SK },
-         { "8", OPTION_VAL_8_SK },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_SK },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_SK },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_SK },
          { "10", OPTION_VAL_10_SK },
          { NULL, NULL },
       },
@@ -100035,9 +101015,9 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       "input",
       {
          { "0", OPTION_VAL_0_SK },
-         { "1", OPTION_VAL_1_SK },
-         { "2", OPTION_VAL_2_SK },
-         { "3", OPTION_VAL_3_SK },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SK },
          { NULL, NULL },
@@ -101217,6 +102197,14 @@ struct retro_core_options_v2 options_sk = {
 #define OPTION_VAL_SOFTWARE_SR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SR NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SR NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_SR NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_SR NULL
+#define OPTION_VAL_1_SR NULL
+#define OPTION_VAL_2_SR NULL
+#define OPTION_VAL_3_SR NULL
+#define OPTION_VAL_4_SR NULL
+#define OPTION_VAL_6_SR NULL
+#define OPTION_VAL_8_SR NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_SR NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_SR NULL
 #define OPTION_VAL_24BIT_SR NULL
@@ -101305,9 +102293,9 @@ struct retro_core_options_v2 options_sk = {
 #define OPTION_VAL_VERYHIGH_SR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_SR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_SR NULL
-#define OPTION_VAL_4_SR NULL
-#define OPTION_VAL_6_SR NULL
-#define OPTION_VAL_8_SR NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_SR NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_SR NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_SR NULL
 #define OPTION_VAL_10_SR NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_SR NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_SR NULL
@@ -101489,9 +102477,9 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SR NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SR NULL
 #define OPTION_VAL_0_SR NULL
-#define OPTION_VAL_1_SR NULL
-#define OPTION_VAL_2_SR NULL
-#define OPTION_VAL_3_SR NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SR NULL
@@ -101978,6 +102966,26 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_SR,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_SR,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_SR },
+         { "2",        OPTION_VAL_2_SR },
+         { "3",        OPTION_VAL_3_SR },
+         { "4",        OPTION_VAL_4_SR },
+         { "6",        OPTION_VAL_6_SR },
+         { "8",        OPTION_VAL_8_SR },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_SR,
       NULL,
@@ -102184,9 +103192,9 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_SR },
-         { "6", OPTION_VAL_6_SR },
-         { "8", OPTION_VAL_8_SR },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_SR },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_SR },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_SR },
          { "10", OPTION_VAL_10_SR },
          { NULL, NULL },
       },
@@ -102922,9 +103930,9 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       "input",
       {
          { "0", OPTION_VAL_0_SR },
-         { "1", OPTION_VAL_1_SR },
-         { "2", OPTION_VAL_2_SR },
-         { "3", OPTION_VAL_3_SR },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SR },
          { NULL, NULL },
@@ -104103,7 +105111,15 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_HARDWARE_VK_SV NULL
 #define OPTION_VAL_SOFTWARE_SV "Mjukvara"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_SV "Programvarubildbuffert"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SV "Aktivera korrekt emulering av bildbufferteffekter, till exempel rörelseoskärpa och FF7-stridsvirvel, när maskinrenderare används genom att köra en kopia av programvarurenderaren med ursprunglig upplösning i bakgrunden. Om funktionen är inaktiverad utelämnas dessa åtgärder i OpenGL eller renderas av GPU:n i Vulkan. Inaktivering kan förbättra prestandan men orsaka allvarliga grafikfel. Låt funktionen vara aktiverad om du är osäker."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_SV "Behåller en kopia i ursprunglig upplösning av VRAM som programvarurenderaren ritar parallellt med hårdvarurenderaren, på GPU-tråden där den kan köras. Spelets läsningar av VRAM och sparade tillstånd kommer sedan från kopian, precis som maskinvaran skulle tillhandahålla dem. När den är inaktiverad läses de tillbaka från grafikprocessorn, vilket stoppar emuleringen och vid uppskalad intern upplösning ger spelet nedskalade bildpunkter som kan visa sig som grafikfel. Att inaktivera sparar endast tid där GPU-tråden inte körs: på en snabb enkelkärna, med en ljuspistol ansluten eller där processorns kärnor inte rapporteras, om inte ett trådantal väljs. Lämna den aktiverad om du är osäker."
+#define BEETLE_OPT_GPU_THREAD_LABEL_SV "GPU-tråd"
+#define BEETLE_OPT_GPU_THREAD_INFO_0_SV "Ritar programvarurenderarens bild och programvarubufferten under hårdvarurenderarna på en egen tråd när processorn har två eller fler snabba kärnor. ”Aktiverad” delar även uppskalade bilder mellan de återstående snabba kärnorna, i rader av band; ett antal trådar delar varje bild över så många trådar. Med en ljuspistol ansluten eller där processorns kärnor inte rapporteras fortsätter ”Aktiverad” att rita på emuleringstråden; ett antal trådar startar trådarna ändå. Bilden och den emulerade tidsinställningen är desamma oavsett."
+#define OPTION_VAL_1_SV "1 tråd"
+#define OPTION_VAL_2_SV "2 trådar"
+#define OPTION_VAL_3_SV "3 trådar"
+#define OPTION_VAL_4_SV "4 trådar"
+#define OPTION_VAL_6_SV "6 trådar"
+#define OPTION_VAL_8_SV "8 trådar"
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_SV "Färgformat"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_SV "Väljer färgdjupet för utdata. 24 bitar (standard) är det historiska utdataformatet med 8 bitar per kanal. 30-bitars färg (HDR) ger 10 bitar per kanal, PQ-kodad Rec.2020 (HDR10) för visning på en HDR-kompatibel skärm. Renderaren har redan mer än 8 bitars intern precision, vilket både minskar färgbandning i uppskalade toningar och låter självlysande innehåll ligga över SDR-vitt. 64-bitars färg (HDR, scRGB) ger 16-bitars flyttal, linjär Rec.709 (scRGB): samma bild som 30-bitars HDR utan 10-bitars PQ-kvantisering och färger utanför Rec.709 bärs som negativa värden i stället för via en Rec.2020-behållare. Faller tillbaka till 30-bitars HDR när gränssnittet inte erbjuder scRGB-indata. Fungerar med Vulkan- och OpenGL-maskinrenderarna och kräver HDR-stöd i gränssnittet. Faller tillbaka till 24 bitar med programvarurenderaren eller när gränssnittet inte kan visa HDR. Omstart krävs."
 #define OPTION_VAL_24BIT_SV "24 bitar (standard)"
@@ -104192,9 +105208,9 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_VERYHIGH_SV "Mycket hög (mest krossad)"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_SV "Filmic: högdageromfång"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_SV "Anger hur många exponeringssteg över mellangrått som den logaritmiska kodningen i visningstransformen ”Filmic (Sobotka)” når innan den mättas. Fler steg gör att mycket ljusa motiv kan hållas isär, men bilden blir flatare. Påverkar endast visningstransformen Filmic (Sobotka)."
-#define OPTION_VAL_4_SV "4 steg (Blenders standard)"
-#define OPTION_VAL_6_SV "6 steg (mättas vid 64)"
-#define OPTION_VAL_8_SV "8 steg (mättas vid 256)"
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_SV "4 stopp (Blenders standardvärde)"
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_SV "6 stopp (mättas vid 64)"
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_SV "8 stopp (mättas vid 256)"
 #define OPTION_VAL_10_SV "10 steg (mättas vid 1 024)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_SV "HDR-glöd"
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_SV "Glöd med flera frekvensband för HDR-utdata från maskinvarurenderarna med 30-bitars HDR eller 16-bitars scRGB-färgformat. Ljusa delar extraheras i linjärt ljus, oskärpas i två skalor, en tät kärna och ett brett dis, och läggs till före visningstransformen. Därmed överstiger glöden verkligen pappersvitt och hamnar i HDR-utrymmet. Eldflugekomprimering vid extraheringen hindrar en enda ljus texel från att få halon att flimra. ”Inaktiverad” (standard) lämnar bilden oförändrad."
@@ -104376,9 +105392,9 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_SV "Fördröjning för att hålla knappkombinationen för DualShocks analoga läge"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_SV "Hållningstid för de analoga kombinationsknapparna."
 #define OPTION_VAL_0_SV "0 sekunds fördröjning"
-#define OPTION_VAL_1_SV "1 sekunds fördröjning"
-#define OPTION_VAL_2_SV "2 sekunders fördröjning"
-#define OPTION_VAL_3_SV "3 sekunders fördröjning"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV "1 sekunds fördröjning"
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV "2 sekunders fördröjning"
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV "3 sekunders fördröjning"
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV "Fördröjning på 4 sekunder"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV "5 sekunders fördröjning"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_SV "Multitap på Port 1"
@@ -104509,7 +105525,7 @@ struct retro_core_options_v2 options_sr = {
 #define OPTION_VAL_BOB_OFFSET_SV "Bob (förskjuten)"
 #define OPTION_VAL_FASTMAD_SV "FastMAD (rörelseanpassad)"
 #define BEETLE_OPT_FRAME_DUPING_LABEL_SV "Bildruteduplicering"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_SV NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_SV "Låt gränssnittet upprepa föregående bildruta när spelet inte har något nytt att visa, i stället för att kärnan skickar den igen. Med gränssnittets ”Hoppa över upprepade bildrutor” visas inte dessa upprepningar, så att bildskärmen får spelets egen bildfrekvens, vilket passar verktyg för bildrutegenerering och interpolering."
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_SV "Åsidosätt PAL-videotiming"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_SV "På grund av olika standarder verkar PAL-spel ofta långsammare jämfört med amerikanska eller japanska NTSC-utgåvor. Det här alternativet kan användas för att åsidosätta PAL-timings för att försöka köra dessa spel med NTSC-bildfrekvens."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_SV "Kärnspecifikt bildformat"
@@ -104865,6 +105881,26 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_SV,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_SV,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_SV },
+         { "2",        OPTION_VAL_2_SV },
+         { "3",        OPTION_VAL_3_SV },
+         { "4",        OPTION_VAL_4_SV },
+         { "6",        OPTION_VAL_6_SV },
+         { "8",        OPTION_VAL_8_SV },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_SV,
       NULL,
@@ -105071,9 +106107,9 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_SV },
-         { "6", OPTION_VAL_6_SV },
-         { "8", OPTION_VAL_8_SV },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_SV },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_SV },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_SV },
          { "10", OPTION_VAL_10_SV },
          { NULL, NULL },
       },
@@ -105809,9 +106845,9 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       "input",
       {
          { "0", OPTION_VAL_0_SV },
-         { "1", OPTION_VAL_1_SV },
-         { "2", OPTION_VAL_2_SV },
-         { "3", OPTION_VAL_3_SV },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_SV },
          { NULL, NULL },
@@ -106990,7 +108026,15 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_HARDWARE_VK_TH "ฮาร์ดแวร์ (Vulkan)"
 #define OPTION_VAL_SOFTWARE_TH "ซอฟต์แวร์"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_TH "เฟรมบัฟเฟอร์ซอฟต์แวร์"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_TH "เปิดใช้งานการจำลองเอฟเฟกต์เฟรมบัฟเฟอร์ที่แม่นยำ (เช่น ภาพเบลอจากการเคลื่อนไหว, เอฟเฟกต์วงล้อมก่อนตัดเข้าฉากต่อสู้ใน FF7) เมื่อใช้การเรนเดอร์ด้วยฮาร์ดแวร์ โดยการรันการเรนเดอร์ด้วยซอฟต์แวร์ควบคู่ไปในพื้นหลังที่ความละเอียดดั้งเดิม หากปิดใช้งาน การทำงานเหล่านี้จะถูกข้ามไป (สำหรับ OpenGL) หรือถูกเรนเดอร์บน GPU (สำหรับ Vulkan) การปิดใช้งานอาจช่วยเพิ่มประสิทธิภาพได้แต่อาจทำให้เกิดข้อผิดพลาดทางกราฟิกที่รุนแรง หากไม่แน่ใจให้เปิดทิ้งไว้"
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_TH NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_TH NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_TH NULL
+#define OPTION_VAL_1_TH NULL
+#define OPTION_VAL_2_TH NULL
+#define OPTION_VAL_3_TH NULL
+#define OPTION_VAL_4_TH NULL
+#define OPTION_VAL_6_TH NULL
+#define OPTION_VAL_8_TH NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_TH NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_TH NULL
 #define OPTION_VAL_24BIT_TH NULL
@@ -107079,9 +108123,9 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_VERYHIGH_TH NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_TH NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_TH NULL
-#define OPTION_VAL_4_TH NULL
-#define OPTION_VAL_6_TH NULL
-#define OPTION_VAL_8_TH NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_TH NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_TH NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_TH NULL
 #define OPTION_VAL_10_TH NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_TH NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_TH NULL
@@ -107263,9 +108307,9 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TH "ระยะหน่วงการกดคอมโบค้างเพื่อเข้าโหมด Analog ของ DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TH "ระยะเวลากดคอมโบปุ่มค้างเพื่อเข้าโหมด Analog"
 #define OPTION_VAL_0_TH "0 วินาที (ไม่มีดีเลย์)"
-#define OPTION_VAL_1_TH "1 วินาที (ดีเลย์)"
-#define OPTION_VAL_2_TH "2 วินาที (ดีเลย์)"
-#define OPTION_VAL_3_TH "3 วินาที (ดีเลย์)"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_TH "มัลติแทปบนพอร์ต 1"
@@ -107752,6 +108796,26 @@ struct retro_core_option_v2_definition option_defs_th[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_TH,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_TH,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_TH },
+         { "2",        OPTION_VAL_2_TH },
+         { "3",        OPTION_VAL_3_TH },
+         { "4",        OPTION_VAL_4_TH },
+         { "6",        OPTION_VAL_6_TH },
+         { "8",        OPTION_VAL_8_TH },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_TH,
       NULL,
@@ -107958,9 +109022,9 @@ struct retro_core_option_v2_definition option_defs_th[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_TH },
-         { "6", OPTION_VAL_6_TH },
-         { "8", OPTION_VAL_8_TH },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_TH },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_TH },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_TH },
          { "10", OPTION_VAL_10_TH },
          { NULL, NULL },
       },
@@ -108696,9 +109760,9 @@ struct retro_core_option_v2_definition option_defs_th[] = {
       "input",
       {
          { "0", OPTION_VAL_0_TH },
-         { "1", OPTION_VAL_1_TH },
-         { "2", OPTION_VAL_2_TH },
-         { "3", OPTION_VAL_3_TH },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TH },
          { NULL, NULL },
@@ -109877,7 +110941,15 @@ struct retro_core_options_v2 options_th = {
 #define OPTION_VAL_HARDWARE_VK_TR "Donanım (Vulkan)"
 #define OPTION_VAL_SOFTWARE_TR "Yazılım"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_TR "Yazılım Kare Önbelleği"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_TR "Yazılımsal işleyicinin bir kopyasını arka planda yerel çözünürlükte çalıştırarak, donanım oluşturucuları kullanırken kare önbelleği efektlerinin (ör. hareket bulanıklığı, FF7 battle swirl) doğru taklidini sağlayın. Devre dışı bırakılırsa, bu işlemler atlanır (OpenGL) veya GPU üstünde (Vulkan) oluşturulur. Devre dışı bırakmak performansı artırabilir ama ciddi grafik hatalarına neden olabilir. Emin değilseniz etkin bırakın."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_TR NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_TR NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_TR NULL
+#define OPTION_VAL_1_TR NULL
+#define OPTION_VAL_2_TR NULL
+#define OPTION_VAL_3_TR NULL
+#define OPTION_VAL_4_TR NULL
+#define OPTION_VAL_6_TR NULL
+#define OPTION_VAL_8_TR NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_TR NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_TR NULL
 #define OPTION_VAL_24BIT_TR NULL
@@ -109966,9 +111038,9 @@ struct retro_core_options_v2 options_th = {
 #define OPTION_VAL_VERYHIGH_TR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_TR NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_TR NULL
-#define OPTION_VAL_4_TR NULL
-#define OPTION_VAL_6_TR NULL
-#define OPTION_VAL_8_TR NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_TR NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_TR NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_TR NULL
 #define OPTION_VAL_10_TR NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_TR NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_TR NULL
@@ -110150,9 +111222,9 @@ struct retro_core_options_v2 options_th = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TR "DualShock Analog Mod Kombinasyonu Basma Gecikmesi"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TR NULL
 #define OPTION_VAL_0_TR "0 Saniye Gecikme"
-#define OPTION_VAL_1_TR "1 Saniye Gecikme"
-#define OPTION_VAL_2_TR "2 Saniye Gecikme"
-#define OPTION_VAL_3_TR "3 Saniye Gecikme"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_TR NULL
@@ -110639,6 +111711,26 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_TR,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_TR,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_TR },
+         { "2",        OPTION_VAL_2_TR },
+         { "3",        OPTION_VAL_3_TR },
+         { "4",        OPTION_VAL_4_TR },
+         { "6",        OPTION_VAL_6_TR },
+         { "8",        OPTION_VAL_8_TR },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_TR,
       NULL,
@@ -110845,9 +111937,9 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_TR },
-         { "6", OPTION_VAL_6_TR },
-         { "8", OPTION_VAL_8_TR },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_TR },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_TR },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_TR },
          { "10", OPTION_VAL_10_TR },
          { NULL, NULL },
       },
@@ -111583,9 +112675,9 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       "input",
       {
          { "0", OPTION_VAL_0_TR },
-         { "1", OPTION_VAL_1_TR },
-         { "2", OPTION_VAL_2_TR },
-         { "3", OPTION_VAL_3_TR },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TR },
          { NULL, NULL },
@@ -112765,6 +113857,14 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_SOFTWARE_TT NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_TT NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_TT NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_TT NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_TT NULL
+#define OPTION_VAL_1_TT NULL
+#define OPTION_VAL_2_TT NULL
+#define OPTION_VAL_3_TT NULL
+#define OPTION_VAL_4_TT NULL
+#define OPTION_VAL_6_TT NULL
+#define OPTION_VAL_8_TT NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_TT NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_TT NULL
 #define OPTION_VAL_24BIT_TT NULL
@@ -112853,9 +113953,9 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_VERYHIGH_TT NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_TT NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_TT NULL
-#define OPTION_VAL_4_TT NULL
-#define OPTION_VAL_6_TT NULL
-#define OPTION_VAL_8_TT NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_TT NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_TT NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_TT NULL
 #define OPTION_VAL_10_TT NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_TT NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_TT NULL
@@ -113037,9 +114137,9 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_TT NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_TT NULL
 #define OPTION_VAL_0_TT NULL
-#define OPTION_VAL_1_TT NULL
-#define OPTION_VAL_2_TT NULL
-#define OPTION_VAL_3_TT NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_TT NULL
@@ -113526,6 +114626,26 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_TT,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_TT,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_TT },
+         { "2",        OPTION_VAL_2_TT },
+         { "3",        OPTION_VAL_3_TT },
+         { "4",        OPTION_VAL_4_TT },
+         { "6",        OPTION_VAL_6_TT },
+         { "8",        OPTION_VAL_8_TT },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_TT,
       NULL,
@@ -113732,9 +114852,9 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_TT },
-         { "6", OPTION_VAL_6_TT },
-         { "8", OPTION_VAL_8_TT },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_TT },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_TT },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_TT },
          { "10", OPTION_VAL_10_TT },
          { NULL, NULL },
       },
@@ -114470,9 +115590,9 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       "input",
       {
          { "0", OPTION_VAL_0_TT },
-         { "1", OPTION_VAL_1_TT },
-         { "2", OPTION_VAL_2_TT },
-         { "3", OPTION_VAL_3_TT },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_TT },
          { NULL, NULL },
@@ -115651,7 +116771,15 @@ struct retro_core_options_v2 options_tt = {
 #define OPTION_VAL_HARDWARE_VK_UK NULL
 #define OPTION_VAL_SOFTWARE_UK "Програмне забезпечення"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_UK "Програмний фреймбуфер"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_UK "Увімкнути точну емуляцію ефектів framebuffer (наприклад, рух blur, FF7 battle swirl) при використанні візуалізації обладнання запустивши копію програмного рендеру в рідній роздільній здатності у фоновому режимі. Якщо вимкнено, ці операції не виконуються (OpenGL) або будуть показані на GPU (Vulkan). Вимкнення може підвищити продуктивність, але може призвести до серйозних графічних помилок. Якщо не впевнені, вимкніть цю функцію."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_UK NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_UK NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_UK NULL
+#define OPTION_VAL_1_UK NULL
+#define OPTION_VAL_2_UK NULL
+#define OPTION_VAL_3_UK NULL
+#define OPTION_VAL_4_UK NULL
+#define OPTION_VAL_6_UK NULL
+#define OPTION_VAL_8_UK NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_UK "Формат кольору"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_UK NULL
 #define OPTION_VAL_24BIT_UK "24-бітний (стандартний)"
@@ -115740,9 +116868,9 @@ struct retro_core_options_v2 options_tt = {
 #define OPTION_VAL_VERYHIGH_UK NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_UK NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_UK NULL
-#define OPTION_VAL_4_UK NULL
-#define OPTION_VAL_6_UK NULL
-#define OPTION_VAL_8_UK NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_UK NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_UK NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_UK NULL
 #define OPTION_VAL_10_UK NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_UK NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_UK NULL
@@ -115924,9 +117052,9 @@ struct retro_core_options_v2 options_tt = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_UK "Комбінація Аналогового Режиму DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_UK "Час утримання комбінованих кнопок аналогового режиму"
 #define OPTION_VAL_0_UK "0 Секунд Затримки"
-#define OPTION_VAL_1_UK "1 Секунда Затримки"
-#define OPTION_VAL_2_UK "2 Секунди Затримки"
-#define OPTION_VAL_3_UK "3 Секунди Затримки"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_UK "Багатоканальний зв'язок на порту 1"
@@ -116413,6 +117541,26 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_UK,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_UK,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_UK },
+         { "2",        OPTION_VAL_2_UK },
+         { "3",        OPTION_VAL_3_UK },
+         { "4",        OPTION_VAL_4_UK },
+         { "6",        OPTION_VAL_6_UK },
+         { "8",        OPTION_VAL_8_UK },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_UK,
       NULL,
@@ -116619,9 +117767,9 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_UK },
-         { "6", OPTION_VAL_6_UK },
-         { "8", OPTION_VAL_8_UK },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_UK },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_UK },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_UK },
          { "10", OPTION_VAL_10_UK },
          { NULL, NULL },
       },
@@ -117357,9 +118505,9 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       "input",
       {
          { "0", OPTION_VAL_0_UK },
-         { "1", OPTION_VAL_1_UK },
-         { "2", OPTION_VAL_2_UK },
-         { "3", OPTION_VAL_3_UK },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_UK },
          { NULL, NULL },
@@ -118539,6 +119687,14 @@ struct retro_core_options_v2 options_uk = {
 #define OPTION_VAL_SOFTWARE_VAL NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_VAL NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_VAL NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_VAL NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_VAL NULL
+#define OPTION_VAL_1_VAL NULL
+#define OPTION_VAL_2_VAL NULL
+#define OPTION_VAL_3_VAL NULL
+#define OPTION_VAL_4_VAL NULL
+#define OPTION_VAL_6_VAL NULL
+#define OPTION_VAL_8_VAL NULL
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_VAL NULL
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_VAL NULL
 #define OPTION_VAL_24BIT_VAL NULL
@@ -118627,9 +119783,9 @@ struct retro_core_options_v2 options_uk = {
 #define OPTION_VAL_VERYHIGH_VAL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_VAL NULL
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_VAL NULL
-#define OPTION_VAL_4_VAL NULL
-#define OPTION_VAL_6_VAL NULL
-#define OPTION_VAL_8_VAL NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_VAL NULL
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_VAL NULL
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_VAL NULL
 #define OPTION_VAL_10_VAL NULL
 #define BEETLE_OPT_HDR_BLOOM_LABEL_VAL NULL
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_VAL NULL
@@ -118811,9 +119967,9 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VAL NULL
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VAL NULL
 #define OPTION_VAL_0_VAL NULL
-#define OPTION_VAL_1_VAL NULL
-#define OPTION_VAL_2_VAL NULL
-#define OPTION_VAL_3_VAL NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL NULL
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL NULL
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL NULL
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL NULL
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL NULL
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_VAL NULL
@@ -119300,6 +120456,26 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_VAL,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_VAL,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_VAL },
+         { "2",        OPTION_VAL_2_VAL },
+         { "3",        OPTION_VAL_3_VAL },
+         { "4",        OPTION_VAL_4_VAL },
+         { "6",        OPTION_VAL_6_VAL },
+         { "8",        OPTION_VAL_8_VAL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_VAL,
       NULL,
@@ -119506,9 +120682,9 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_VAL },
-         { "6", OPTION_VAL_6_VAL },
-         { "8", OPTION_VAL_8_VAL },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_VAL },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_VAL },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_VAL },
          { "10", OPTION_VAL_10_VAL },
          { NULL, NULL },
       },
@@ -120244,9 +121420,9 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       "input",
       {
          { "0", OPTION_VAL_0_VAL },
-         { "1", OPTION_VAL_1_VAL },
-         { "2", OPTION_VAL_2_VAL },
-         { "3", OPTION_VAL_3_VAL },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VAL },
          { NULL, NULL },
@@ -121425,7 +122601,15 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_HARDWARE_VK_VN "Phần cứng (Vulkan)"
 #define OPTION_VAL_SOFTWARE_VN "Phần mềm"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_VN "Bộ nhớ khung phần mềm"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_VN "Bật mô phỏng chính xác các hiệu ứng framebuffer (ví dụ: làm mờ chuyển động, hiệu ứng xoáy trong trận chiến của FF7) khi sử dụng bộ Dựng hình phần cứng bằng cách chạy một bản sao của bộ Dựng hình phần mềm ở độ phân giải gốc trong nền. Nếu tắt, các thao tác này sẽ bị bỏ qua (OpenGL) hoặc được Dựng hình bằng GPU (Vulkan). Tắt có thể cải thiện hiệu năng nhưng có thể gây ra lỗi đồ họa nghiêm trọng. Nếu không chắc chắn, hãy để bật."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_VN "Duy trì một bản sao bộ nhớ hình ảnh VRAM ở độ phân giải gốc do bộ dựng hình bằng phần mềm tạo ra, song song với bộ dựng hình bằng phần cứng, trên luồng xử lý đồ họa riêng nếu có thể sử dụng. Khi đó, trò chơi sẽ đọc dữ liệu VRAM và trạng thái lưu từ bản sao này, đúng như dữ liệu mà phần cứng thực tế cung cấp. Nếu tắt, dữ liệu sẽ được đọc ngược từ GPU, khiến quá trình giả lập bị đình trệ và khi độ phân giải kết xuất nội bộ được tăng lên, trò chơi sẽ nhận được các điểm ảnh đã bị thu nhỏ độ phân giải, có thể gây ra lỗi đồ họa. Chỉ tắt thiết lập này mới tiết kiệm được thời gian khi luồng xử lý đồ họa riêng không hoạt động: trên hệ thống chỉ có một lõi xử lý tốc độ cao, khi kết nối súng quang hoặc khi không xác định được số lõi CPU, trừ khi đã chọn số luồng xử lý. Nếu không chắc chắn, hãy giữ thiết lập này ở trạng thái bật."
+#define BEETLE_OPT_GPU_THREAD_LABEL_VN "Luồng xử lý GPU"
+#define BEETLE_OPT_GPU_THREAD_INFO_0_VN "Kết xuất hình ảnh của bộ dựng hình bằng phần mềm và bộ đệm khung hình bằng phần mềm khi sử dụng các bộ dựng hình bằng phần cứng trên một luồng riêng nếu CPU có từ hai lõi xử lý tốc độ cao trở lên. Chế độ 'Bật' cũng chia hình ảnh đã tăng độ phân giải thành các dải hàng điểm ảnh và phân bổ cho những lõi xử lý tốc độ cao còn trống; việc chọn số luồng sẽ chia mọi hình ảnh cho số luồng tương ứng. Khi kết nối súng quang hoặc khi không xác định được số lõi CPU, chế độ 'Bật' vẫn kết xuất hình ảnh trên luồng giả lập; còn khi chọn số luồng, các luồng riêng vẫn được khởi chạy. Hình ảnh và thời gian mô phỏng đều giống nhau trong cả hai trường hợp."
+#define OPTION_VAL_1_VN "1 làn"
+#define OPTION_VAL_2_VN "2 làn"
+#define OPTION_VAL_3_VN "3 làn"
+#define OPTION_VAL_4_VN "4 làn"
+#define OPTION_VAL_6_VN "6 làn"
+#define OPTION_VAL_8_VN "8 làn"
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_VN "Định dạng màu"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_VN "Chọn độ sâu màu đầu ra. '24-bit (Tiêu chuẩn)' là chế độ xuất hình truyền thống với 8 bit cho mỗi kênh màu. '30-bit Color (HDR)' xuất hình với 10 bit cho mỗi kênh màu, sử dụng mã hóa PQ theo tiêu chuẩn Rec.2020 (HDR10) để hiển thị trên màn hình hỗ trợ HDR: bộ Dựng hình vốn đã duy trì độ chính xác nội bộ cao hơn 8 bit, vì vậy chế độ này vừa giảm hiện tượng phân dải màu trên các dải chuyển sắc được phóng to, vừa cho phép các nội dung tự phát sáng có độ sáng vượt mức trắng SDR. '64-bit Color (HDR, scRGB)' xuất hình dấu phẩy động 16 bit, theo tuyến tính Rec.709 (scRGB): cho hình ảnh giống HDR 30 bit nhưng không bị lượng tử hóa PQ 10 bit, đồng thời biểu diễn các màu nằm ngoài Rec.709 bằng giá trị âm thay vì chứa chúng trong không gian màu Rec.2020; chế độ này sẽ chuyển về HDR 30 bit khi giao diện điều khiển không cung cấp Điều khiển scRGB. Có hiệu lực với bộ Dựng hình phần cứng Vulkan và OpenGL, đồng thời yêu cầu giao diện điều khiển hỗ trợ HDR; sẽ chuyển về 24 bit khi dùng bộ Dựng hình phần mềm hoặc khi giao diện điều khiển không thể xuất hình HDR. Cần khởi động lại."
 #define OPTION_VAL_24BIT_VN "24-bit (Tiêu chuẩn)"
@@ -121514,9 +122698,9 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_VERYHIGH_VN "Rất cao (dìm tối mạnh nhất)"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_VN "Filmic: Phạm vi vùng sáng"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_VN "Số mức phơi sáng cao hơn xám trung tính mà phép mã hóa lôgarit của phép biến đổi hiển thị 'Filmic (Sobotka)' đạt tới trước khi bão hòa. Số mức càng lớn thì các chi tiết có độ sáng rất cao càng được phân biệt rõ, nhưng hình ảnh sẽ ít tương phản hơn. Chỉ ảnh hưởng đến phép biến đổi hiển thị Filmic (Sobotka)."
-#define OPTION_VAL_4_VN "4 mức phơi sáng (mặc định của Blender)"
-#define OPTION_VAL_6_VN "6 mức phơi sáng (bão hòa ở mức 64)"
-#define OPTION_VAL_8_VN "8 mức phơi sáng (bão hòa ở mức 256)"
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_VN "4 mức (mặc định của Blender)"
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_VN "6 mức (bão hòa ở giá trị 64)"
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_VN "8 mức (bão hòa ở giá trị 256)"
 #define OPTION_VAL_10_VN "10 mức phơi sáng (bão hòa ở mức 1024)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_VN "Hiệu ứng quầng sáng HDR"
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_VN "Hiệu ứng quầng sáng đa dải dành cho đầu ra HDR (bộ Dựng hình bằng phần cứng, định dạng màu HDR 30 bit hoặc scRGB 16 bit). Các vùng sáng được tách ra trong không gian ánh sáng tuyến tính, làm mờ ở hai tỷ lệ - lõi sáng hẹp và vùng sáng lan tỏa rộng - rồi được cộng vào trước phép biến đổi hiển thị, để ánh sáng phát sáng thực sự vượt mức trắng giấy và tận dụng khoảng sáng dự trữ của HDR. Các điểm sáng đơn lẻ được nén khi tách để một điểm ảnh quá sáng không khiến quầng sáng nhấp nháy. 'Tắt' (mặc định) giữ nguyên hình ảnh như trước."
@@ -121698,9 +122882,9 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_VN "Độ trễ giữ tổ hợp chế độ Analog của DualShock"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_VN "Thời gian giữ tổ hợp Phím chuyển chế độ analog."
 #define OPTION_VAL_0_VN "Độ trễ 0 giây"
-#define OPTION_VAL_1_VN "Trễ 1 giây"
-#define OPTION_VAL_2_VN "Trễ 2 giây"
-#define OPTION_VAL_3_VN "Trễ 3 giây"
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN "Chờ 1 giây"
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN "Chờ 2 giây"
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN "Chờ 3 giây"
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN "Độ trễ 4 giây"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN "Độ trễ 5 giây"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_VN "Multitap ở Cổng 1"
@@ -121762,7 +122946,7 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_QUADRATIC_VN "Bậc hai"
 #define OPTION_VAL_CUBIC_VN "Bậc ba"
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_VN "vùng chết xoay neGcon"
-#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_VN "Vùng chết của Analog trái khi mô phỏng thao tác xoay của neGcon giả lập. Dùng để loại bỏ hiện tượng trôi cần.Lưu ý: Hầu hết các trò chơi hỗ trợ neGcon đều có tùy chọn trong game để đặt giá trị vùng chết cho thao tác xoay. Để tránh mất độ chính xác, vùng chết trong game luôn phải đặt về 0. Mọi điều chỉnh cần thiết chỉ nên thực hiện tại tùy chọn này của lõi giả lập. Điều này đặc biệt quan trọng khi kiểu phản hồi neGcon được đặt là bậc hai hoặc bậc ba."
+#define BEETLE_OPT_NEGCON_DEADZONE_INFO_0_VN "Vùng chết của Analog trái khi mô phỏng thao tác xoay của neGcon giả lập. Dùng để loại bỏ hiện tượng trôi cần.Lưu ý: Hầu hết các trò chơi hỗ trợ neGcon đều có tùy chọn trong game để đặt giá trị vùng chết cho thao tác xoay. Để tránh mất độ chính xác, vùng chết trong game luôn phải đặt về 0. Mọi điều chỉnh cần thiết chỉ nên thực hiện tại tùy chọn này của trình giả lập. Điều này đặc biệt quan trọng khi kiểu phản hồi neGcon được đặt là bậc hai hoặc bậc ba."
 #define OPTION_VAL_0_BEETLE_OPT_NEGCON_DEADZONE_VN NULL
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_LABEL_VN "Phương thức thẻ nhớ"
 #define BEETLE_OPT_USE_MEDNAFEN_MEMCARD0_METHOD_INFO_0_VN "Định dạng dữ liệu lưu dùng cho khe thẻ nhớ bên trái. Có thể dùng định dạng Mednafen để tương thích với phiên bản Mednafen độc lập. Khi sử dụng với Beetle PSX, dữ liệu lưu của Libretro và Mednafen có định dạng nội bộ giống hệt nhau và có thể chuyển đổi qua lại chỉ bằng cách đổi tên tệp. Cần khởi động lại."
@@ -121831,7 +123015,7 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_BOB_OFFSET_VN "Bob (Lệch dòng)"
 #define OPTION_VAL_FASTMAD_VN "FastMAD (Thích ứng chuyển động)"
 #define BEETLE_OPT_FRAME_DUPING_LABEL_VN "Nhân bản khung hình"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_VN "Cho phép giao diện chính lặp lại khung hình trước đó khi trò chơi không có khung hình mới để hiển thị, thay vì yêu cầu lõi giả lập gửi lại khung hình đó. Khi bật tính năng 'Bỏ qua khung hình trùng lặp' của giao diện chính, những khung hình lặp lại này sẽ không được xuất ra màn hình, nhờ đó màn hình nhận được tốc độ khung hình thực tế của trò chơi (dành cho các công cụ tạo khung hình và nội suy chuyển động)."
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_VN "Cho phép giao diện chính lặp lại khung hình trước đó khi trò chơi không có khung hình mới để hiển thị, thay vì yêu cầu trình giả lập gửi lại khung hình đó. Khi bật tính năng 'Bỏ qua khung hình trùng lặp' của giao diện chính, những khung hình lặp lại này sẽ không được xuất ra màn hình, nhờ đó màn hình nhận được tốc độ khung hình thực tế của trò chơi (dành cho các công cụ tạo khung hình và nội suy chuyển động)."
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_VN "Ghi đè thời gian video PAL"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_VN "Do sự khác biệt về tiêu chuẩn, các game PAL thường chạy chậm hơn so với các bản NTSC của Mỹ hoặc Nhật. Tùy chọn này cho phép ghi đè thời gian PAL để cố gắng chạy các game này với tốc độ khung hình NTSC."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_VN "Tỷ lệ khung hình của trình giả lập"
@@ -122187,6 +123371,26 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       "enabled"
    },
    {
+      BEETLE_OPT(gpu_thread),
+      BEETLE_OPT_GPU_THREAD_LABEL_VN,
+      NULL,
+      BEETLE_OPT_GPU_THREAD_INFO_0_VN,
+      NULL,
+      "video",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { "1",        OPTION_VAL_1_VN },
+         { "2",        OPTION_VAL_2_VN },
+         { "3",        OPTION_VAL_3_VN },
+         { "4",        OPTION_VAL_4_VN },
+         { "6",        OPTION_VAL_6_VN },
+         { "8",        OPTION_VAL_8_VN },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(color_format),
       BEETLE_OPT_COLOR_FORMAT_LABEL_VN,
       NULL,
@@ -122393,9 +123597,9 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       NULL,
       "video",
       {
-         { "4", OPTION_VAL_4_VN },
-         { "6", OPTION_VAL_6_VN },
-         { "8", OPTION_VAL_8_VN },
+         { "4", OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_VN },
+         { "6", OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_VN },
+         { "8", OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_VN },
          { "10", OPTION_VAL_10_VN },
          { NULL, NULL },
       },
@@ -123131,9 +124335,9 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       "input",
       {
          { "0", OPTION_VAL_0_VN },
-         { "1", OPTION_VAL_1_VN },
-         { "2", OPTION_VAL_2_VN },
-         { "3", OPTION_VAL_3_VN },
+         { "1", OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN },
+         { "2", OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN },
+         { "3", OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN },
          { "4", OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN },
          { "5", OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_VN },
          { NULL, NULL },
