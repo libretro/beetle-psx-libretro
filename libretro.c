@@ -7702,14 +7702,17 @@ bool retro_serialize(void *data, size_t size)
    st.fixed          = true;
    st.sizing         = false;
 
-   /* The snapshot first: the GPU's VRAM is then in it, and the state need
-    * not fetch it back */
+   /* Vulkan can skip native VRAM readback. Keep the native GL payload
+    * available in case its texture copies fail or storage changes. */
    if (managed && rhi_intf_snapshot_save(&slot, &gen))
    {
       flags = STATE_TOKEN_SNAPSHOT;
-      if (!rhi_intf_has_software_renderer())
-         flags |= STATE_TOKEN_VRAM_OLD;
-      GPU_SetStateSnapshotSaved(true);
+      if (rhi_intf_is_type() == RHI_VULKAN)
+      {
+         if (!rhi_intf_has_software_renderer())
+            flags |= STATE_TOKEN_VRAM_OLD;
+         GPU_SetStateSnapshotSaved(true);
+      }
    }
 
    FastSaveStates = UsingFastSavestates();
