@@ -7757,8 +7757,8 @@ bool retro_serialize(void *data, size_t size)
    st.fixed          = true;
    st.sizing         = false;
 
-   /* Vulkan can skip native VRAM readback. Keep the native GL payload
-    * available in case its texture copies fail or storage changes. */
+   /* Keep the native GL and Software payloads for fallback. Vulkan
+    * can skip bringing native VRAM up to date after a snapshot. */
    if (managed && rhi_intf_snapshot_save(&token.slot, &token.gen))
    {
       token.flags = STATE_TOKEN_SNAPSHOT;
@@ -7782,7 +7782,10 @@ bool retro_serialize(void *data, size_t size)
 
    if (managed)
    {
-      if (ret && rhi_intf_is_type() == RHI_OPENGL && PGXP_GetModes() &&
+      if (ret && PGXP_GetModes() &&
+          (rhi_intf_is_type() == RHI_OPENGL ||
+           (rhi_intf_is_type() == RHI_SOFTWARE &&
+            (token.flags & STATE_TOKEN_SNAPSHOT))) &&
           !pgxp_state_save(&token))
       {
          log_cb(RETRO_LOG_WARN, "retro_serialize: PGXP state unavailable\n");

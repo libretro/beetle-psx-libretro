@@ -1125,8 +1125,14 @@ uint32_t rhi_intf_vram_dirty_groups(unsigned br)
 
 /* Keep tokens distinct if the renderer changes while a state is retained. */
 #define RHI_GL_SNAPSHOT_SLOT (UINT32_C(1) << 31)
+#define RHI_SW_SNAPSHOT_SLOT (UINT32_C(1) << 30)
 bool rhi_intf_snapshot_save(uint32_t *slot, uint32_t *gen)
 {
+   if (rhi_type == RHI_SOFTWARE && GPU_SoftwareSnapshotSave(slot, gen))
+   {
+      *slot |= RHI_SW_SNAPSHOT_SLOT;
+      return true;
+   }
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    if (rhi_type == RHI_OPENGL && rhi_gl_snapshot_save(slot, gen))
    {
@@ -1143,6 +1149,9 @@ bool rhi_intf_snapshot_save(uint32_t *slot, uint32_t *gen)
 
 bool rhi_intf_snapshot_valid(uint32_t slot, uint32_t gen)
 {
+   if (slot & RHI_SW_SNAPSHOT_SLOT)
+      return rhi_type == RHI_SOFTWARE &&
+            GPU_SoftwareSnapshotValid(slot & ~RHI_SW_SNAPSHOT_SLOT, gen);
    if (slot & RHI_GL_SNAPSHOT_SLOT)
    {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -1161,6 +1170,9 @@ bool rhi_intf_snapshot_valid(uint32_t slot, uint32_t gen)
 bool rhi_intf_snapshot_restore(uint32_t slot, uint32_t gen)
 {
    bool restored = false;
+   if (slot & RHI_SW_SNAPSHOT_SLOT)
+      return rhi_type == RHI_SOFTWARE &&
+            GPU_SoftwareSnapshotRestore(slot & ~RHI_SW_SNAPSHOT_SLOT, gen);
    if (slot & RHI_GL_SNAPSHOT_SLOT)
    {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
@@ -1181,6 +1193,11 @@ bool rhi_intf_snapshot_restore(uint32_t slot, uint32_t gen)
 
 void rhi_intf_snapshot_release(uint32_t slot, uint32_t gen)
 {
+   if (slot & RHI_SW_SNAPSHOT_SLOT)
+   {
+      GPU_SoftwareSnapshotRelease(slot & ~RHI_SW_SNAPSHOT_SLOT, gen);
+      return;
+   }
    if (slot & RHI_GL_SNAPSHOT_SLOT)
    {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)

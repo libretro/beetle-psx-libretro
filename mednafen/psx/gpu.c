@@ -1226,6 +1226,155 @@ void GPU_GetModulateStats(uint64_t *pixels, uint64_t *sat_pixels,
 }
 #endif
 
+/* Raster workers share GPU.vram. Compare immutable pages only after
+ * settling them, so the raster hot paths need no snapshot bookkeeping. */
+#define SW_VRAM_PAGE_WORDS 8192
+#define SW_VRAM_SNAPSHOT_SLOTS 16
+
+struct sw_vram_page
+{
+   unsigned refs;
+   uint16_t words[SW_VRAM_PAGE_WORDS];
+};
+
+struct sw_vram_snapshot
+{
+   struct sw_vram_page **pages;
+   size_t count;
+   uint32_t generation;
+};
+
+#define SW_VRAM_PAGE_LIMIT (((size_t)256 << 20) / sizeof(struct sw_vram_page))
+static const uint16_t sw_vram_zero[SW_VRAM_PAGE_WORDS];
+static struct sw_vram_snapshot sw_vram_states[SW_VRAM_SNAPSHOT_SLOTS];
+static unsigned sw_vram_latest;
+static size_t sw_vram_pages;
+
+static void sw_vram_snapshot_free(struct sw_vram_snapshot *state)
+{
+   size_t i;
+   for (i = 0; i < state->count; i++)
+   {
+      struct sw_vram_page *page = state->pages[i];
+      if (page && !--page->refs)
+      {
+         free(page);
+         sw_vram_pages--;
+      }
+   }
+   free(state->pages);
+   memset(state, 0, sizeof(*state));
+}
+
+static void sw_vram_snapshots_clear(void)
+{
+   unsigned i;
+   for (i = 0; i < SW_VRAM_SNAPSHOT_SLOTS; i++)
+      sw_vram_snapshot_free(&sw_vram_states[i]);
+}
+
+bool GPU_SoftwareSnapshotSave(uint32_t *slot, uint32_t *gen)
+{
+   static uint32_t generation;
+   struct sw_vram_snapshot next = {0};
+   struct sw_vram_snapshot *latest = &sw_vram_states[sw_vram_latest];
+   size_t count, i;
+   unsigned dest;
+
+   if (!GPU.vram || !GPU.upscale_shift)
+      return false;
+   for (dest = 0; dest < SW_VRAM_SNAPSHOT_SLOTS; dest++)
+      if (!sw_vram_states[dest].generation)
+         break;
+   if (dest == SW_VRAM_SNAPSHOT_SLOTS)
+      return false;
+
+   gpu_thread_settle();
+   count = (1024u * 512u / SW_VRAM_PAGE_WORDS) << (2 * GPU.upscale_shift);
+   next.pages = (struct sw_vram_page **)calloc(count, sizeof(*next.pages));
+   if (!next.pages)
+      goto failed;
+
+   for (i = 0; i < count; i++)
+   {
+      const uint16_t *words = GPU.vram + i * SW_VRAM_PAGE_WORDS;
+      struct sw_vram_page *page = latest->pages ? latest->pages[i] : NULL;
+      if (!page || memcmp(words, page->words, sizeof(sw_vram_zero)))
+      {
+         page = NULL;
+         if (memcmp(words, sw_vram_zero, sizeof(sw_vram_zero)))
+         {
+            if (sw_vram_pages < SW_VRAM_PAGE_LIMIT)
+               page = (struct sw_vram_page *)malloc(sizeof(*page));
+            if (!page)
+               goto failed;
+            sw_vram_pages++;
+            page->refs = 0;
+            memcpy(page->words, words, sizeof(page->words));
+         }
+      }
+      if (page)
+         page->refs++;
+      next.pages[next.count++] = page;
+   }
+
+   /* A released latest capture can serve as the comparison for one more save. */
+   if (!latest->generation)
+      sw_vram_snapshot_free(latest);
+   if (++generation == 0)
+      generation++;
+   next.generation = generation;
+   sw_vram_states[dest] = next;
+   sw_vram_latest = dest;
+   *slot = dest;
+   *gen = generation;
+   return true;
+
+failed:
+   sw_vram_snapshot_free(&next);
+   /* Drop the scratch capture if it is the only thing keeping pages live. */
+   if (!latest->generation)
+      sw_vram_snapshot_free(latest);
+   return false;
+}
+
+bool GPU_SoftwareSnapshotValid(uint32_t slot, uint32_t gen)
+{
+   return slot < SW_VRAM_SNAPSHOT_SLOTS && gen &&
+         sw_vram_states[slot].generation == gen;
+}
+
+bool GPU_SoftwareSnapshotRestore(uint32_t slot, uint32_t gen)
+{
+   const struct sw_vram_snapshot *state;
+   size_t i;
+   if (!GPU_SoftwareSnapshotValid(slot, gen))
+      return false;
+
+   /* The GPU state loader already settled the workers. The next batch
+    * picks up the restored contents through the same VRAM pointer. */
+   state = &sw_vram_states[slot];
+   for (i = 0; i < state->count; i++)
+   {
+      uint16_t *dest = GPU.vram + i * SW_VRAM_PAGE_WORDS;
+      const struct sw_vram_page *page = state->pages[i];
+      const uint16_t *words = page ? page->words : sw_vram_zero;
+      if (memcmp(dest, words, sizeof(sw_vram_zero)))
+         memcpy(dest, words, sizeof(sw_vram_zero));
+   }
+   return true;
+}
+
+void GPU_SoftwareSnapshotRelease(uint32_t slot, uint32_t gen)
+{
+   if (!GPU_SoftwareSnapshotValid(slot, gen))
+      return;
+   if (slot == sw_vram_latest)
+      sw_vram_states[slot].generation = 0;
+   else
+      sw_vram_snapshot_free(&sw_vram_states[slot]);
+}
+
 /* Allocate the GPU framebuffer at the requested upscale shift. Returns
  * NULL on allocation failure. Was previously `new uint16_t[size]`,
  * which under -fno-exceptions either aborts (libstdc++) or returns
@@ -1317,6 +1466,7 @@ void GPU_RecalcClockRatio(void) {
 void GPU_Destroy(void)
 {
    gpu_thread_stop();
+   sw_vram_snapshots_clear();
    free(GPU.vram);
    GPU.vram = NULL;
    free(state_vram_1x);
@@ -1381,6 +1531,7 @@ bool GPU_Rescale(uint8_t ushift)
    /* Past the OOM cliff. Now we can commit: switch upscale_shift
     * before texel_put runs (it reads upscale_shift to compute
     * destination coords) and swap the vram pointer. */
+   sw_vram_snapshots_clear();
    GPU.vram = new_vram;
    GPU_set_upscale_shift(ushift);
 
@@ -3785,7 +3936,9 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       GPU.may_be_2d = may_be_2d;
    }
 
-   GPU_RestoreStateP2(load);
+   /* The full software snapshot replaces the native-resolution upload. */
+   GPU_RestoreStateP2(load && !(snapshot && ret &&
+         rhi_intf_is_type() == RHI_SOFTWARE));
 
    if(load)
    {
