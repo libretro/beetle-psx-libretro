@@ -12,7 +12,8 @@ forever, one iteration ~ one game frame:
   - 400 textured 16x16 sprites
   - one 64x64 VRAM->VRAM copy
 Options (any order after the output path):
-  readback  a 16x16 GP0(C0h) VRAM->CPU read per iteration
+  readback  a 16x16 GP0(C0h) VRAM->CPU read per iteration,
+            written to guest RAM at 0x1f0000
   additive  semi-transparent quads in additive mode
   drawarea  the drawing area follows the buffer being drawn, as a
             double-buffered game sets it (otherwise it is all of VRAM)
@@ -163,11 +164,11 @@ if not STATIC:
     cmd(0x80000000); gp0(xy(512, 0)); gp0(xy(768, 0)); gp0((64 << 16) | 64)
 if READBACK:
     cmd(0xC0000000); gp0(xy(0, 0)); gp0((16 << 16) | 16)
-    emit(addiu(T2, ZERO, 0)); emit(addiu(T3, ZERO, 128))
+    li32(T2, 0xA01F0000); li32(T3, 0xA01F0200)
     rl = here()
     wait_bit(27)
-    emit(lw(T1, S1, 0)); emit(NOP)
-    emit(addiu(T2, T2, 1))
+    emit(lw(T1, S1, 0)); emit(addiu(T2, T2, 4))
+    emit(sw(T1, T2, -4))
     branch(bne, T2, T3, rl)
 emit(addiu(S5, S5, 1))
 emit(j(frame)); emit(NOP)
