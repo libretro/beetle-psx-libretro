@@ -48,12 +48,17 @@ static bool     tt_coh_da_pending   = true;  /* re-mark draw area on next primit
 static uint8_t  tt_coh_clean[TT_COH_BH * TT_COH_BW]; /* 0=dirty (default), 1=clean */
 static uint16_t tt_coh_dax, tt_coh_day, tt_coh_daw, tt_coh_dah; /* draw area x,y,w,h */
 
-static void tt_coh_reset(void)
+static void tt_coh_invalidate(void)
 {
    memset(tt_coh_clean, 0, sizeof(tt_coh_clean));
+   tt_coh_da_pending = true;
+}
+
+static void tt_coh_reset(void)
+{
+   tt_coh_invalidate();
    tt_coh_dax = tt_coh_day = 0;
    tt_coh_daw = tt_coh_dah = 0;
-   tt_coh_da_pending = true;
 }
 
 /* DIRTY: every block the rect OVERLAPS (conservative superset). */

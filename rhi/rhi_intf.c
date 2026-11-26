@@ -1149,7 +1149,7 @@ bool rhi_intf_snapshot_restore(uint32_t slot, uint32_t gen)
    if (rhi_type == RHI_VULKAN && rhi_vulkan_snapshot_restore(slot, gen))
    {
       /* What the GPU holds is no longer what the CPU copy was compared with */
-      tt_coh_reset();
+      tt_coh_invalidate();
       return true;
    }
 #endif
