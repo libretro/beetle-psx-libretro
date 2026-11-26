@@ -7783,7 +7783,8 @@ bool retro_serialize(void *data, size_t size)
    if (managed)
    {
       if (ret && PGXP_GetModes() &&
-          (rhi_intf_is_type() == RHI_OPENGL ||
+          (rhi_intf_is_type() == RHI_VULKAN ||
+           rhi_intf_is_type() == RHI_OPENGL ||
            (rhi_intf_is_type() == RHI_SOFTWARE &&
             (token.flags & STATE_TOKEN_SNAPSHOT))) &&
           !pgxp_state_save(&token))
