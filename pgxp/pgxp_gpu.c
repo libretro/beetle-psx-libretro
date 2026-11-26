@@ -28,6 +28,7 @@
 #include "pgxp_gte.h"
 #include "pgxp_main.h"
 #include "pgxp_mem.h"
+#include "pgxp_state.h"
 #include "pgxp_value.h"
 
 #include <stdlib.h>
@@ -163,6 +164,12 @@ const uint32_t mode_fail = 3;
 
 static PGXP_cache_entry *vertexCache = NULL;
 
+#define PGXP_VERTEX_PAGE_ENTRIES 256
+#define PGXP_VERTEX_PAGES (VERTEX_CACHE_SIZE / PGXP_VERTEX_PAGE_ENTRIES)
+#define PGXP_VERTEX_STATE_BUDGET ((size_t)128 << 20)
+static uint32_t vertex_page_gen[PGXP_VERTEX_PAGES];
+static size_t vertex_state_bytes;
+
 uint32_t cacheMode = 0;
 
 /* Current write generation.  Bumped when a write session opens (i.e. on
@@ -224,6 +231,7 @@ static int VertexCacheEnsureAllocated(void)
 	/* The buffer is zeroed, so every tag reads as empty and restarting
 	 * the generation counter here cannot resurrect anything. */
 	cacheGen = 1;
+	memset(vertex_page_gen, 0, sizeof(vertex_page_gen));
 #if PGXP_DIAG
 	memset(vcache_stats, 0, sizeof(vcache_stats));
 #endif
@@ -333,6 +341,116 @@ void PGXP_CacheVertex(int16_t sx, int16_t sy, const PGXP_value* _pVertex)
 		pOldVertex->y   = pNewVertex->y;
 		pOldVertex->z   = pNewVertex->z;
 		pOldVertex->tag = tag;
+		vertex_page_gen[(pOldVertex - vertexCache) / PGXP_VERTEX_PAGE_ENTRIES] = cacheGen;
+	}
+}
+
+struct pgxp_live_vertex
+{
+	uint32_t index;
+	PGXP_cache_entry value;
+};
+
+struct pgxp_vertex_state
+{
+	size_t count;
+};
+
+static size_t pgxp_live_vertices(struct pgxp_live_vertex *out)
+{
+	size_t count = 0;
+	unsigned page, i;
+
+	for (page = 0; page < PGXP_VERTEX_PAGES; page++)
+	{
+		unsigned start = page * PGXP_VERTEX_PAGE_ENTRIES;
+		if (vertex_page_gen[page] != cacheGen)
+			continue;
+		for (i = start; i < start + PGXP_VERTEX_PAGE_ENTRIES; i++)
+			if (PGXP_TAG_GEN(vertexCache[i].tag) == cacheGen)
+			{
+				if (out)
+				{
+					out[count].index = i;
+					out[count].value = vertexCache[i];
+				}
+				count++;
+			}
+	}
+	return count;
+}
+
+bool PGXP_VertexStateSave(struct pgxp_vertex_state **saved)
+{
+	struct pgxp_vertex_state *state;
+	size_t count, bytes;
+
+	if (!vertexCache)
+		return true;
+	count = pgxp_live_vertices(NULL);
+	bytes = sizeof(*state) + count * sizeof(struct pgxp_live_vertex);
+	if (bytes > PGXP_VERTEX_STATE_BUDGET - vertex_state_bytes)
+		return false;
+	state = (struct pgxp_vertex_state *)malloc(bytes);
+	if (!state)
+		return false;
+	state->count = count;
+	pgxp_live_vertices((struct pgxp_live_vertex *)(state + 1));
+	vertex_state_bytes += bytes;
+	*saved = state;
+	return true;
+}
+
+bool PGXP_VertexStatePrepare(const struct pgxp_vertex_state *saved, void **reserve)
+{
+	if (saved && !vertexCache && !*reserve)
+		*reserve = calloc(VERTEX_CACHE_SIZE, sizeof(*vertexCache));
+	return !saved || vertexCache || *reserve;
+}
+
+void PGXP_VertexStateLoad(const struct pgxp_vertex_state *saved, void **reserve)
+{
+	const struct pgxp_live_vertex *vertices;
+	size_t i;
+
+	if (!saved)
+	{
+		PGXP_FreeVertexCache();
+		return;
+	}
+	if (!vertexCache)
+	{
+		vertexCache = (PGXP_cache_entry *)*reserve;
+		*reserve = NULL;
+		memset(vertex_page_gen, 0, sizeof(vertex_page_gen));
+		cacheGen = 1;
+	}
+	/* Retag the live vertices so a rollback cannot revive stale cache entries. */
+	if (cacheGen == 0x7FFFFFFFu)
+	{
+		memset(vertexCache, 0, VERTEX_CACHE_SIZE * sizeof(*vertexCache));
+		memset(vertex_page_gen, 0, sizeof(vertex_page_gen));
+		cacheGen = 1;
+	}
+	cacheGen++;
+	vertices = (const struct pgxp_live_vertex *)(saved + 1);
+	for (i = 0; i < saved->count; i++)
+	{
+		unsigned index = vertices[i].index;
+		vertexCache[index] = vertices[i].value;
+		vertexCache[index].tag = PGXP_TAG_MAKE(cacheGen) |
+				(vertices[i].value.tag & PGXP_TAG_AMBIGUOUS);
+		vertex_page_gen[index / PGXP_VERTEX_PAGE_ENTRIES] = cacheGen;
+	}
+}
+
+void PGXP_VertexStateFree(struct pgxp_vertex_state *saved)
+{
+	if (saved)
+	{
+		vertex_state_bytes -= sizeof(*saved) +
+				saved->count * sizeof(struct pgxp_live_vertex);
+		free(saved);
 	}
 }
 
@@ -671,4 +789,16 @@ int PGXP_GetVertex(const uint32_t offset, const uint32_t* addr, OGLVertex* pOutp
 	}
 
 	return 1;
+}
+
+size_t PGXP_GPUStateSize(void)
+{
+	return sizeof(FIFO) + sizeof(CB) + sizeof(cacheMode);
+}
+
+void PGXP_GPUState(uint8_t *data, bool load)
+{
+	pgxp_state_copy(&data, &FIFO, sizeof(FIFO), load);
+	pgxp_state_copy(&data, &CB, sizeof(CB), load);
+	pgxp_state_copy(&data, &cacheMode, sizeof(cacheMode), load);
 }

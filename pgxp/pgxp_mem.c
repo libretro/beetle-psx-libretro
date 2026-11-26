@@ -1,6 +1,8 @@
 #include <string.h>
 
 #include "pgxp_mem.h"
+#include <stdlib.h>
+#include "pgxp_state.h"
 #include "pgxp_cpu.h"
 #include "pgxp_gte.h"
 #include "pgxp_value.h"
@@ -52,9 +54,30 @@ static PGXP_value RegisterMem[REGISTER_MEM_COUNT];
  *     lifetime of the memset.  Entries that were written once keep
  *     taking the full path even after invalidation - conservative,
  *     but the touched set (stack, vertex scratch) stays small.
- * PGXP state is not serialised in savestates, so there is nothing to
- * version. */
+ * Ordinary savestates leave these shadows out. Managed states keep the
+ * bitmap with the shadow pages so it describes the same execution point. */
 static uint32_t MemEverWritten[(PGXP_MEM_TOTAL + 31) / 32];
+
+#define PGXP_MEMORY_WORDS 128
+#define PGXP_MEMORY_PAGES (PGXP_MEM_TOTAL / PGXP_MEMORY_WORDS)
+
+struct pgxp_memory_page
+{
+   unsigned refs;
+   PGXP_value words[PGXP_MEMORY_WORDS];
+};
+
+struct pgxp_memory_state
+{
+   struct pgxp_memory_page *pages[PGXP_MEMORY_PAGES];
+   uint32_t written[(PGXP_MEM_TOTAL + 31) / 32];
+};
+
+#define PGXP_MEMORY_PAGE_LIMIT (((size_t)128 << 20) / sizeof(struct pgxp_memory_page))
+static struct pgxp_memory_page *memory_pages[PGXP_MEMORY_PAGES];
+static uint8_t memory_dirty[PGXP_MEMORY_PAGES];
+static size_t memory_page_count;
+static bool memory_tracking;
 
 const uint32_t UserMemOffset  = 0;
 const uint32_t ScratchOffset  = USER_MEM_COUNT;
@@ -69,6 +92,8 @@ static inline int MemBitTest(uint32_t paddr)
 static inline void MemBitSet(uint32_t paddr)
 {
 	MemEverWritten[paddr >> 5] |= (uint32_t)1 << (paddr & 31);
+	if (memory_tracking)
+		memory_dirty[paddr / PGXP_MEMORY_WORDS] = 1;
 }
 
 /* Resolve an already-converted (packed) address to its entry.
@@ -82,8 +107,131 @@ static inline PGXP_value* PtrFromPacked(uint32_t paddr)
 	return &RegisterMem[paddr - RegisterOffset];
 }
 
+static PGXP_value *pgxp_memory_page_address(unsigned page)
+{
+	return PtrFromPacked(page * PGXP_MEMORY_WORDS);
+}
+
+static void pgxp_memory_page_release(struct pgxp_memory_page *page)
+{
+	if (page && !--page->refs)
+	{
+		memory_page_count--;
+		free(page);
+	}
+}
+
+void PGXP_MemoryStopTracking(void)
+{
+	unsigned i;
+	if (!memory_tracking)
+		return;
+	for (i = 0; i < PGXP_MEMORY_PAGES; i++)
+	{
+		pgxp_memory_page_release(memory_pages[i]);
+		memory_pages[i] = NULL;
+	}
+	memory_tracking = false;
+}
+
+void PGXP_MemoryStateFree(struct pgxp_memory_state *state)
+{
+	unsigned i;
+	if (!state)
+		return;
+	for (i = 0; i < PGXP_MEMORY_PAGES; i++)
+		pgxp_memory_page_release(state->pages[i]);
+	free(state);
+}
+
+struct pgxp_memory_state *PGXP_MemoryStateSave(void)
+{
+	static const PGXP_value zero[PGXP_MEMORY_WORDS];
+	struct pgxp_memory_state *state;
+	unsigned i;
+
+	state = (struct pgxp_memory_state *)calloc(1, sizeof(*state));
+	if (!state)
+		return NULL;
+	if (!memory_tracking)
+	{
+		memset(memory_dirty, 1, sizeof(memory_dirty));
+		memory_tracking = true;
+	}
+
+	/* Reuse unchanged pages across retained states. Each dirty page gets a
+	 * private copy if any state still needs the previous contents. */
+	for (i = 0; i < PGXP_MEMORY_PAGES; i++)
+	{
+		struct pgxp_memory_page *page = memory_pages[i];
+		if (memory_dirty[i])
+		{
+			const PGXP_value *src = pgxp_memory_page_address(i);
+			if (!memcmp(src, zero, sizeof(zero)))
+			{
+				pgxp_memory_page_release(page);
+				page = NULL;
+			}
+			else
+			{
+				if (!page || page->refs != 1)
+				{
+					struct pgxp_memory_page *next =
+						memory_page_count < PGXP_MEMORY_PAGE_LIMIT ?
+						(struct pgxp_memory_page *)malloc(sizeof(*next)) : NULL;
+					if (!next)
+					{
+						PGXP_MemoryStateFree(state);
+						return NULL;
+					}
+					memory_page_count++;
+					next->refs = 1;
+					pgxp_memory_page_release(page);
+					page = next;
+				}
+				memcpy(page->words, src, sizeof(page->words));
+			}
+			memory_pages[i] = page;
+			memory_dirty[i] = 0;
+		}
+		if (page)
+			page->refs++;
+		state->pages[i] = page;
+	}
+	memcpy(state->written, MemEverWritten, sizeof(state->written));
+	return state;
+}
+
+void PGXP_MemoryStateLoad(const struct pgxp_memory_state *state)
+{
+	unsigned i;
+	for (i = 0; i < PGXP_MEMORY_PAGES; i++)
+	{
+		struct pgxp_memory_page *page = state->pages[i];
+		if (!memory_tracking || memory_dirty[i] || memory_pages[i] != page)
+		{
+			PGXP_value *dst = pgxp_memory_page_address(i);
+			if (page)
+				memcpy(dst, page->words, sizeof(page->words));
+			else
+				memset(dst, 0, PGXP_MEMORY_WORDS * sizeof(*dst));
+		}
+		if (memory_pages[i] != page)
+		{
+			if (page)
+				page->refs++;
+			pgxp_memory_page_release(memory_pages[i]);
+			memory_pages[i] = page;
+		}
+		memory_dirty[i] = 0;
+	}
+	memcpy(MemEverWritten, state->written, sizeof(MemEverWritten));
+	memory_tracking = true;
+}
+
 void PGXP_InitMem()
 {
+	PGXP_MemoryStopTracking();
 	memset(UserMem,     0, sizeof(UserMem));
 	memset(ScratchMem,  0, sizeof(ScratchMem));
 	memset(RegisterMem, 0, sizeof(RegisterMem));
@@ -184,7 +332,7 @@ void ValidateAndCopyMem(PGXP_value* dest, uint32_t addr, uint32_t value)
 	if (paddr < InvalidAddress)
 	{
 		PGXP_value* pMem;
-
+		uint32_t flags;
 		if (!MemBitTest(paddr))
 		{
 			/* Entry is provably the InitMem memset zero: Validate()
@@ -196,7 +344,10 @@ void ValidateAndCopyMem(PGXP_value* dest, uint32_t addr, uint32_t value)
 		}
 
 		pMem = PtrFromPacked(paddr);
+		flags = pMem->flags;
 		Validate(pMem, value);
+		if (memory_tracking && flags != pMem->flags)
+			memory_dirty[paddr / PGXP_MEMORY_WORDS] = 1;
 		*dest = *pMem;
 		return;
 	}
@@ -247,7 +398,12 @@ void ValidateAndCopyMem16(PGXP_value* dest, uint32_t addr, uint32_t value, int s
 		}
 
 		/* validate and copy whole value */
-		MaskValidate(pMem, val.d, mask.d, validMask);
+		{
+			uint32_t flags = pMem->flags;
+			MaskValidate(pMem, val.d, mask.d, validMask);
+			if (memory_tracking && pMem != &zero_local && flags != pMem->flags)
+				memory_dirty[paddr / PGXP_MEMORY_WORDS] = 1;
+		}
 		*dest = *pMem;
 
 		/* if high word then shift */
