@@ -11832,14 +11832,14 @@ struct retro_core_options_v2 options_bg = {
 #define OPTION_VAL_SOFTWARE_CA "Programari"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_CA "Memòria intermèdia per programari"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_CA NULL
-#define BEETLE_OPT_GPU_THREAD_LABEL_CA NULL
+#define BEETLE_OPT_GPU_THREAD_LABEL_CA "Fil de GPU"
 #define BEETLE_OPT_GPU_THREAD_INFO_0_CA NULL
-#define OPTION_VAL_1_CA NULL
-#define OPTION_VAL_2_CA NULL
-#define OPTION_VAL_3_CA NULL
-#define OPTION_VAL_4_CA NULL
-#define OPTION_VAL_6_CA NULL
-#define OPTION_VAL_8_CA NULL
+#define OPTION_VAL_1_CA "1 carril"
+#define OPTION_VAL_2_CA "2 carrils"
+#define OPTION_VAL_3_CA "3 carrils"
+#define OPTION_VAL_4_CA "4 carrils"
+#define OPTION_VAL_6_CA "6 carrils"
+#define OPTION_VAL_8_CA "8 carrils"
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_CA "Format del color"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_CA "Selecciona la profunditat de color de la sortida. «24 bits (estàndard)» correspon a la sortida clàssica de 8 bits per canal. «Color de 30 bits (HDR)» genera una sortida de 10 bits per canal, en format Rec.2020 codificat amb PQ (HDR10), per a la visualització en pantalles compatibles amb HDR: com que el motor de renderització ja utilitza una precisió interna superior als 8 bits, això permet reduir l'efecte de bandes («banding») en degradats escalats i fer que el contingut emissiu superi el nivell del blanc SDR. «Color de 64 bits (HDR, scRGB)» utilitza coma flotant de 16 bits en l'espai de color lineal Rec.709 (scRGB): ofereix la mateixa imatge que l'HDR de 30 bits, però sense la quantificació PQ de 10 bits, i els colors situats fora de l'espai Rec.709 es representen mitjançant valors negatius en lloc d'emprar un contenidor Rec.2020. Si la interfície no admet l'entrada scRGB, el sistema recorre automàticament a l'HDR de 30 bits. Aquesta opció funciona amb els motors de renderització per maquinari Vulkan i OpenGL, i requereix que la interfície sigui compatible amb HDR; en cas d'utilitzar el renderitzador per programari («software»), o si la interfície no pot mostrar contingut HDR, el sistema torna al mode de 24 bits. Cal reiniciar l'aplicació."
 #define OPTION_VAL_24BIT_CA "24 bits (Estàndard)"
@@ -11848,7 +11848,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_HDR_DISPLAY_TRANSFORM_LABEL_CA NULL
 #define BEETLE_OPT_HDR_DISPLAY_TRANSFORM_INFO_0_CA NULL
 #define OPTION_VAL_REINHARD_CA "Reinhad (Soft Knee)"
-#define OPTION_VAL_KNEE_EXP_CA NULL
+#define OPTION_VAL_KNEE_EXP_CA "Transició exponencial"
 #define OPTION_VAL_RPLAIN_CA NULL
 #define OPTION_VAL_REXT_CA NULL
 #define OPTION_VAL_JODIE_CA NULL
@@ -11903,8 +11903,8 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_HDR_AGX_LOOK_LABEL_CA "AgX: Observa"
 #define BEETLE_OPT_HDR_AGX_LOOK_INFO_0_CA NULL
 #define OPTION_VAL_DEFAULT_CA "per defecte"
-#define OPTION_VAL_PUNCHY_CA NULL
-#define BEETLE_OPT_HDR_GT_TOE_LABEL_CA NULL
+#define OPTION_VAL_PUNCHY_CA "contundent"
+#define BEETLE_OPT_HDR_GT_TOE_LABEL_CA "GR: base"
 #define BEETLE_OPT_HDR_GT_TOE_INFO_0_CA NULL
 #define OPTION_VAL_0_10_CA NULL
 #define OPTION_VAL_0_16_CA NULL
@@ -11940,7 +11940,7 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_HDR_BLOOM_SELECT_LABEL_CA NULL
 #define BEETLE_OPT_HDR_BLOOM_SELECT_INFO_0_CA NULL
 #define OPTION_VAL_CLASSIC_CA "Clàssic"
-#define OPTION_VAL_KNEE_CA NULL
+#define OPTION_VAL_KNEE_CA "Transició de corba"
 #define BEETLE_OPT_HDR_BLOOM_RANGE_LABEL_CA NULL
 #define BEETLE_OPT_HDR_BLOOM_RANGE_INFO_0_CA NULL
 #define OPTION_VAL_STANDARD_BEETLE_OPT_HDR_BLOOM_RANGE_CA NULL
@@ -12112,10 +12112,10 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_CA "Temps d'espera per a les combinacions de botons en el mode analògic"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_CA "Estableix el temps que cal mantenir premuts els botons de la combinació del mode analògic."
 #define OPTION_VAL_0_CA "Espera de 0 segons"
-#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA NULL
-#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA NULL
-#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA NULL
-#define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA "Espera de 1 segon"
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA "Espera de 2 segons"
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA "Espera de 3 segons"
+#define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA "Espera de 4 segons"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_CA "Espera de 5 segons"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_CA "Toc múltiple en el port 1"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_INFO_0_CA "Habilitar el sistema Multitap en el port 1."
@@ -29321,15 +29321,15 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_HARDWARE_VK_DE NULL
 #define OPTION_VAL_SOFTWARE_DE NULL
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_DE "Software-Framebuffer"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_DE NULL
-#define BEETLE_OPT_GPU_THREAD_LABEL_DE NULL
-#define BEETLE_OPT_GPU_THREAD_INFO_0_DE NULL
-#define OPTION_VAL_1_DE NULL
-#define OPTION_VAL_2_DE NULL
-#define OPTION_VAL_3_DE NULL
-#define OPTION_VAL_4_DE NULL
-#define OPTION_VAL_6_DE NULL
-#define OPTION_VAL_8_DE NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_DE "Hält neben dem Hardware-Renderer eine Kopie des VRAM in nativer Auflösung vor, die vom Software-Renderer gezeichnet wird, und zwar auf dem GPU-Thread, sofern dieser ausgeführt werden kann. Lesezugriffe des Spiels auf den VRAM und Spielstände greifen dann auf diese Kopie zu, genau wie es die Hardware liefern würde. Bei deaktivierter Option wird der VRAM stattdessen von der GPU ausgelesen. Dadurch wird die Emulation angehalten, und bei einer hochskalierten internen Auflösung erhält das Spiel heruntergerechnete Pixel, die Grafikfehler verursachen können. Eine Deaktivierung spart nur Zeit, wenn der GPU-Thread nicht ausgeführt wird: bei nur einem schnellen CPU-Kern, bei angeschlossener Lightgun oder wenn die CPU-Kerne nicht gemeldet werden, sofern keine Thread-Anzahl ausgewählt wurde. Im Zweifelsfall aktiviert lassen."
+#define BEETLE_OPT_GPU_THREAD_LABEL_DE "GPU-Thread"
+#define BEETLE_OPT_GPU_THREAD_INFO_0_DE "Das Bild des Software-Renderers und den Software-Framebuffer bei Hardware-Renderern auf einem eigenen Thread zeichnen, wenn die CPU über mindestens zwei schnelle Kerne verfügt. Bei „Aktiviert“ werden außerdem hochskalierte Bilder auf die übrigen schnellen Kerne aufgeteilt, und zwar in Zeilenblöcke. Bei einer Anzahl von Lanes wird jedes Bild auf entsprechend viele Threads aufgeteilt. Wenn eine Lightgun angeschlossen ist oder die CPU-Kerne nicht gemeldet werden, wird bei „Aktiviert“ weiterhin im Emulationsthread gezeichnet. Bei einer Anzahl von Lanes werden die Threads trotzdem gestartet. Bild und emuliertes Timing sind in beiden Fällen identisch."
+#define OPTION_VAL_1_DE "1 Thread"
+#define OPTION_VAL_2_DE "2 Threads"
+#define OPTION_VAL_3_DE "3 Threads"
+#define OPTION_VAL_4_DE "4 Threads"
+#define OPTION_VAL_6_DE "6 Threads"
+#define OPTION_VAL_8_DE "8 Threads"
 #define BEETLE_OPT_COLOR_FORMAT_LABEL_DE "Farbformat"
 #define BEETLE_OPT_COLOR_FORMAT_INFO_0_DE "Legt die Ausgabefarbtiefe fest. „24 Bit (Standard)“ ist die herkömmliche Ausgabe mit 8 Bit pro Kanal. „30-Bit-Farbe (HDR)“ gibt ein PQ-kodiertes Rec.2020-Signal (HDR10) mit 10 Bit pro Kanal zur Anzeige auf einem HDR-fähigen Bildschirm aus: Da der Renderer intern bereits mit mehr als 8 Bit Präzision arbeitet, werden dadurch sowohl Abstufungen in hochskalierten Farbverläufen reduziert als auch selbstleuchtende Inhalte oberhalb von SDR-Weiß dargestellt. „64-Bit-Farbe (HDR, scRGB)“ gibt ein lineares Rec.709-Signal (scRGB) mit 16-Bit-Gleitkommawerten aus: dasselbe Bild wie bei 30-Bit-HDR, jedoch ohne die 10-Bit-PQ-Quantisierung; Farben außerhalb von Rec.709 werden als negative Werte statt in einem Rec.2020-Farbraumcontainer dargestellt. Wird auf 30-Bit-HDR zurückgesetzt, wenn das Frontend keine scRGB-Eingabe unterstützt. Wird mit den Vulkan- und OpenGL-Hardware-Renderern wirksam und erfordert HDR-Unterstützung durch das Frontend; wird beim Software-Renderer oder wenn das Frontend keine HDR-Ausgabe unterstützt auf 24 Bit zurückgesetzt. Neustart erforderlich."
 #define OPTION_VAL_24BIT_DE "24-Bit (Standard)"
@@ -29418,9 +29418,9 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_VERYHIGH_DE "Sehr hoch (stärkste Absenkung)"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_LABEL_DE "Filmic: Spitzlichtbereich"
 #define BEETLE_OPT_HDR_FILMICLOG_RANGE_INFO_0_DE "Wie viele Blendenstufen über Mittelgrau die logarithmische Kodierung der Displaytransformation „Filmic (Sobotka)“ erreicht, bevor sie gesättigt ist. Mehr Blendenstufen halten sehr helle Bildinhalte besser unterscheidbar, führen aber zu einem flacheren Bild. Wirkt sich nur auf die Displaytransformation „Filmic (Sobotka)“ aus."
-#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE NULL
-#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE NULL
-#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE NULL
+#define OPTION_VAL_4_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE "4 Stufen (Blender-Standard)"
+#define OPTION_VAL_6_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE "6 Stufen (Sättigung bei 64)"
+#define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_DE "8 Stufen (Sättigung bei 256)"
 #define OPTION_VAL_10_DE "10 Blendenstufen (Sättigung bei 1024)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_DE "HDR-Bloom"
 #define BEETLE_OPT_HDR_BLOOM_INFO_0_DE "Mehrbandiger Bloom-Effekt für HDR-Ausgaben (Hardware-Renderer, 30-Bit-HDR oder 16-Bit-scRGB-Farbformat). Helle Bildinhalte werden im linearen Farbraum extrahiert, mit zwei unterschiedlichen Radien weichgezeichnet – einem engen Kern und einem breiten Schleier – und vor der Displaytransformation hinzugefügt. Dadurch reicht der Leuchteffekt tatsächlich über das Papierweiß hinaus und nutzt den zusätzlichen HDR-Helligkeitsbereich. Extrem helle Einzelpixel werden bei der Extraktion komprimiert, damit ein einzelner heller Texel kein Flackern des Leuchthofs verursacht. „Deaktiviert“ (Standard) lässt das Bild unverändert."
@@ -29602,9 +29602,9 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_LABEL_DE "DualShock Analogmodus-Combo Halteverzögerung"
 #define BEETLE_OPT_ANALOG_TOGGLE_HOLD_INFO_0_DE "Haltezeit für die Kombitasten im Analogmodus."
 #define OPTION_VAL_0_DE "0 Sekunden Verzögerung"
-#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE NULL
-#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE NULL
-#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE NULL
+#define OPTION_VAL_1_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE "1-Sekunden-Verzögerung"
+#define OPTION_VAL_2_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE "2-Sekunden-Verzögerung"
+#define OPTION_VAL_3_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE "3-Sekunden-Verzögerung"
 #define OPTION_VAL_4_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE "4-Sekunden-Verzögerung"
 #define OPTION_VAL_5_BEETLE_OPT_ANALOG_TOGGLE_HOLD_DE "5-Sekunden-Verzögerung"
 #define BEETLE_OPT_ENABLE_MULTITAP_PORT1_LABEL_DE "MultiTap auf Port 1"
@@ -29735,7 +29735,7 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_BOB_OFFSET_DE NULL
 #define OPTION_VAL_FASTMAD_DE "FastMAD (Bewegungsadaptiv)"
 #define BEETLE_OPT_FRAME_DUPING_LABEL_DE "Bild-Duplizierung"
-#define BEETLE_OPT_FRAME_DUPING_INFO_0_DE NULL
+#define BEETLE_OPT_FRAME_DUPING_INFO_0_DE "Das Frontend den vorherigen Frame wiederholen lassen, wenn das Spiel nichts Neues anzuzeigen hat, anstatt ihn erneut vom Core senden zu lassen. Bei aktiviertem „Doppelte Frames überspringen“ des Frontends werden diese Wiederholungen nicht ausgegeben, sodass die Anzeige die tatsächliche Bildrate des Spiels erhält (für Frame-Generierungs- und Interpolationstools)."
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_LABEL_DE "PAL-Video-Timing-Übersteuerung"
 #define BEETLE_OPT_PAL_VIDEO_TIMING_OVERRIDE_INFO_0_DE "Aufgrund unterschiedlicher Standards erscheinen PAL-Spiele im Vergleich zu den amerikanischen oder japanischen NTSC-Releases oft verlangsamt. Diese Option kann genutzt werden, um PAL-Timings zu übersteuern und zu versuchen, diese Spiele mit der NTSC-Bildwiederholrate auszuführen."
 #define BEETLE_OPT_ASPECT_RATIO_LABEL_DE "Core-Seitenverhältnis"
@@ -52641,9 +52641,9 @@ struct retro_core_options_v2 options_fr = {
 #define OPTION_VAL_HARDWARE_VK_GA "Crua-earraí (Vulkan)"
 #define OPTION_VAL_SOFTWARE_GA "Bogearraí"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_GA "Maolán Fráma Bogearraí"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GA NULL
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_GA "Coinníonn sé cóip den VRAM i réiteach dúchasach arna tarraingt ag an rindreálaí bogearraí taobh leis an rindreálaí crua-earraí, ar an Snáithe GPU áit ar féidir leis rith. Tagann léamha an chluiche ar VRAM agus ar staideanna sábhála ón gcóip sin ansin, díreach mar a thabharfadh an crua-earraí dóibh. Díchumasaithe, léitear ar ais iad ón GPU, rud a chuireann stop leis an aithris agus, ag réiteach inmheánach uasghrádaithe, tugann sé picteilíní íslithe don chluiche ar féidir iad a thaispeáint mar earráidí grafacha. Ní shábhálann díchumasú am ach amháin nuair nach ritheann an Snáithe GPU: ar chroílár tapa aonair, le gunna solais ceangailte, nó nuair nach dtuairiscítear croíleacáin an LAP, mura roghnaítear comhaireamh lána. Fág cumasaithe mura bhfuil tú cinnte."
 #define BEETLE_OPT_GPU_THREAD_LABEL_GA "Snáithe GPU"
-#define BEETLE_OPT_GPU_THREAD_INFO_0_GA NULL
+#define BEETLE_OPT_GPU_THREAD_INFO_0_GA "Tarraingíonn sé pictiúr an rindreálaí bogearraí, agus an Bogearraí Fráma-Maolán faoi na rindreálaithe crua-earraí, ar shnáithe dá chuid féin nuair a bhíonn dhá chroílár nó níos mó tapa ag an LAP. Roinneann 'Cumasaithe' pictiúir uasghrádaithe trasna na gcroílár tapa atá fágtha freisin, i mbannaí sraitheanna; roinneann roinnt lánaí gach pictiúr trasna an líon sin snáitheanna. Le gunna solais ceangailte, nó i gcás nach dtuairiscítear croílár an LAP, leanann 'Cumasaithe' ag tarraingt ar an snáithe aithrise; tosaíonn roinnt lánaí na snáitheanna ar aon nós. Tá an pictiúr agus an t-am aithrise mar a chéile ar aon nós."
 #define OPTION_VAL_1_GA "1 Lána"
 #define OPTION_VAL_2_GA "2 Lána"
 #define OPTION_VAL_3_GA "3 Lána"
@@ -58346,7 +58346,7 @@ struct retro_core_options_v2 options_gl = {
 #define CATEGORY_VIDEO_INFO_0_HE NULL
 #define CATEGORY_PGXP_LABEL_HE NULL
 #define CATEGORY_PGXP_INFO_0_HE NULL
-#define CATEGORY_OSD_LABEL_HE NULL
+#define CATEGORY_OSD_LABEL_HE "תצוגה על המסך"
 #define CATEGORY_OSD_INFO_0_HE NULL
 #define CATEGORY_INPUT_LABEL_HE "קלט"
 #define CATEGORY_INPUT_INFO_0_HE NULL
@@ -58458,7 +58458,7 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_OPENBIOS_HE NULL
 #define BEETLE_OPT_REGION_LABEL_HE NULL
 #define BEETLE_OPT_REGION_INFO_0_HE NULL
-#define OPTION_VAL_AUTO_HE NULL
+#define OPTION_VAL_AUTO_HE "אוטומטי"
 #define OPTION_VAL_NTSC_J_HE NULL
 #define OPTION_VAL_NTSC_U_HE NULL
 #define OPTION_VAL_PAL_HE NULL
@@ -58524,7 +58524,7 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_4000_HE NULL
 #define BEETLE_OPT_HDR_EXPANSION_LABEL_HE NULL
 #define BEETLE_OPT_HDR_EXPANSION_INFO_0_HE NULL
-#define OPTION_VAL_DISABLED_HE NULL
+#define OPTION_VAL_DISABLED_HE "ללא"
 #define OPTION_VAL_INVERSE_HE NULL
 #define OPTION_VAL_HUE_HE NULL
 #define BEETLE_OPT_HDR_HIGHLIGHT_HUE_LABEL_HE NULL
@@ -58644,10 +58644,10 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_SCALED_UV_OFFSET_INFO_0_HE NULL
 #define BEETLE_OPT_FILTER_LABEL_HE NULL
 #define BEETLE_OPT_FILTER_INFO_0_HE NULL
-#define OPTION_VAL_NEAREST_HE NULL
+#define OPTION_VAL_NEAREST_HE "השכן הקרוב"
 #define OPTION_VAL_SABR_HE NULL
 #define OPTION_VAL_XBR_HE NULL
-#define OPTION_VAL_BILINEAR_HE NULL
+#define OPTION_VAL_BILINEAR_HE "בילינארי"
 #define OPTION_VAL_3_POINT_HE NULL
 #define OPTION_VAL_JINC2_HE NULL
 #define BEETLE_OPT_FILTER_EXCLUDE_SPRITE_LABEL_HE NULL
@@ -58771,11 +58771,11 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_DOT_HE NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_LABEL_HE NULL
 #define BEETLE_OPT_CROSSHAIR_COLOR_P1_INFO_0_HE NULL
-#define OPTION_VAL_RED_HE NULL
-#define OPTION_VAL_BLUE_HE NULL
-#define OPTION_VAL_GREEN_HE NULL
+#define OPTION_VAL_RED_HE "אדום"
+#define OPTION_VAL_BLUE_HE "כחול"
+#define OPTION_VAL_GREEN_HE "ירוק"
 #define OPTION_VAL_ORANGE_HE NULL
-#define OPTION_VAL_YELLOW_HE NULL
+#define OPTION_VAL_YELLOW_HE "צהוב"
 #define OPTION_VAL_CYAN_HE NULL
 #define OPTION_VAL_PINK_HE NULL
 #define OPTION_VAL_PURPLE_HE NULL
@@ -58812,7 +58812,7 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_195_HE NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_LABEL_HE NULL
 #define BEETLE_OPT_NEGCON_RESPONSE_INFO_0_HE NULL
-#define OPTION_VAL_LINEAR_HE NULL
+#define OPTION_VAL_LINEAR_HE "לינארי"
 #define OPTION_VAL_QUADRATIC_HE NULL
 #define OPTION_VAL_CUBIC_HE NULL
 #define BEETLE_OPT_NEGCON_DEADZONE_LABEL_HE NULL
@@ -58834,7 +58834,7 @@ struct retro_core_options_v2 options_gl = {
 #define OPTION_VAL_1_BEETLE_OPT_MEMCARD_RIGHT_INDEX_HE NULL
 #define BEETLE_OPT_LINE_RENDER_LABEL_HE NULL
 #define BEETLE_OPT_LINE_RENDER_INFO_0_HE NULL
-#define OPTION_VAL_DEFAULT_BEETLE_OPT_LINE_RENDER_HE NULL
+#define OPTION_VAL_DEFAULT_BEETLE_OPT_LINE_RENDER_HE "ברירת מחדל"
 #define OPTION_VAL_AGGRESSIVE_HE NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_LABEL_HE NULL
 #define BEETLE_OPT_WIDESCREEN_HACK_INFO_0_HE NULL
@@ -70119,9 +70119,9 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_REGION_LABEL_IT "Regione Di Sistema"
 #define BEETLE_OPT_REGION_INFO_0_IT NULL
 #define OPTION_VAL_AUTO_IT NULL
-#define OPTION_VAL_NTSC_J_IT NULL
-#define OPTION_VAL_NTSC_U_IT NULL
-#define OPTION_VAL_PAL_IT NULL
+#define OPTION_VAL_NTSC_J_IT "NTSC-J (Giappone)"
+#define OPTION_VAL_NTSC_U_IT "NTSC-U (America del Nord)"
+#define OPTION_VAL_PAL_IT "PAL (Europa)"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_LABEL_IT "Risoluzione GPU Interna"
 #define BEETLE_OPT_INTERNAL_RESOLUTION_INFO_0_IT "Risoluzioni maggiori di '1x (Nativo)' migliorano la fedeltà dei modelli 3D a spese di requisiti di performance più alti. Elementi 2D sono generalmente non condizionati da questa impostazione."
 #define BEETLE_OPT_RENDERER_LABEL_IT NULL
@@ -122601,9 +122601,9 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_HARDWARE_VK_VN "Phần cứng (Vulkan)"
 #define OPTION_VAL_SOFTWARE_VN "Phần mềm"
 #define BEETLE_OPT_RENDERER_SOFTWARE_FB_LABEL_VN "Bộ nhớ khung phần mềm"
-#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_VN "Duy trì một bản sao bộ nhớ hình ảnh VRAM ở độ phân giải gốc do bộ dựng hình bằng phần mềm tạo ra, song song với bộ dựng hình bằng phần cứng, trên luồng xử lý đồ họa riêng nếu có thể sử dụng. Khi đó, trò chơi sẽ đọc dữ liệu VRAM và trạng thái lưu từ bản sao này, đúng như dữ liệu mà phần cứng thực tế cung cấp. Nếu tắt, dữ liệu sẽ được đọc ngược từ GPU, khiến quá trình giả lập bị đình trệ và khi độ phân giải kết xuất nội bộ được tăng lên, trò chơi sẽ nhận được các điểm ảnh đã bị thu nhỏ độ phân giải, có thể gây ra lỗi đồ họa. Chỉ tắt thiết lập này mới tiết kiệm được thời gian khi luồng xử lý đồ họa riêng không hoạt động: trên hệ thống chỉ có một lõi xử lý tốc độ cao, khi kết nối súng quang hoặc khi không xác định được số lõi CPU, trừ khi đã chọn số luồng xử lý. Nếu không chắc chắn, hãy giữ thiết lập này ở trạng thái bật."
+#define BEETLE_OPT_RENDERER_SOFTWARE_FB_INFO_0_VN "Duy trì một bản sao bộ nhớ hình ảnh VRAM ở độ phân giải gốc do bộ dựng hình bằng phần mềm tạo ra, song song với bộ dựng hình bằng phần cứng, trên luồng xử lý đồ họa riêng nếu có thể sử dụng. Khi đó, trò chơi sẽ đọc dữ liệu VRAM và trạng thái lưu từ bản sao này, đúng như dữ liệu mà phần cứng thực tế cung cấp. Nếu tắt, dữ liệu sẽ được đọc ngược từ GPU, khiến quá trình giả lập bị đình trệ và khi độ phân giải kết xuất nội bộ được tăng lên, trò chơi sẽ nhận được các điểm ảnh đã bị thu nhỏ độ phân giải, có thể gây ra lỗi đồ họa. Chỉ tắt thiết lập này mới tiết kiệm được thời gian khi luồng xử lý đồ họa riêng không hoạt động: trên hệ thống chỉ có một trình giả lập xử lý tốc độ cao, khi kết nối súng quang hoặc khi không xác định được số trình giả lập CPU, trừ khi đã chọn số luồng xử lý. Nếu không chắc chắn, hãy giữ thiết lập này ở trạng thái bật."
 #define BEETLE_OPT_GPU_THREAD_LABEL_VN "Luồng xử lý GPU"
-#define BEETLE_OPT_GPU_THREAD_INFO_0_VN "Kết xuất hình ảnh của bộ dựng hình bằng phần mềm và bộ đệm khung hình bằng phần mềm khi sử dụng các bộ dựng hình bằng phần cứng trên một luồng riêng nếu CPU có từ hai lõi xử lý tốc độ cao trở lên. Chế độ 'Bật' cũng chia hình ảnh đã tăng độ phân giải thành các dải hàng điểm ảnh và phân bổ cho những lõi xử lý tốc độ cao còn trống; việc chọn số luồng sẽ chia mọi hình ảnh cho số luồng tương ứng. Khi kết nối súng quang hoặc khi không xác định được số lõi CPU, chế độ 'Bật' vẫn kết xuất hình ảnh trên luồng giả lập; còn khi chọn số luồng, các luồng riêng vẫn được khởi chạy. Hình ảnh và thời gian mô phỏng đều giống nhau trong cả hai trường hợp."
+#define BEETLE_OPT_GPU_THREAD_INFO_0_VN "Kết xuất hình ảnh của bộ dựng hình bằng phần mềm và bộ đệm khung hình bằng phần mềm khi sử dụng các bộ dựng hình bằng phần cứng trên một luồng riêng nếu CPU có từ hai trình giả lập xử lý tốc độ cao trở lên. Chế độ 'Bật' cũng chia hình ảnh đã tăng độ phân giải thành các dải hàng điểm ảnh và phân bổ cho những trình giả lập xử lý tốc độ cao còn trống; việc chọn số luồng sẽ chia mọi hình ảnh cho số luồng tương ứng. Khi kết nối súng quang hoặc khi không xác định được số trình giả lập CPU, chế độ 'Bật' vẫn kết xuất hình ảnh trên luồng giả lập; còn khi chọn số luồng, các luồng riêng vẫn được khởi chạy. Hình ảnh và thời gian mô phỏng đều giống nhau trong cả hai trường hợp."
 #define OPTION_VAL_1_VN "1 làn"
 #define OPTION_VAL_2_VN "2 làn"
 #define OPTION_VAL_3_VN "3 làn"
@@ -122703,7 +122703,7 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_8_BEETLE_OPT_HDR_FILMICLOG_RANGE_VN "8 mức (bão hòa ở giá trị 256)"
 #define OPTION_VAL_10_VN "10 mức phơi sáng (bão hòa ở mức 1024)"
 #define BEETLE_OPT_HDR_BLOOM_LABEL_VN "Hiệu ứng quầng sáng HDR"
-#define BEETLE_OPT_HDR_BLOOM_INFO_0_VN "Hiệu ứng quầng sáng đa dải dành cho đầu ra HDR (bộ Dựng hình bằng phần cứng, định dạng màu HDR 30 bit hoặc scRGB 16 bit). Các vùng sáng được tách ra trong không gian ánh sáng tuyến tính, làm mờ ở hai tỷ lệ - lõi sáng hẹp và vùng sáng lan tỏa rộng - rồi được cộng vào trước phép biến đổi hiển thị, để ánh sáng phát sáng thực sự vượt mức trắng giấy và tận dụng khoảng sáng dự trữ của HDR. Các điểm sáng đơn lẻ được nén khi tách để một điểm ảnh quá sáng không khiến quầng sáng nhấp nháy. 'Tắt' (mặc định) giữ nguyên hình ảnh như trước."
+#define BEETLE_OPT_HDR_BLOOM_INFO_0_VN "Hiệu ứng quầng sáng đa dải dành cho đầu ra HDR (bộ Dựng hình bằng phần cứng, định dạng màu HDR 30 bit hoặc scRGB 16 bit). Các vùng sáng được tách ra trong không gian ánh sáng tuyến tính, làm mờ ở hai tỷ lệ - trình giả lập sáng hẹp và vùng sáng lan tỏa rộng - rồi được cộng vào trước phép biến đổi hiển thị, để ánh sáng phát sáng thực sự vượt mức trắng giấy và tận dụng khoảng sáng dự trữ của HDR. Các điểm sáng đơn lẻ được nén khi tách để một điểm ảnh quá sáng không khiến quầng sáng nhấp nháy. 'Tắt' (mặc định) giữ nguyên hình ảnh như trước."
 #define OPTION_VAL_SUBTLE_VN "Nhẹ"
 #define OPTION_VAL_STANDARD_VN "Tiêu chuẩn"
 #define OPTION_VAL_INTENSE_VN "Mạnh"
@@ -122717,7 +122717,7 @@ struct retro_core_options_v2 options_val = {
 #define OPTION_VAL_WIDE_VN "Rộng (4 lần)"
 #define OPTION_VAL_WIDEST_VN "Rộng nhất (16 lần)"
 #define BEETLE_OPT_HDR_BLOOM_CONVOLUTION_LABEL_VN "Hiệu ứng quầng sáng HDR: Phép tích chập"
-#define BEETLE_OPT_HDR_BLOOM_CONVOLUTION_INFO_0_VN "Thay hai tỷ lệ làm mờ cố định của hiệu ứng quầng sáng bằng một kim tự tháp sáu quãng tám, sau đó cộng dồn ngược lên bằng bộ lọc hình lều - mô phỏng gần đúng một hàm phân bố điểm rộng với phần đuôi kéo dài. Ánh sáng phát sáng lan xa hơn nhiều và mờ dần mượt mà thay vì dừng đột ngột ở rìa vùng làm mờ. Tổng năng lượng quầng sáng không đổi, vì vậy lõi sáng mềm hơn và ánh sáng lan rộng hơn. Cần bật 'Hiệu ứng quầng sáng HDR'."
+#define BEETLE_OPT_HDR_BLOOM_CONVOLUTION_INFO_0_VN "Thay hai tỷ lệ làm mờ cố định của hiệu ứng quầng sáng bằng một kim tự tháp sáu quãng tám, sau đó cộng dồn ngược lên bằng bộ lọc hình lều - mô phỏng gần đúng một hàm phân bố điểm rộng với phần đuôi kéo dài. Ánh sáng phát sáng lan xa hơn nhiều và mờ dần mượt mà thay vì dừng đột ngột ở rìa vùng làm mờ. Tổng năng lượng quầng sáng không đổi, vì vậy trình giả lập sáng mềm hơn và ánh sáng lan rộng hơn. Cần bật 'Hiệu ứng quầng sáng HDR'."
 #define BEETLE_OPT_HDR_HALATION_LABEL_VN "Hiệu ứng ửng đỏ phim HDR"
 #define BEETLE_OPT_HDR_HALATION_INFO_0_VN "Làm ấm màu quầng sáng quanh các vùng sáng theo hướng đỏ cam, giống như phim ảnh: ánh sáng đi qua lớp nhũ tương bị tán xạ bởi lớp nền rồi quay trở lại với sắc đỏ hơn. Hiệu ứng này nhuộm màu quầng sáng hiện có thay vì thêm một lượt xử lý mới, vì vậy cần bật 'Hiệu ứng quầng sáng HDR'. Kết hợp tự nhiên với phép biến đổi hiển thị Filmic nhưng không phụ thuộc vào phép biến đổi này."
 #define OPTION_VAL_STRONG_VN "Mạnh"
