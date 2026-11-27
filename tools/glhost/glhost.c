@@ -12,6 +12,7 @@
  *
  * Usage: glhost <core.so> <content> [savestate|-] [frames] [outdir]
  *   GLHOST_VARS: semicolon list of key=value core option overrides.
+ *   GLHOST_LIFETIME=1: use managed savestates with GLHOST_PREEMPT=2.
  *   HOST_VARIABLE_SIZE=1: accept variable savestate sizes, as RetroArch.
  *   HOST_HDR_*: the display presented through GET_HDR_METADATA and
  *   GET_DISPLAY_METADATA; see tools/hdr_display/host_metadata.h.
@@ -89,6 +90,8 @@ static unsigned last_w, last_h, frames_presented, frames_duped;
  * the rejection-retry ladder). */
 static int ctx_gl2, ctx_rejcore;
 static int avflags_on;
+static retro_savestate_release_t state_release;
+static bool managed_state;
 static char sysdir[512] = "/tmp/vkhost_sys";
 static char savedir[512] = "/tmp/vkhost_save";
 
@@ -321,6 +324,30 @@ static bool env_cb(unsigned cmd, void *data)
          if (!getenv("HOST_VARIABLE_SIZE"))
             return false;
          *(uint64_t *)data |= RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE;
+         return true;
+      case RETRO_ENVIRONMENT_SET_SAVESTATE_LIFETIME:
+      {
+         const struct retro_savestate_lifetime *lifetime =
+            (const struct retro_savestate_lifetime *)data;
+         if (!getenv("GLHOST_LIFETIME") || state_release || !lifetime ||
+             !lifetime->release ||
+             lifetime->version != RETRO_SAVESTATE_LIFETIME_VERSION)
+            return false;
+         state_release = lifetime->release;
+         return true;
+      }
+      case RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT:
+         if (!data)
+            return false;
+         *(int *)data = managed_state
+               ? RETRO_SAVESTATE_CONTEXT_SAME_INSTANCE_MANAGED
+               : RETRO_SAVESTATE_CONTEXT_NORMAL;
+         return true;
+      case RETRO_ENVIRONMENT_GET_EXECUTION_PHASE:
+         if (!data)
+            return false;
+         *(enum retro_execution_phase *)data = in_replay
+               ? RETRO_EXECUTION_PHASE_REPLAY : RETRO_EXECUTION_PHASE_RETAINED;
          return true;
       case RETRO_ENVIRONMENT_GET_VARIABLE:
       {
@@ -671,6 +698,10 @@ int main(int argc, char **argv)
    if (argc > 3 && strcmp(argv[3], "-")) state_path = argv[3];
    if (argc > 4) frames = atoi(argv[4]);
    if (argc > 5) outdir = argv[5];
+   if (getenv("GLHOST_SYSTEM_DIR"))
+      snprintf(sysdir, sizeof(sysdir), "%s", getenv("GLHOST_SYSTEM_DIR"));
+   if (getenv("GLHOST_SAVE_DIR"))
+      snprintf(savedir, sizeof(savedir), "%s", getenv("GLHOST_SAVE_DIR"));
    snprintf(cmd, sizeof(cmd), "mkdir -p %s %s %s", outdir, sysdir, savedir);
    if (system(cmd) != 0) {}
 
@@ -760,7 +791,15 @@ int main(int argc, char **argv)
      ssize_t_t ssz  = (ssize_t_t)dlsym(core, "retro_serialize_size");
      unser_t unser  = (unser_t)dlsym(core, "retro_unserialize");
      int preempt    = getenv("GLHOST_PREEMPT") ? atoi(getenv("GLHOST_PREEMPT")) : 0;
-     void *pbuf     = NULL; void *pbuf2 = NULL; size_t pcap = 0; int have_prev = 0;
+     void *pbuf = NULL;
+     size_t pcap = 0, previous = 0;
+     unsigned saves = 0, releases = 0;
+     int failed = 0;
+     if (getenv("GLHOST_LIFETIME") && (preempt != 2 || !state_release))
+     {
+        fprintf(stderr, "[glhost] managed rollback unavailable\n");
+        return 5;
+     }
      avflags_on = 1;
      for (i = 1; i <= frames; i++)
      {
@@ -833,28 +872,50 @@ int main(int argc, char **argv)
             * state saved before the PREVIOUS frame, re-run that frame
             * (replay), then save and run the current frame - two
             * retro_run calls per presented frame, rolling back one. */
-           size_t need = ssz();
-           if (need > pcap)
-           { free(pbuf); free(pbuf2); pbuf = malloc(need); pbuf2 = malloc(need); pcap = need; }
-           if (pbuf && pbuf2)
+           size_t need;
+           managed_state = state_release != NULL;
+           if (previous)
            {
-              if (have_prev)
+              failed = !unser(pbuf, previous);
+              if (managed_state)
               {
-                 if (!unser(pbuf, pcap))
-                    fprintf(stderr, "[glhost] rollback unser FAILED frame %d\n", i);
-                 input_frame = (unsigned)i - 1;
-                 in_replay   = 1;
-                 run(); /* replay previous frame */
-                 in_replay   = 0;
-                 input_frame = (unsigned)i;
-                 if (getenv("GLHOST_DIRTY"))
-                    frontend_dirty_state();
+                 state_release(pbuf, previous);
+                 releases++;
               }
-              if (!ser(pbuf2, need))
-                 fprintf(stderr, "[glhost] rollback ser FAILED frame %d\n", i);
-              { void *t = pbuf; pbuf = pbuf2; pbuf2 = t; }
-              have_prev = 1;
+              previous = 0;
+              if (failed)
+                 break;
+              managed_state = false;
+              input_frame = (unsigned)i - 1;
+              in_replay   = 1;
+              run();
+              in_replay   = 0;
+              input_frame = (unsigned)i;
+              if (getenv("GLHOST_DIRTY"))
+                 frontend_dirty_state();
            }
+           managed_state = state_release != NULL;
+           need = ssz();
+           if (need > pcap)
+           {
+              void *larger = realloc(pbuf, need);
+              if (!larger)
+              {
+                 failed = 1;
+                 break;
+              }
+              pbuf = larger;
+              pcap = need;
+           }
+           if (!ser(pbuf, need))
+           {
+              failed = 1;
+              break;
+           }
+           previous = need;
+           if (managed_state)
+              saves++;
+           managed_state = false;
         }
         run();
         if (getenv("GLHOST_DIRTY"))
@@ -864,7 +925,23 @@ int main(int argc, char **argv)
           snprintf(path, sizeof(path), "%s/frame_%04d.ppm", outdir, i);
           dump_frame(path); }
      }
-   free(pbuf); free(pbuf2);
+   managed_state = false;
+   if (state_release && previous)
+   {
+      state_release(pbuf, previous);
+      releases++;
+   }
+   free(pbuf);
+   if (state_release)
+      fprintf(stderr, "[glhost] lifetime: %u saves, %u releases\n",
+            saves, releases);
+   if (failed)
+   {
+      fprintf(stderr, "[glhost] rollback failed at frame %d\n", i);
+      ((fn_t)dlsym(core, "retro_unload_game"))();
+      ((fn_t)dlsym(core, "retro_deinit"))();
+      return 5;
+   }
    }
    fprintf(stderr, "[glhost] steady state: %llu texels uploaded in the second half of the run\n",
            upload_texels - upload_texels_half);

@@ -1191,6 +1191,53 @@ struct gl_vram_sync_tile
 };
 
 
+
+struct gl_vram_sync
+{
+   uint64_t sequence;
+   /* Pending tiles still need the frame resolve, even after a texture
+    * dependency has consumed their writer records. */
+   uint16_t pending[GL_VRAM_SYNC_TILES_Y * GL_VRAM_SYNC_TILES_X];
+   unsigned pending_count;
+   struct gl_vram_sync_tile tiles
+         [GL_VRAM_SYNC_TILES_Y][GL_VRAM_SYNC_TILES_X];
+};
+
+struct gl_palette_cache
+{
+   uint16_t x;
+   uint16_t y;
+   uint8_t depth;
+   bool gpu_written;
+   bool valid;
+   bool saved;
+};
+
+#ifndef GL_CONTEXT_LOST
+#define GL_CONTEXT_LOST 0x0507
+#endif
+
+#define GL_STATE_SNAPSHOT_SLOTS 16
+#define GL_STATE_SNAPSHOT_BUDGET (UINT64_C(1) << 30)
+
+enum gl_state_image
+{
+   GL_STATE_COLOR,
+   GL_STATE_DEPTH,
+   GL_STATE_NATIVE,
+   GL_STATE_PALETTE,
+   GL_STATE_IMAGE_COUNT
+};
+
+struct gl_state_snapshot
+{
+   gl_texture images[GL_STATE_IMAGE_COUNT];
+   struct gl_vram_sync vram_sync;
+   struct gl_palette_cache palette_cache;
+   double analog_phase;
+   uint32_t generation; /* 0 denotes a free slot. */
+};
+
 struct gl_analog;
 struct gl_post;
 
@@ -1353,28 +1400,10 @@ struct gl_renderer {
    GLuint fb_out_fbo;
    GLuint fb_texture_fbo;
 
-   /* fb_out receives primitive rendering while fb_texture supplies texels.
-    * Remember native VRAM regions that are newer in fb_out so a later draw
-    * can resolve only the texture page or CLUT data it actually depends on. */
-   struct
-   {
-      uint64_t sequence;
-      /* Dependency snapshots can consume writer records without updating the
-       * native mirror. The tiles written since the frame's final resolve
-       * are kept separately, as indices ty * GL_VRAM_SYNC_TILES_X + tx: the
-       * resolve covers them and the clear touches only them. */
-      uint16_t pending[GL_VRAM_SYNC_TILES_Y * GL_VRAM_SYNC_TILES_X];
-      unsigned pending_count;
-      struct gl_vram_sync_tile tiles
-            [GL_VRAM_SYNC_TILES_Y][GL_VRAM_SYNC_TILES_X];
-   } vram_sync;
-
-   uint16_t palette_cache_x;
-   uint16_t palette_cache_y;
-   uint8_t palette_cache_depth;
-   bool palette_cache_gpu_written;
-   bool palette_cache_valid;
-   bool palette_cache_saved;
+   /* Native texture mirror and retained CLUT. */
+   struct gl_vram_sync vram_sync;
+   struct gl_palette_cache palette_cache;
+   struct gl_state_snapshot *state_snapshots[GL_STATE_SNAPSHOT_SLOTS];
 };
 typedef struct gl_renderer gl_renderer;
 
@@ -2861,6 +2890,187 @@ static void gl_vram_sync_invalidate_scaled(gl_renderer *renderer)
          renderer->vram_sync.tiles[ty][tx].scaled_dirty_mask = UINT64_MAX;
 }
 
+static void gl_state_snapshot_free(struct gl_state_snapshot *snapshot)
+{
+   unsigned i;
+   for (i = 0; i < GL_STATE_IMAGE_COUNT; i++)
+      glDeleteTextures(1, &snapshot->images[i].id);
+   free(snapshot);
+}
+
+static void gl_state_snapshots_clear(gl_renderer *renderer)
+{
+   unsigned i;
+   for (i = 0; i < GL_STATE_SNAPSHOT_SLOTS; i++)
+      if (renderer->state_snapshots[i])
+      {
+         gl_state_snapshot_free(renderer->state_snapshots[i]);
+         renderer->state_snapshots[i] = NULL;
+      }
+}
+
+static void gl_state_images(gl_renderer *renderer, const gl_texture **images)
+{
+   images[GL_STATE_COLOR]   = &renderer->fb_out;
+   images[GL_STATE_DEPTH]   = &renderer->fb_out_depth;
+   images[GL_STATE_NATIVE]  = &renderer->fb_texture;
+   images[GL_STATE_PALETTE] = &renderer->palette_texture;
+}
+
+static struct gl_state_snapshot *gl_state_snapshot_new(
+      const gl_texture *const *images)
+{
+   struct gl_state_snapshot *snapshot;
+   GLint texture = 0;
+   unsigned i;
+
+   snapshot = (struct gl_state_snapshot *)calloc(1, sizeof(*snapshot));
+   if (!snapshot)
+      return NULL;
+
+   glGetIntegerv(GL_TEXTURE_BINDING_2D, &texture);
+   for (i = 0; i < GL_STATE_IMAGE_COUNT; i++)
+      if (!gl_texture_init(&snapshot->images[i], images[i]->width,
+               images[i]->height, images[i]->internal_format))
+         break;
+   glBindTexture(GL_TEXTURE_2D, texture);
+
+   if (i == GL_STATE_IMAGE_COUNT && glGetError() == GL_NO_ERROR)
+      return snapshot;
+   gl_state_snapshot_free(snapshot);
+   return NULL;
+}
+
+static bool gl_state_copy_ready(void)
+{
+   unsigned i;
+   for (i = 0; i < 16; i++)
+   {
+      GLenum error = glGetError();
+      if (error == GL_NO_ERROR)
+         return true;
+      if (error == GL_OUT_OF_MEMORY || error == GL_CONTEXT_LOST)
+         return false;
+   }
+   return false;
+}
+
+static void gl_state_copy_image(const gl_texture *src, const gl_texture *dst)
+{
+   gl_caps.fp_glCopyImageSubData(src->id, GL_TEXTURE_2D, 0, 0, 0, 0,
+         dst->id, GL_TEXTURE_2D, 0, 0, 0, 0, src->width, src->height, 1);
+}
+
+static bool gl_state_copy_images(gl_renderer *renderer,
+      struct gl_state_snapshot *snapshot, bool restore)
+{
+   const gl_texture *live[GL_STATE_IMAGE_COUNT];
+   unsigned i;
+
+   gl_state_images(renderer, live);
+   for (i = 0; i < GL_STATE_IMAGE_COUNT; i++)
+   {
+      const gl_texture *saved = &snapshot->images[i];
+      if (i == GL_STATE_PALETTE &&
+          !(restore ? snapshot->palette_cache.saved : renderer->palette_cache.saved))
+         continue;
+      gl_state_copy_image(restore ? saved : live[i], restore ? live[i] : saved);
+   }
+   return glGetError() == GL_NO_ERROR;
+}
+
+bool rhi_gl_snapshot_save(uint32_t *slot, uint32_t *gen)
+{
+   static uint32_t generation;
+   gl_renderer *renderer = static_renderer.state_data;
+   const gl_texture *images[GL_STATE_IMAGE_COUNT];
+   struct gl_state_snapshot *snapshot;
+   uint64_t bytes;
+   unsigned i;
+
+   if (!rhi_gl_context_ready() || !gl_caps.fp_glCopyImageSubData ||
+       (renderer->internal_upscaling == 1 &&
+        renderer->fb_out.internal_format == GL_RGB5_A1))
+      return false;
+
+   gl_state_images(renderer, images);
+   /* Allow four bytes per texel for packed color/depth and eight for FP16. */
+   bytes = 0;
+   for (i = 0; i < GL_STATE_IMAGE_COUNT; i++)
+      bytes += (uint64_t)images[i]->width * images[i]->height *
+            (images[i]->internal_format == GL_RGBA16F ? 8 : 4);
+
+   for (i = 0; i < GL_STATE_SNAPSHOT_SLOTS; i++)
+      if (!renderer->state_snapshots[i] ||
+          !renderer->state_snapshots[i]->generation)
+         break;
+   if (i == GL_STATE_SNAPSHOT_SLOTS ||
+       bytes * (i + 1) > GL_STATE_SNAPSHOT_BUDGET || !gl_state_copy_ready())
+      return false;
+
+   if (!gl_draw_buffer_is_empty(renderer->command_buffer))
+      gl_renderer_draw(renderer);
+
+   snapshot = renderer->state_snapshots[i];
+   if (!snapshot)
+   {
+      snapshot = gl_state_snapshot_new(images);
+      if (!snapshot)
+         return false;
+      renderer->state_snapshots[i] = snapshot;
+   }
+
+   if (!gl_state_copy_images(renderer, snapshot, false))
+      return false;
+
+   snapshot->vram_sync = renderer->vram_sync;
+   snapshot->palette_cache = renderer->palette_cache;
+   snapshot->analog_phase = renderer->analog_phase;
+   if (++generation == 0)
+      generation++;
+   snapshot->generation = generation;
+   *slot = i;
+   *gen  = generation;
+   return true;
+}
+
+bool rhi_gl_snapshot_valid(uint32_t slot, uint32_t gen)
+{
+   gl_renderer *renderer = static_renderer.state_data;
+   return rhi_gl_context_ready() && slot < GL_STATE_SNAPSHOT_SLOTS && gen &&
+         renderer->state_snapshots[slot] &&
+         renderer->state_snapshots[slot]->generation == gen;
+}
+
+bool rhi_gl_snapshot_restore(uint32_t slot, uint32_t gen)
+{
+   gl_renderer *renderer = static_renderer.state_data;
+   struct gl_state_snapshot *snapshot;
+
+   if (!rhi_gl_snapshot_valid(slot, gen) || !gl_state_copy_ready())
+      return false;
+
+   if (!gl_draw_buffer_is_empty(renderer->command_buffer))
+      gl_renderer_draw(renderer);
+
+   snapshot = renderer->state_snapshots[slot];
+   if (!gl_state_copy_images(renderer, snapshot, true))
+      return false;
+
+   renderer->vram_sync = snapshot->vram_sync;
+   gl_vram_sync_invalidate_scaled(renderer);
+   renderer->palette_cache = snapshot->palette_cache;
+   renderer->analog_phase = snapshot->analog_phase;
+   renderer->presented_resolution = 0;
+   return true;
+}
+
+void rhi_gl_snapshot_release(uint32_t slot, uint32_t gen)
+{
+   if (rhi_gl_snapshot_valid(slot, gen))
+      static_renderer.state_data->state_snapshots[slot]->generation = 0;
+}
+
 static void gl_vram_sync_clean_rect(gl_renderer *renderer,
       unsigned x, unsigned y, unsigned w, unsigned h)
 {
@@ -3128,19 +3338,19 @@ static bool gl_palette_cache_overlaps(const gl_renderer *renderer,
    unsigned dx;
    unsigned px;
 
-   if (!renderer->palette_cache_valid || !w || !h)
+   if (!renderer->palette_cache.valid || !w || !h)
       return false;
 
    x %= VRAM_WIDTH_PIXELS;
    y %= VRAM_HEIGHT;
    w = w < VRAM_WIDTH_PIXELS ? w : VRAM_WIDTH_PIXELS;
    h = h < VRAM_HEIGHT ? h : VRAM_HEIGHT;
-   if ((renderer->palette_cache_y + VRAM_HEIGHT - y) % VRAM_HEIGHT >= h)
+   if ((renderer->palette_cache.y + VRAM_HEIGHT - y) % VRAM_HEIGHT >= h)
       return false;
 
-   palette_width = renderer->palette_cache_depth == 1 ? 256u : 16u;
-   dx = (renderer->palette_cache_x + VRAM_WIDTH_PIXELS - x) % VRAM_WIDTH_PIXELS;
-   px = (x + VRAM_WIDTH_PIXELS - renderer->palette_cache_x) % VRAM_WIDTH_PIXELS;
+   palette_width = renderer->palette_cache.depth == 1 ? 256u : 16u;
+   dx = (renderer->palette_cache.x + VRAM_WIDTH_PIXELS - x) % VRAM_WIDTH_PIXELS;
+   px = (x + VRAM_WIDTH_PIXELS - renderer->palette_cache.x) % VRAM_WIDTH_PIXELS;
    return dx < w || px < palette_width;
 }
 
@@ -3150,14 +3360,14 @@ static void gl_palette_cache_preserve(gl_renderer *renderer,
    unsigned palette_width;
    unsigned first_width;
 
-   if (renderer->palette_cache_saved ||
+   if (renderer->palette_cache.saved ||
        !gl_caps.fp_glBlitFramebuffer ||
        !gl_palette_cache_overlaps(renderer, x, y, w, h))
       return;
 
-   palette_width = renderer->palette_cache_depth == 1 ? 256u : 16u;
-   first_width = palette_width < VRAM_WIDTH_PIXELS - renderer->palette_cache_x
-         ? palette_width : VRAM_WIDTH_PIXELS - renderer->palette_cache_x;
+   palette_width = renderer->palette_cache.depth == 1 ? 256u : 16u;
+   first_width = palette_width < VRAM_WIDTH_PIXELS - renderer->palette_cache.x
+         ? palette_width : VRAM_WIDTH_PIXELS - renderer->palette_cache.x;
 
    glBindFramebuffer(GL_READ_FRAMEBUFFER, renderer->vram_sync_read_fbo);
 #ifdef HAVE_OPENGLES3
@@ -3170,17 +3380,17 @@ static void gl_palette_cache_preserve(gl_renderer *renderer,
    glReadBuffer(GL_COLOR_ATTACHMENT0);
    glBindTexture(GL_TEXTURE_2D, renderer->palette_texture.id);
    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-         renderer->palette_cache_x, renderer->palette_cache_y,
+         renderer->palette_cache.x, renderer->palette_cache.y,
          first_width, 1);
 
    if (first_width < palette_width)
       glCopyTexSubImage2D(GL_TEXTURE_2D, 0, first_width, 0,
-            0, renderer->palette_cache_y,
+            0, renderer->palette_cache.y,
             palette_width - first_width, 1);
 
    glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-   renderer->palette_cache_saved = true;
+   renderer->palette_cache.saved = true;
 }
 #else
 static void gl_palette_cache_preserve(gl_renderer *renderer,
@@ -3314,27 +3524,27 @@ static void gl_vram_sync_primitive(gl_renderer *renderer,
             texture_rect.width, texture_rect.height, false);
       if (depth == 1 || depth == 2)
       {
-         clut_cached = renderer->palette_cache_valid &&
-               renderer->palette_cache_depth == depth &&
-               renderer->palette_cache_x == v[0].clut[0] &&
-               renderer->palette_cache_y == v[0].clut[1];
+         clut_cached = renderer->palette_cache.valid &&
+               renderer->palette_cache.depth == depth &&
+               renderer->palette_cache.x == v[0].clut[0] &&
+               renderer->palette_cache.y == v[0].clut[1];
          if (clut_cached)
-            clut_gpu_written = renderer->palette_cache_gpu_written;
+            clut_gpu_written = renderer->palette_cache.gpu_written;
          else
          {
-            if (renderer->palette_cache_saved &&
+            if (renderer->palette_cache.saved &&
                 !gl_draw_buffer_is_empty(renderer->command_buffer))
                gl_renderer_draw(renderer);
-            renderer->palette_cache_saved = false;
+            renderer->palette_cache.saved = false;
             clut_dirty = gl_vram_sync_rect_is_dirty(renderer,
                   v[0].clut[0], v[0].clut[1], clut_width, 1);
             clut_gpu_written = gl_vram_sync_rect_has_mask(renderer,
                   v[0].clut[0], v[0].clut[1], clut_width, 1, false);
-            renderer->palette_cache_x = v[0].clut[0];
-            renderer->palette_cache_y = v[0].clut[1];
-            renderer->palette_cache_depth = (uint8_t)depth;
-            renderer->palette_cache_gpu_written = clut_gpu_written;
-            renderer->palette_cache_valid = true;
+            renderer->palette_cache.x = v[0].clut[0];
+            renderer->palette_cache.y = v[0].clut[1];
+            renderer->palette_cache.depth = (uint8_t)depth;
+            renderer->palette_cache.gpu_written = clut_gpu_written;
+            renderer->palette_cache.valid = true;
          }
       }
 
@@ -3382,7 +3592,7 @@ static void gl_vram_sync_primitive(gl_renderer *renderer,
                   texture_rect.x, texture_rect.y,
                   texture_rect.width, texture_rect.height);
          if (scaled_feedback && (depth == 1 || depth == 2) &&
-             !renderer->palette_cache_saved &&
+             !renderer->palette_cache.saved &&
              gl_vram_sync_rect_has_mask(renderer,
                   v[0].clut[0], v[0].clut[1], clut_width, 1, true))
             scaled_feedback = gl_snapshot_fb_out(renderer,
@@ -3411,7 +3621,7 @@ static void gl_vram_sync_primitive(gl_renderer *renderer,
    for (i = 0; i < vertices; i++)
    {
       v[i].framebuffer_feedback = framebuffer_feedback;
-      v[i].palette_cached = renderer->palette_cache_saved;
+      v[i].palette_cached = renderer->palette_cache.saved;
    }
 }
 
@@ -5811,6 +6021,7 @@ static void gl_renderer_free(gl_renderer *renderer)
       return;
 
    gl_dt_free();
+   gl_state_snapshots_clear(renderer);
 
    if (renderer->fb_out_fbo)
       glDeleteFramebuffers(1, &renderer->fb_out_fbo);
@@ -6370,6 +6581,7 @@ static bool retro_refresh_variables(gl_renderer *renderer)
          if (!gl_texture_init(&new_depth, w, h, GL_DEPTH24_STENCIL8))
             goto framebuffer_failed;
       }
+      gl_state_snapshots_clear(renderer);
       glDeleteTextures(1, &renderer->fb_out.id);
       renderer->fb_out = new_out;
       renderer->fb_out_internal_format = texture_storage;
@@ -8198,12 +8410,12 @@ void rhi_gl_invalidate_clut_cache(void)
 
    /* Queued draws still address the retained texture; issue them before a
     * later preserve is allowed to overwrite it. */
-   if (renderer->palette_cache_saved &&
+   if (renderer->palette_cache.saved &&
        !gl_draw_buffer_is_empty(renderer->command_buffer))
       gl_renderer_draw(renderer);
 
-   renderer->palette_cache_valid = false;
-   renderer->palette_cache_saved = false;
+   renderer->palette_cache.valid = false;
+   renderer->palette_cache.saved = false;
 }
 
 void rhi_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)

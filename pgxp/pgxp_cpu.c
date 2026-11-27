@@ -4,6 +4,7 @@
 #include "pgxp_cpu.h"
 #include "pgxp_value.h"
 #include "pgxp_mem.h"
+#include "pgxp_state.h"
 
 
 #include "limits.h"
@@ -1616,4 +1617,16 @@ void PGXP_CPU_Dispatch(uint32_t instr,
       case 0x2E: PGXP_CPU_SWR(instr, rtVal, addr);           break;
       default: break;
    }
+}
+
+size_t PGXP_CPUStateSize(void)
+{
+	return sizeof(CPU_reg_mem) +
+		sizeof(CP0_reg_mem);
+}
+
+void PGXP_CPUState(uint8_t *data, bool load)
+{
+	pgxp_state_copy(&data, &CPU_reg_mem, sizeof(CPU_reg_mem), load);
+	pgxp_state_copy(&data, &CP0_reg_mem, sizeof(CP0_reg_mem), load);
 }

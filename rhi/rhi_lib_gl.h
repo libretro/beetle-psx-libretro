@@ -116,6 +116,11 @@ void rhi_gl_toggle_display(bool status);
 bool rhi_gl_has_software_renderer(void);
 bool rhi_gl_context_ready(void);
 
+bool rhi_gl_snapshot_save(uint32_t *slot, uint32_t *gen);
+bool rhi_gl_snapshot_valid(uint32_t slot, uint32_t gen);
+bool rhi_gl_snapshot_restore(uint32_t slot, uint32_t gen);
+void rhi_gl_snapshot_release(uint32_t slot, uint32_t gen);
+
 #ifdef __cplusplus
 }
 #endif

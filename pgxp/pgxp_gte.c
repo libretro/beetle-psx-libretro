@@ -34,6 +34,7 @@
 #include "pgxp_main.h"
 #include "pgxp_value.h"
 #include "pgxp_mem.h"
+#include "pgxp_state.h"
 #include "pgxp_cpu.h"
 #include "pgxp_gpu.h"
 
@@ -101,9 +102,10 @@ void PGXP_InvalidateVertexFIFO(void)
 	SXY2.flags = 0;
 }
 
+static uint32_t vertex_push_count, color_push_count;
+
 void PGXP_pushSXYZ2f(float _x, float _y, float _z, uint32_t _v)
 {
-	static uint32_t uCount = 0;
 	low_value temp;
 	/* push values down FIFO */
 	SXY0 = SXY1;
@@ -114,7 +116,7 @@ void PGXP_pushSXYZ2f(float _x, float _y, float _z, uint32_t _v)
 	SXY2.z		= (PGXP_GetModes() & PGXP_TEXTURE_CORRECTION) ? _z : 1.f;
 	SXY2.value	= _v;
 	SXY2.flags	= VALID_ALL;
-	SXY2.count	= uCount++;
+	SXY2.count	= vertex_push_count++;
 
 	/* cache value in GPU plugin */
 	temp.word = _v;
@@ -208,8 +210,7 @@ int PGXP_GTE_GetFogByCount(uint32_t count, float out_pre[3],
 
 void PGXP_pushRGBf(float _r, float _g, float _b, uint32_t _v)
 {
-	static uint32_t uCount = 0;
-	pgxp_fog_entry *slot = &pgxp_fog_ring[uCount % PGXP_FOG_RING_SIZE];
+	pgxp_fog_entry *slot = &pgxp_fog_ring[color_push_count % PGXP_FOG_RING_SIZE];
 
 	if (pgxp_fog_pending_set)
 	{
@@ -218,7 +219,7 @@ void PGXP_pushRGBf(float _r, float _g, float _b, uint32_t _v)
 	}
 	else
 		slot->t = -1.0f;
-	slot->count = uCount;
+	slot->count = color_push_count;
 
 	GTE_data_reg[20] = GTE_data_reg[21];
 	GTE_data_reg[21] = GTE_data_reg[22];
@@ -228,7 +229,7 @@ void PGXP_pushRGBf(float _r, float _g, float _b, uint32_t _v)
 	GTE_data_reg[22].z      = _b;
 	GTE_data_reg[22].value  = _v;
 	GTE_data_reg[22].flags  = VALID_ALL;
-	GTE_data_reg[22].count  = uCount++;
+	GTE_data_reg[22].count  = color_push_count++;
 	GTE_data_reg[22].gFlags = 0;
 	GTE_data_reg[22].lFlags = 0;
 	GTE_data_reg[22].hFlags = 0;
@@ -424,3 +425,25 @@ void PGXP_DiagDump(void)
 }
 
 #endif /* PGXP_DIAG */
+
+size_t PGXP_GTEStateSize(void)
+{
+	return sizeof(GTE_data_reg_mem) +
+		sizeof(GTE_ctrl_reg_mem) +
+		sizeof(pgxp_fog_ring) +
+		sizeof(pgxp_fog_pending) +
+		sizeof(pgxp_fog_pending_set) +
+		sizeof(vertex_push_count) +
+		sizeof(color_push_count);
+}
+
+void PGXP_GTEState(uint8_t *data, bool load)
+{
+	pgxp_state_copy(&data, &GTE_data_reg_mem, sizeof(GTE_data_reg_mem), load);
+	pgxp_state_copy(&data, &GTE_ctrl_reg_mem, sizeof(GTE_ctrl_reg_mem), load);
+	pgxp_state_copy(&data, &pgxp_fog_ring, sizeof(pgxp_fog_ring), load);
+	pgxp_state_copy(&data, &pgxp_fog_pending, sizeof(pgxp_fog_pending), load);
+	pgxp_state_copy(&data, &pgxp_fog_pending_set, sizeof(pgxp_fog_pending_set), load);
+	pgxp_state_copy(&data, &vertex_push_count, sizeof(vertex_push_count), load);
+	pgxp_state_copy(&data, &color_push_count, sizeof(color_push_count), load);
+}

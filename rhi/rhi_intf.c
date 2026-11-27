@@ -1123,10 +1123,23 @@ uint32_t rhi_intf_vram_dirty_groups(unsigned br)
    return tt_coh_dirty_groups(br);
 }
 
-/* Snapshots of VRAM as the hardware renderer holds it, for managed
- * savestates. Only the Vulkan renderer takes them. */
+/* Keep tokens distinct if the renderer changes while a state is retained. */
+#define RHI_GL_SNAPSHOT_SLOT (UINT32_C(1) << 31)
+#define RHI_SW_SNAPSHOT_SLOT (UINT32_C(1) << 30)
 bool rhi_intf_snapshot_save(uint32_t *slot, uint32_t *gen)
 {
+   if (rhi_type == RHI_SOFTWARE && GPU_SoftwareSnapshotSave(slot, gen))
+   {
+      *slot |= RHI_SW_SNAPSHOT_SLOT;
+      return true;
+   }
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+   if (rhi_type == RHI_OPENGL && rhi_gl_snapshot_save(slot, gen))
+   {
+      *slot |= RHI_GL_SNAPSHOT_SLOT;
+      return true;
+   }
+#endif
 #if defined(HAVE_VULKAN)
    if (rhi_type == RHI_VULKAN)
       return rhi_vulkan_snapshot_save(slot, gen);
@@ -1136,6 +1149,17 @@ bool rhi_intf_snapshot_save(uint32_t *slot, uint32_t *gen)
 
 bool rhi_intf_snapshot_valid(uint32_t slot, uint32_t gen)
 {
+   if (slot & RHI_SW_SNAPSHOT_SLOT)
+      return rhi_type == RHI_SOFTWARE &&
+            GPU_SoftwareSnapshotValid(slot & ~RHI_SW_SNAPSHOT_SLOT, gen);
+   if (slot & RHI_GL_SNAPSHOT_SLOT)
+   {
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+      if (rhi_type == RHI_OPENGL)
+         return rhi_gl_snapshot_valid(slot & ~RHI_GL_SNAPSHOT_SLOT, gen);
+#endif
+      return false;
+   }
 #if defined(HAVE_VULKAN)
    if (rhi_type == RHI_VULKAN)
       return rhi_vulkan_snapshot_valid(slot, gen);
@@ -1145,19 +1169,43 @@ bool rhi_intf_snapshot_valid(uint32_t slot, uint32_t gen)
 
 bool rhi_intf_snapshot_restore(uint32_t slot, uint32_t gen)
 {
-#if defined(HAVE_VULKAN)
-   if (rhi_type == RHI_VULKAN && rhi_vulkan_snapshot_restore(slot, gen))
+   bool restored = false;
+   if (slot & RHI_SW_SNAPSHOT_SLOT)
+      return rhi_type == RHI_SOFTWARE &&
+            GPU_SoftwareSnapshotRestore(slot & ~RHI_SW_SNAPSHOT_SLOT, gen);
+   if (slot & RHI_GL_SNAPSHOT_SLOT)
    {
-      /* What the GPU holds is no longer what the CPU copy was compared with */
-      tt_coh_reset();
-      return true;
-   }
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+      if (rhi_type == RHI_OPENGL)
+         restored = rhi_gl_snapshot_restore(slot & ~RHI_GL_SNAPSHOT_SLOT, gen);
 #endif
-   return false;
+   }
+#if defined(HAVE_VULKAN)
+   else if (rhi_type == RHI_VULKAN)
+      restored = rhi_vulkan_snapshot_restore(slot, gen);
+#endif
+
+   /* Recheck the native mirror after rollback; preserve the restored draw area. */
+   if (restored)
+      tt_coh_invalidate();
+   return restored;
 }
 
 void rhi_intf_snapshot_release(uint32_t slot, uint32_t gen)
 {
+   if (slot & RHI_SW_SNAPSHOT_SLOT)
+   {
+      GPU_SoftwareSnapshotRelease(slot & ~RHI_SW_SNAPSHOT_SLOT, gen);
+      return;
+   }
+   if (slot & RHI_GL_SNAPSHOT_SLOT)
+   {
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+      if (rhi_type == RHI_OPENGL)
+         rhi_gl_snapshot_release(slot & ~RHI_GL_SNAPSHOT_SLOT, gen);
+#endif
+      return;
+   }
 #if defined(HAVE_VULKAN)
    if (rhi_type == RHI_VULKAN)
       rhi_vulkan_snapshot_release(slot, gen);
